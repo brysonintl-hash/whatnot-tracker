@@ -121,8 +121,8 @@ export default function InventoryPage() {
               <table>
                 <thead><tr>
                   <th>Model #</th><th>Description</th><th>UPC</th><th>ASIN</th>
-                  <th className="text-center">WN</th><th className="text-center">WS</th><th className="text-center">AMZ</th>
-                  <th>Status</th><th className="text-right">Retail</th><th className="text-right">Value</th><th></th>
+                  <th className="text-center">Available Qty</th>
+                  <th>Stock Status</th><th className="text-right">Retail</th><th className="text-right">Total Value</th><th></th>
                 </tr></thead>
                 <tbody>
                   {filtered.map(item => (
@@ -131,9 +131,7 @@ export default function InventoryPage() {
                       <td className="max-w-xs"><span className="text-xs text-gray-600 line-clamp-2 block">{item.description}</span></td>
                       <td className="font-mono text-xs text-gray-400">{item.upc}</td>
                       <td className="font-mono text-xs text-gray-400">{item.asin}</td>
-                      <td className="text-center text-sm font-semibold">{item.wn || '—'}</td>
-                      <td className="text-center text-sm font-semibold">{item.ws || '—'}</td>
-                      <td className="text-center text-sm font-semibold">{item.amz || '—'}</td>
+                      <td className="text-center font-black text-lg text-gray-900">{item.qty}</td>
                       <td><QtyBadge qty={item.qty} /></td>
                       <td className="text-right font-semibold">${item.retail.toFixed(2)}</td>
                       <td className="text-right font-black text-green-600">${item.total.toFixed(2)}</td>
@@ -149,7 +147,7 @@ export default function InventoryPage() {
                       </td>
                     </tr>
                   ))}
-                  {filtered.length === 0 && <tr><td colSpan={11} className="text-center text-gray-400 py-12">No items found</td></tr>}
+                  {filtered.length === 0 && <tr><td colSpan={9} className="text-center text-gray-400 py-12">No items found</td></tr>}
                 </tbody>
               </table>
             )}
