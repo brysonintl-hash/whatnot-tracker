@@ -12,6 +12,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            try {
+              if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+              }
+            } catch(e) {}
+          `
+        }} />
+      </head>
       <body className={inter.className}>{children}</body>
     </html>
   );

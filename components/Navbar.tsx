@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
@@ -14,6 +15,23 @@ const links = [
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'));
+  }, []);
+
+  function toggleTheme() {
+    const isDark = !dark;
+    setDark(isDark);
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -21,7 +39,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white border-b-4 border-amber-400 sticky top-0 z-50 shadow-sm">
+    <nav className="bg-white dark:bg-[#161b22] border-b-4 border-amber-400 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 flex items-center h-16">
         {/* Stack Bargains Logo */}
         <Link href="/dashboard" className="flex items-center gap-2 mr-8 shrink-0">
@@ -39,7 +57,7 @@ export default function Navbar() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                 pathname.startsWith(link.href)
                   ? 'bg-amber-400 text-gray-900'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-amber-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-amber-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#21262d]'
               }`}
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,8 +69,24 @@ export default function Navbar() {
         </div>
 
         <button
+          onClick={toggleTheme}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="text-gray-500 hover:text-amber-500 p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-[#21262d] dark:text-gray-400 transition-colors shrink-0 mr-1"
+        >
+          {dark ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
+
+        <button
           onClick={logout}
-          className="text-gray-500 hover:text-red-600 text-sm flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors font-medium shrink-0"
+          className="text-gray-500 hover:text-red-600 text-sm flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-[#21262d] transition-colors font-medium shrink-0"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

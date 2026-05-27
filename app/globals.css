@@ -2,13 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light mode */
 body {
   background-color: #F3F4F6;
   color: #111827;
 }
 
+/* Dark mode */
+.dark body {
+  background-color: #0d1117;
+  color: #e6edf3;
+}
+
 .card {
-  @apply bg-white border border-gray-200 rounded-xl shadow-sm;
+  @apply bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-[#161b22] dark:border-[#30363d];
 }
 
 .btn-primary {
@@ -20,29 +27,29 @@ body {
 }
 
 .btn-secondary {
-  @apply bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors;
+  @apply bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors dark:bg-[#21262d] dark:border-[#30363d] dark:text-gray-200 dark:hover:bg-[#30363d];
 }
 
 input, select, textarea {
-  @apply bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent;
+  @apply bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent dark:bg-[#0d1117] dark:border-[#30363d] dark:text-white;
 }
 
-table {
-  @apply w-full text-sm;
-}
+table { @apply w-full text-sm; }
 
 th {
-  @apply text-left text-gray-500 font-semibold py-3 px-4 border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide;
+  @apply text-left text-gray-500 font-semibold py-3 px-4 border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide dark:text-gray-400 dark:border-[#30363d] dark:bg-[#0d1117];
 }
 
 td {
-  @apply py-3 px-4 border-b border-gray-100 text-gray-700;
+  @apply py-3 px-4 border-b border-gray-100 text-gray-700 dark:border-[#21262d] dark:text-gray-300;
 }
 
 tr:hover td {
-  @apply bg-amber-50;
+  @apply bg-amber-50 dark:bg-[#21262d];
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #F3F4F6; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+.dark ::-webkit-scrollbar-track { background: #0d1117; }
+.dark ::-webkit-scrollbar-thumb { background: #30363d; }
