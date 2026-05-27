@@ -9,10 +9,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: '#0d1117',
-        surface: '#161b22',
-        border: '#30363d',
-        accent: '#10b981',
+        brand: {
+          yellow: '#FBBF24',
+          yellow2: '#F59E0B',
+          red: '#DC2626',
+          dark: '#111827',
+        },
       },
     },
   },
