@@ -23,6 +23,14 @@ function parseTabDate(tab: string): Date {
 
 function startOfDay(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
+function fmt(n: number) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtInt(n: number) {
+  return n.toLocaleString('en-US');
+}
+
 const DATE_PRESETS = [
   { label: 'All Time', value: 'all' },
   { label: 'Today', value: 'today' },
@@ -83,7 +91,10 @@ export default function SalesPage() {
     });
   }, [orders, preset, customFrom, customTo]);
 
-  const hosts = useMemo(() => ['All', ...Array.from(new Set(dateFiltered.map(o => o.host).filter(Boolean)))], [dateFiltered]);
+  const hosts = useMemo(() => {
+    const named = Array.from(new Set(dateFiltered.map(o => o.host).filter(h => h && !/^\d+$/.test(h))));
+    return ['All', ...named.sort()];
+  }, [dateFiltered]);
   const filtered = selectedHost === 'All' ? dateFiltered : dateFiltered.filter(o => o.host === selectedHost);
 
   const byTab = useMemo(() => {
@@ -98,7 +109,8 @@ export default function SalesPage() {
   const byHost = useMemo(() => {
     const m: Record<string, { sales: number; profit: number; orders: number; margins: number[] }> = {};
     orders.forEach(o => {
-      const h = o.host || 'Unknown';
+      const h = o.host;
+      if (!h) return; // skip orders with no identified host
       if (!m[h]) m[h] = { sales: 0, profit: 0, orders: 0, margins: [] };
       m[h].sales += o.sold; m[h].profit += o.profit; m[h].orders++; m[h].margins.push(o.margin);
     });
@@ -167,11 +179,11 @@ export default function SalesPage() {
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               {[
-                { label: 'Revenue', value: `$${filtered.reduce((s, o) => s + o.sold, 0).toFixed(2)}`, color: 'text-gray-900 dark:text-white' },
-                { label: 'Profit', value: `$${filtered.reduce((s, o) => s + o.profit, 0).toFixed(2)}`, color: filtered.reduce((s, o) => s + o.profit, 0) >= 0 ? 'text-green-500' : 'text-red-500' },
+                { label: 'Revenue', value: `$${fmt(filtered.reduce((s, o) => s + o.sold, 0))}`, color: 'text-gray-900 dark:text-white' },
+                { label: 'Profit', value: `$${fmt(filtered.reduce((s, o) => s + o.profit, 0))}`, color: filtered.reduce((s, o) => s + o.profit, 0) >= 0 ? 'text-green-500' : 'text-red-500' },
                 { label: 'Avg Margin', value: `${(filtered.reduce((s, o) => s + o.margin, 0) / (filtered.length || 1)).toFixed(1)}%`, color: 'text-amber-500' },
-                { label: 'Orders', value: `${filtered.length}`, color: 'text-gray-900 dark:text-white' },
-                { label: 'Shows', value: `${byTab.length}`, color: 'text-gray-900 dark:text-white' },
+                { label: 'Orders', value: fmtInt(filtered.length), color: 'text-gray-900 dark:text-white' },
+                { label: 'Shows', value: fmtInt(byTab.length), color: 'text-gray-900 dark:text-white' },
               ].map(kpi => (
                 <div key={kpi.label} className="card p-4">
                   <p className="text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">{kpi.label}</p>
@@ -203,8 +215,8 @@ export default function SalesPage() {
                       <tr key={tab}>
                         <td className="font-semibold">{tab}</td>
                         <td className="text-right text-gray-400 text-sm">{filtered.filter(o => o.tab === tab).length}</td>
-                        <td className="text-right font-semibold">${d.sales.toFixed(2)}</td>
-                        <td className={`text-right font-bold ${d.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>${d.profit.toFixed(2)}</td>
+                        <td className="text-right font-semibold">${fmt(d.sales)}</td>
+                        <td className={`text-right font-bold ${d.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>${fmt(d.profit)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -222,7 +234,7 @@ export default function SalesPage() {
                         <td className="text-gray-400 text-sm font-bold">{i + 1}</td>
                         <td className="font-semibold">{buyer}</td>
                         <td className="text-right text-gray-400 text-sm">{d.orders}</td>
-                        <td className="text-right font-black text-amber-500">${d.spent.toFixed(2)}</td>
+                        <td className="text-right font-black text-amber-500">${fmt(d.spent)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -244,11 +256,11 @@ export default function SalesPage() {
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="bg-gray-50 dark:bg-[#0d1117] rounded-lg p-2.5">
                         <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">Revenue</p>
-                        <p className="font-black text-gray-900 dark:text-white">${data.sales.toFixed(2)}</p>
+                        <p className="font-black text-gray-900 dark:text-white">${fmt(data.sales)}</p>
                       </div>
                       <div className="bg-gray-50 dark:bg-[#0d1117] rounded-lg p-2.5">
                         <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">Profit</p>
-                        <p className={`font-black ${data.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>${data.profit.toFixed(2)}</p>
+                        <p className={`font-black ${data.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>${fmt(data.profit)}</p>
                       </div>
                       <div className="bg-gray-50 dark:bg-[#0d1117] rounded-lg p-2.5">
                         <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">Orders</p>

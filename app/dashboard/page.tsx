@@ -120,7 +120,8 @@ export default function DashboardPage() {
   const avgMargin = filtered.length ? filtered.reduce((s, o) => s + o.margin, 0) / filtered.length : 0;
 
   const byHost = filtered.reduce<Record<string, { sales: number; profit: number; orders: number }>>((acc, o) => {
-    const h = o.host || 'Unknown';
+    const h = o.host;
+    if (!h) return acc; // skip orders with no identified host
     if (!acc[h]) acc[h] = { sales: 0, profit: 0, orders: 0 };
     acc[h].sales += o.sold; acc[h].profit += o.profit; acc[h].orders++;
     return acc;
@@ -146,7 +147,7 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Dashboard</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">{filtered.length} orders · {Object.keys(byTab).length} shows</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{filtered.length.toLocaleString()} orders · {Object.keys(byTab).length} shows</p>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             {DATE_PRESETS.map(p => (
@@ -184,10 +185,10 @@ export default function DashboardPage() {
           <>
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <StatCard label="Total Sales" value={`$${fmt(totalSales)}`} sub={`${filtered.length} orders`} color="text-gray-900 dark:text-white" />
+              <StatCard label="Total Sales" value={`$${fmt(totalSales)}`} sub={`${filtered.length.toLocaleString()} orders`} color="text-gray-900 dark:text-white" />
               <StatCard label="Gross Profit" value={`$${fmt(totalProfit)}`} sub="after COGS" color={totalProfit >= 0 ? 'text-green-500' : 'text-red-500'} />
               <StatCard label="Avg Margin" value={`${avgMargin.toFixed(1)}%`} color="text-amber-500" />
-              <StatCard label="Shows" value={`${Object.keys(byTab).length}`} sub={`${filtered.length} total orders`} color="text-gray-900 dark:text-white" />
+              <StatCard label="Shows" value={Object.keys(byTab).length.toLocaleString()} sub={`${filtered.length.toLocaleString()} total orders`} color="text-gray-900 dark:text-white" />
             </div>
 
             {/* Host cards */}
@@ -203,7 +204,7 @@ export default function DashboardPage() {
                         </div>
                         <span className="font-black text-gray-900 dark:text-white text-lg">{host}</span>
                       </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#21262d] px-2.5 py-1 rounded-full font-semibold">{data.orders} orders</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#21262d] px-2.5 py-1 rounded-full font-semibold">{data.orders.toLocaleString()} orders</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-gray-50 dark:bg-[#0d1117] rounded-lg p-3">
@@ -213,6 +214,7 @@ export default function DashboardPage() {
                       <div className="bg-gray-50 dark:bg-[#0d1117] rounded-lg p-3">
                         <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">Profit</p>
                         <p className={`font-black text-lg ${data.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>${fmt(data.profit)}</p>
+
                       </div>
                     </div>
                   </div>

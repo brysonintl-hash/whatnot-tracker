@@ -21,6 +21,14 @@ function parseMoney(val: string | undefined): number {
   return parseFloat(val.replace(/[$,%]/g, '')) || 0;
 }
 
+function parseHost(val: string | undefined): string {
+  if (!val) return '';
+  const v = val.trim();
+  // Reject pure numbers (tracking #s, order IDs) and anything over 60 chars
+  if (!v || /^\d+$/.test(v) || v.length > 60) return '';
+  return v;
+}
+
 export async function getSalesData(): Promise<SaleOrder[]> {
   if (isDemo()) return sampleSales;
 
@@ -67,7 +75,7 @@ export async function getSalesData(): Promise<SaleOrder[]> {
           profit: parseMoney(row[9]),
           margin: parseMoney(row[10]),
           showDuration: row[11] || '',
-          host: row[13] || row[12] || '', // N first (possible host col), fall back to M
+          host: parseHost(row[13]) || parseHost(row[12]) || '',
         });
       }
     });
