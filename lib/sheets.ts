@@ -37,33 +37,40 @@ export async function getSalesData(): Promise<SaleOrder[]> {
     .filter(n => n && /^\d+\/\d+\/\d+$/.test(n));
 
   const allOrders: SaleOrder[] = [];
+  const BATCH = 50; // batchGet limit is 100; use 50 to stay safe
 
-  for (const tab of sheetNames) {
-    const res = await sheets.spreadsheets.values.get({
+  for (let i = 0; i < sheetNames.length; i += BATCH) {
+    const batch = sheetNames.slice(i, i + BATCH);
+    const ranges = batch.map(tab => `'${tab}'!A3:R2000`); // A-R covers any host column
+
+    const batchRes = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      range: `'${tab}'!A3:M2000`,
+      ranges,
     });
 
-    const rows = res.data.values || [];
-    for (const row of rows) {
-      if (!row[0]) continue;
-      allOrders.push({
-        tab,
-        orderId: row[0] || '',
-        orderNum: row[1] || '',
-        buyer: row[2] || '',
-        modelNum: row[3] || '',
-        productName: row[4] || '',
-        qty: parseInt(row[5]) || 0,
-        sold: parseMoney(row[6]),
-        cost: parseMoney(row[7]),
-        earn: parseMoney(row[8]),
-        profit: parseMoney(row[9]),
-        margin: parseMoney(row[10]),
-        showDuration: row[11] || '',
-        host: row[12] || '',
-      });
-    }
+    (batchRes.data.valueRanges || []).forEach((vr, idx) => {
+      const tab = batch[idx];
+      const rows = vr.values || [];
+      for (const row of rows) {
+        if (!row[0]) continue;
+        allOrders.push({
+          tab,
+          orderId: row[0] || '',
+          orderNum: row[1] || '',
+          buyer: row[2] || '',
+          modelNum: row[3] || '',
+          productName: row[4] || '',
+          qty: parseInt(row[5]) || 0,
+          sold: parseMoney(row[6]),
+          cost: parseMoney(row[7]),
+          earn: parseMoney(row[8]),
+          profit: parseMoney(row[9]),
+          margin: parseMoney(row[10]),
+          showDuration: row[11] || '',
+          host: row[13] || row[12] || '', // N first (possible host col), fall back to M
+        });
+      }
+    });
   }
 
   return allOrders;

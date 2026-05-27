@@ -46,7 +46,7 @@ export default function SalesPage() {
   const [selectedHost, setSelectedHost] = useState('All');
 
   useEffect(() => {
-    fetch('/api/sales')
+    fetch('/api/sales', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         if (data?.error) setError(data.error);

@@ -64,7 +64,7 @@ export default function DashboardPage() {
   const [customTo, setCustomTo] = useState('');
 
   useEffect(() => {
-    fetch('/api/sales')
+    fetch('/api/sales', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         if (data?.error) {

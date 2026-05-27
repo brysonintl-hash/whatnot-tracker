@@ -31,7 +31,7 @@ export async function GET() {
       try {
         const rowRes = await sheets.spreadsheets.values.get({
           spreadsheetId: salesId!,
-          range: `'${rowTabUsed}'!A1:M8`,
+          range: `'${rowTabUsed}'!A1:S8`,
         });
         sampleRows = rowRes.data.values || [];
       } catch (e: any) {
