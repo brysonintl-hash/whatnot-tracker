@@ -60,8 +60,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [preset, setPreset] = useState('all');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [customDate, setCustomDate] = useState('');
 
   useEffect(() => {
     fetch('/api/sales', { cache: 'no-store' })
@@ -107,9 +106,9 @@ export default function DashboardPage() {
         const lme = new Date(now.getFullYear(), now.getMonth(), 0);
         return d >= lm && d <= lme;
       }
-      if (preset === 'custom' && customFrom && customTo) {
-        const from = new Date(customFrom); const to = new Date(customTo);
-        return d >= from && d <= to;
+      if (preset === 'custom' && customDate) {
+        const sel = startOfDay(new Date(customDate));
+        return d.getTime() === sel.getTime();
       }
       return true;
     });
@@ -164,11 +163,7 @@ export default function DashboardPage() {
               </button>
             ))}
             {preset === 'custom' && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="text-xs py-1.5" />
-                <span className="text-gray-400 text-xs">to</span>
-                <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="text-xs py-1.5" />
-              </div>
+              <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)} className="text-xs py-1.5" />
             )}
           </div>
         </div>
