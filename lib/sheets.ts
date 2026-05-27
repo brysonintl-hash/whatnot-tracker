@@ -27,50 +27,46 @@ export async function getSalesData(): Promise<SaleOrder[]> {
   const auth = getAuth();
   if (!auth) return sampleSales;
 
-  try {
-    const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SALES_SHEET_ID;
+  if (!spreadsheetId) throw new Error('SALES_SHEET_ID environment variable is not set');
 
-    const meta = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheetNames = (meta.data.sheets || [])
-      .map(s => s.properties?.title || '')
-      .filter(n => n && /^\d+\/\d+\/\d+$/.test(n)); // only date tabs like 5/26/26
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheetNames = (meta.data.sheets || [])
+    .map(s => s.properties?.title || '')
+    .filter(n => n && /^\d+\/\d+\/\d+$/.test(n));
 
-    const allOrders: SaleOrder[] = [];
+  const allOrders: SaleOrder[] = [];
 
-    for (const tab of sheetNames) {
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `'${tab}'!A3:M2000`,
+  for (const tab of sheetNames) {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${tab}'!A3:M2000`,
+    });
+
+    const rows = res.data.values || [];
+    for (const row of rows) {
+      if (!row[0]) continue;
+      allOrders.push({
+        tab,
+        orderId: row[0] || '',
+        orderNum: row[1] || '',
+        buyer: row[2] || '',
+        modelNum: row[3] || '',
+        productName: row[4] || '',
+        qty: parseInt(row[5]) || 0,
+        sold: parseMoney(row[6]),
+        cost: parseMoney(row[7]),
+        earn: parseMoney(row[8]),
+        profit: parseMoney(row[9]),
+        margin: parseMoney(row[10]),
+        showDuration: row[11] || '',
+        host: row[12] || '',
       });
-
-      const rows = res.data.values || [];
-      for (const row of rows) {
-        if (!row[0]) continue;
-        allOrders.push({
-          tab,
-          orderId: row[0] || '',
-          orderNum: row[1] || '',
-          buyer: row[2] || '',
-          modelNum: row[3] || '',
-          productName: row[4] || '',
-          qty: parseInt(row[5]) || 0,
-          sold: parseMoney(row[6]),
-          cost: parseMoney(row[7]),
-          earn: parseMoney(row[8]),
-          profit: parseMoney(row[9]),
-          margin: parseMoney(row[10]),
-          showDuration: row[11] || '',
-          host: row[12] || '',
-        });
-      }
     }
-
-    return allOrders;
-  } catch (e) {
-    console.error('Sheets error:', e);
-    return sampleSales;
   }
+
+  return allOrders;
 }
 
 export async function getInventoryData(): Promise<InventoryItem[]> {

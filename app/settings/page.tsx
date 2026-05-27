@@ -47,27 +47,27 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-[#0d1117]">
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-black text-gray-900">Host Management</h1>
-          <p className="text-gray-500 text-sm">Add your show hosts — their stats will appear on the dashboard</p>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Host Management</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Add your show hosts — their stats will appear on the dashboard</p>
         </div>
 
         {/* Add host form */}
         <div className="card p-5 mb-6">
-          <h2 className="font-bold text-gray-900 mb-4">Add New Host</h2>
+          <h2 className="font-bold text-gray-900 dark:text-white mb-4">Add New Host</h2>
           <form onSubmit={addHost} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Host Name</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Host Name</label>
               <input
                 type="text" value={name} onChange={e => setName(e.target.value)}
                 placeholder="e.g. Jason, Devon..." className="w-full" required
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Color</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Color</label>
               <div className="flex gap-2">
                 {COLORS.map(c => (
                   <button key={c} type="button" onClick={() => setColor(c)}
@@ -85,15 +85,15 @@ export default function SettingsPage() {
 
         {/* Hosts list */}
         <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200">
-            <h2 className="font-bold text-gray-900">Your Hosts</h2>
+          <div className="px-5 py-4 border-b border-gray-200 dark:border-[#30363d]">
+            <h2 className="font-bold text-gray-900 dark:text-white">Your Hosts</h2>
           </div>
           {loading ? (
             <div className="p-8 text-center text-gray-400">Loading...</div>
           ) : hosts.length === 0 ? (
             <div className="p-8 text-center text-gray-400">No hosts added yet</div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-[#21262d]">
               {hosts.map(host => (
                 <div key={host.id} className="flex items-center gap-4 px-5 py-4">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-lg shrink-0"
@@ -101,7 +101,7 @@ export default function SettingsPage() {
                     {host.name[0].toUpperCase()}
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-gray-900">{host.name}</p>
+                    <p className="font-bold text-gray-900 dark:text-white">{host.name}</p>
                     <p className="text-xs text-gray-400">Host · Stats appear on Dashboard & Sales pages</p>
                   </div>
                   <button onClick={() => deleteHost(host.id)} className="btn-danger">Remove</button>
@@ -112,8 +112,8 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-6 card p-5">
-          <h2 className="font-bold text-gray-900 mb-2">How Hosts Work</h2>
-          <ul className="text-sm text-gray-600 space-y-1.5 list-disc list-inside">
+          <h2 className="font-bold text-gray-900 dark:text-white mb-2">How Hosts Work</h2>
+          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 list-disc list-inside">
             <li>When connected to Google Sheets, host names are pulled from column M of each show tab</li>
             <li>Make sure the name in your spreadsheet matches exactly what you add here</li>
             <li>Host stats (sales, profit, margin) are calculated automatically from your orders</li>

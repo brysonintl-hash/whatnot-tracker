@@ -32,7 +32,8 @@ export default function InventoryPage() {
 
   async function load() {
     const res = await fetch('/api/inventory');
-    setItems(Array.isArray(await res.json()) ? await fetch('/api/inventory').then(r => r.json()) : []);
+    const data = await res.json();
+    setItems(Array.isArray(data) ? data : []);
     setLoading(false);
   }
 
@@ -70,7 +71,7 @@ export default function InventoryPage() {
   function FF({ label, field, type = 'text' }: { label: string; field: keyof typeof form; type?: string }) {
     return (
       <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
+        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{label}</label>
         <input type={type} value={String(form[field])}
           onChange={e => setForm(f => ({ ...f, [field]: type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value }))}
           className="w-full text-sm" />
@@ -79,13 +80,13 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-[#0d1117]">
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">Inventory</h1>
-            <p className="text-gray-500 text-sm">{items.length} items tracked</p>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Inventory</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{items.length} items tracked</p>
           </div>
           <button onClick={() => { setForm(emptyItem); setEditing(null); setModal('add'); }} className="btn-primary flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -95,10 +96,10 @@ export default function InventoryPage() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="card p-4"><p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-1">Total Items</p><p className="text-2xl font-black text-gray-900">{items.length}</p></div>
-          <div className="card p-4 border-l-4 border-red-500"><p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-1">Out of Stock</p><p className="text-2xl font-black text-red-600">{outOfStock}</p></div>
-          <div className="card p-4 border-l-4 border-amber-400"><p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-1">Low Stock (≤5)</p><p className="text-2xl font-black text-amber-600">{lowStock}</p></div>
-          <div className="card p-4 border-l-4 border-green-500"><p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-1">Total Value</p><p className="text-2xl font-black text-green-600">${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p></div>
+          <div className="card p-4"><p className="text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Total Items</p><p className="text-2xl font-black text-gray-900 dark:text-white">{items.length}</p></div>
+          <div className="card p-4 border-l-4 border-red-500"><p className="text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Out of Stock</p><p className="text-2xl font-black text-red-500">{outOfStock}</p></div>
+          <div className="card p-4 border-l-4 border-amber-400"><p className="text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Low Stock (≤5)</p><p className="text-2xl font-black text-amber-500">{lowStock}</p></div>
+          <div className="card p-4 border-l-4 border-green-500"><p className="text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Total Value</p><p className="text-2xl font-black text-green-500">${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p></div>
         </div>
 
         {/* Filters */}
@@ -107,7 +108,7 @@ export default function InventoryPage() {
           <div className="flex gap-1">
             {(['all', 'low', 'out'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${filter === f ? 'bg-amber-400 border-amber-400 text-gray-900' : 'bg-white border-gray-300 text-gray-600 hover:border-amber-400'}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${filter === f ? 'bg-amber-400 border-amber-400 text-gray-900' : 'bg-white border-gray-300 text-gray-600 hover:border-amber-400 dark:bg-[#21262d] dark:border-[#30363d] dark:text-gray-300'}`}>
                 {f === 'all' ? 'All' : f === 'low' ? 'Low Stock' : 'Out of Stock'}
               </button>
             ))}
@@ -127,11 +128,11 @@ export default function InventoryPage() {
                 <tbody>
                   {filtered.map(item => (
                     <tr key={item.rowIndex}>
-                      <td className="font-mono text-xs text-blue-600 font-bold">{item.modelNum}</td>
-                      <td className="max-w-xs"><span className="text-xs text-gray-600 line-clamp-2 block">{item.description}</span></td>
+                      <td className="font-mono text-xs text-blue-500 dark:text-blue-400 font-bold">{item.modelNum}</td>
+                      <td className="max-w-xs"><span className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 block">{item.description}</span></td>
                       <td className="font-mono text-xs text-gray-400">{item.upc}</td>
                       <td className="font-mono text-xs text-gray-400">{item.asin}</td>
-                      <td className="text-center font-black text-lg text-gray-900">{item.qty}</td>
+                      <td className="text-center font-black text-lg text-gray-900 dark:text-white">{item.qty}</td>
                       <td><QtyBadge qty={item.qty} /></td>
                       <td className="text-right font-semibold">${item.retail.toFixed(2)}</td>
                       <td className="text-right font-black text-green-600">${item.total.toFixed(2)}</td>
@@ -157,11 +158,11 @@ export default function InventoryPage() {
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-gray-200">
-              <h2 className="font-black text-gray-900">{modal === 'add' ? 'Add New Item' : 'Edit Item'}</h2>
-              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#161b22] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-[#30363d]">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-[#30363d]">
+              <h2 className="font-black text-gray-900 dark:text-white">{modal === 'add' ? 'Add New Item' : 'Edit Item'}</h2>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -173,7 +174,7 @@ export default function InventoryPage() {
               <FF label="WhatNot Shop (WS)" field="ws" type="number" /><FF label="Amazon (AMZ)" field="amz" type="number" />
               <FF label="FBM" field="fbm" type="number" /><FF label="JZ" field="jz" type="number" />
             </div>
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200 dark:border-[#30363d]">
               <button onClick={() => setModal(null)} className="btn-secondary">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="btn-primary">{saving ? 'Saving...' : modal === 'add' ? 'Add Item' : 'Save Changes'}</button>
             </div>

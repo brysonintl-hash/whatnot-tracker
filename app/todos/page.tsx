@@ -77,13 +77,13 @@ export default function TodosPage() {
   const done = todos.filter(t => t.completed);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-[#0d1117]">
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">Daily To-Do</h1>
-            <p className="text-gray-500 text-sm">{pending.length} tasks remaining</p>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Daily To-Do</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{pending.length} tasks remaining</p>
           </div>
           {/* Name badge */}
           {nameSet ? (
@@ -108,7 +108,7 @@ export default function TodosPage() {
 
         {/* Add task form */}
         <div className="card p-5 mb-6">
-          <h2 className="font-bold text-gray-900 mb-3">Add New Task</h2>
+          <h2 className="font-bold text-gray-900 dark:text-white mb-3">Add New Task</h2>
           <form onSubmit={addTodo} className="space-y-3">
             <input
               type="text" value={text} onChange={e => setText(e.target.value)}
@@ -116,14 +116,14 @@ export default function TodosPage() {
               required
             />
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-600">Priority:</span>
+              <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Priority:</span>
               {(['high', 'medium', 'low'] as const).map(p => (
                 <button
                   key={p} type="button" onClick={() => setPriority(p)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
                     priority === p
                       ? `${PRIORITY_STYLES[p].bg} ${PRIORITY_STYLES[p].text} ${PRIORITY_STYLES[p].border}`
-                      : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'
+                      : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400 dark:bg-[#21262d] dark:border-[#30363d] dark:text-gray-400'
                   }`}
                 >
                   {PRIORITY_STYLES[p].label}
@@ -144,7 +144,7 @@ export default function TodosPage() {
             {pending.length === 0 && (
               <div className="card p-8 text-center mb-4">
                 <div className="text-4xl mb-2">🎉</div>
-                <p className="font-bold text-gray-700">All tasks done! Great work!</p>
+                <p className="font-bold text-gray-700 dark:text-gray-300">All tasks done! Great work!</p>
               </div>
             )}
             <div className="space-y-2 mb-6">
@@ -160,7 +160,7 @@ export default function TodosPage() {
                         className="mt-0.5 w-5 h-5 rounded border-2 border-gray-400 flex items-center justify-center shrink-0 hover:border-amber-400 transition-colors">
                       </button>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm">{todo.text}</p>
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{todo.text}</p>
                         <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded ${PRIORITY_STYLES[todo.priority].bg} ${PRIORITY_STYLES[todo.priority].text}`}>
                           {PRIORITY_STYLES[todo.priority].label} PRIORITY
                         </span>

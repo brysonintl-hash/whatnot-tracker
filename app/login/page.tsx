@@ -28,7 +28,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-[#0d1117]">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -36,14 +36,14 @@ export default function LoginPage() {
             <div className="text-white font-black text-3xl tracking-tight leading-none">STACK</div>
             <div className="text-amber-400 font-black text-3xl tracking-tight leading-none">BARGAINS</div>
           </div>
-          <p className="text-gray-500 text-sm font-medium">Sales & Inventory Dashboard</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Sales & Inventory Dashboard</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Sign In</h2>
+        <div className="bg-white dark:bg-[#161b22] rounded-2xl shadow-md border border-gray-200 dark:border-[#30363d] p-8">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">Sign In</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Username</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Username</label>
               <input
                 type="text"
                 value={username}
@@ -55,7 +55,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
               <input
                 type="password"
                 value={password}
