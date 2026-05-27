@@ -34,7 +34,7 @@ export async function getSalesData(): Promise<SaleOrder[]> {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const sheetNames = (meta.data.sheets || [])
       .map(s => s.properties?.title || '')
-      .filter(n => n && n !== 'Dashboard' && n !== 'Missing Cost');
+      .filter(n => n && /^\d+\/\d+\/\d+$/.test(n)); // only date tabs like 5/26/26
 
     const allOrders: SaleOrder[] = [];
 

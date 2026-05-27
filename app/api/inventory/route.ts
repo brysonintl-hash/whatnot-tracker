@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getInventoryData, addInventoryItem } from '@/lib/sheets';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const data = await getInventoryData();
