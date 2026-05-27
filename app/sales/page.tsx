@@ -88,7 +88,7 @@ export default function SalesPage() {
       if (preset === 'custom' && customDate) { const sel = startOfDay(new Date(customDate)); return d.getTime() === sel.getTime(); }
       return true;
     });
-  }, [orders, preset, customFrom, customTo]);
+  }, [orders, preset, customDate]);
 
   const hosts = useMemo(() => {
     const named = Array.from(new Set(dateFiltered.map(o => o.host).filter(h => h && !/^\d+$/.test(h))));

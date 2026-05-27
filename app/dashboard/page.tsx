@@ -112,7 +112,7 @@ export default function DashboardPage() {
       }
       return true;
     });
-  }, [orders, preset, customFrom, customTo]);
+  }, [orders, preset, customDate]);
 
   const totalSales = filtered.reduce((s, o) => s + o.sold, 0);
   const totalProfit = filtered.reduce((s, o) => s + o.profit, 0);
