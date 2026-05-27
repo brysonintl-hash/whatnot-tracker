@@ -51,6 +51,8 @@ export default function SalesPage() {
   const [preset, setPreset] = useState('all');
   const [customDate, setCustomDate] = useState('');
   const [selectedHost, setSelectedHost] = useState('All');
+  const [showPage, setShowPage] = useState(1);
+  const SHOW_PAGE_SIZE = 20;
 
   useEffect(() => {
     fetch('/api/sales', { cache: 'no-store' })
@@ -85,7 +87,7 @@ export default function SalesPage() {
       if (preset === '7days') { const w = new Date(today); w.setDate(today.getDate() - 7); return d >= w; }
       if (preset === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       if (preset === 'lastmonth') { const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1); const lme = new Date(now.getFullYear(), now.getMonth(), 0); return d >= lm && d <= lme; }
-      if (preset === 'custom' && customDate) { const sel = startOfDay(new Date(customDate)); return d.getTime() === sel.getTime(); }
+      if (preset === 'custom' && customDate) { const [cy,cm,cd] = customDate.split('-').map(Number); const sel = new Date(cy, cm-1, cd); return d.getTime() === sel.getTime(); }
       return true;
     });
   }, [orders, preset, customDate]);
@@ -95,6 +97,8 @@ export default function SalesPage() {
     return ['All', ...named.sort()];
   }, [dateFiltered]);
   const filtered = selectedHost === 'All' ? dateFiltered : dateFiltered.filter(o => o.host === selectedHost);
+
+  useEffect(() => { setShowPage(1); }, [preset, customDate, selectedHost]);
 
   const byTab = useMemo(() => {
     const m: Record<string, { sales: number; profit: number }> = {};
@@ -211,7 +215,7 @@ export default function SalesPage() {
                 <table>
                   <thead><tr><th>Show</th><th className="text-right">Orders</th><th className="text-right">Sales</th><th className="text-right">Profit</th></tr></thead>
                   <tbody>
-                    {byTab.map(([tab, d]) => (
+                    {byTab.slice((showPage - 1) * SHOW_PAGE_SIZE, showPage * SHOW_PAGE_SIZE).map(([tab, d]) => (
                       <tr key={tab}>
                         <td className="font-semibold">{tab}</td>
                         <td className="text-right text-gray-400 text-sm">{filtered.filter(o => o.tab === tab).length}</td>
@@ -221,6 +225,35 @@ export default function SalesPage() {
                     ))}
                   </tbody>
                 </table>
+                {Math.ceil(byTab.length / SHOW_PAGE_SIZE) > 1 && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-[#30363d]">
+                    <p className="text-xs text-gray-400">{(showPage - 1) * SHOW_PAGE_SIZE + 1}–{Math.min(showPage * SHOW_PAGE_SIZE, byTab.length)} of {byTab.length}</p>
+                    <div className="flex gap-1">
+                      <button onClick={() => setShowPage(p => Math.max(1, p - 1))} disabled={showPage === 1}
+                        className="px-2.5 py-1 rounded text-xs font-bold border bg-white dark:bg-[#21262d] border-gray-300 dark:border-[#30363d] text-gray-600 dark:text-gray-300 disabled:opacity-40">
+                        ←
+                      </button>
+                      {Array.from({ length: Math.ceil(byTab.length / SHOW_PAGE_SIZE) }, (_, i) => i + 1)
+                        .filter(n => n === 1 || n === Math.ceil(byTab.length / SHOW_PAGE_SIZE) || Math.abs(n - showPage) <= 1)
+                        .reduce<(number | string)[]>((acc, n, i, arr) => {
+                          if (i > 0 && (n as number) - (arr[i - 1] as number) > 1) acc.push('...');
+                          acc.push(n); return acc;
+                        }, [])
+                        .map((n, i) => n === '...' ? (
+                          <span key={`e${i}`} className="px-1.5 py-1 text-gray-400 text-xs">…</span>
+                        ) : (
+                          <button key={n} onClick={() => setShowPage(n as number)}
+                            className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${showPage === n ? 'bg-amber-400 border-amber-400 text-gray-900' : 'bg-white dark:bg-[#21262d] border-gray-300 dark:border-[#30363d] text-gray-600 dark:text-gray-300 hover:border-amber-400'}`}>
+                            {n}
+                          </button>
+                        ))}
+                      <button onClick={() => setShowPage(p => Math.min(Math.ceil(byTab.length / SHOW_PAGE_SIZE), p + 1))} disabled={showPage === Math.ceil(byTab.length / SHOW_PAGE_SIZE)}
+                        className="px-2.5 py-1 rounded text-xs font-bold border bg-white dark:bg-[#21262d] border-gray-300 dark:border-[#30363d] text-gray-600 dark:text-gray-300 disabled:opacity-40">
+                        →
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Top buyers */}

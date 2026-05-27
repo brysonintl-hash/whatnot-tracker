@@ -29,6 +29,8 @@ export default function InventoryPage() {
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState<Omit<Item, 'rowIndex'>>(emptyItem);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 30;
 
   async function load() {
     const res = await fetch('/api/inventory');
@@ -38,6 +40,7 @@ export default function InventoryPage() {
   }
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); }, [search, filter]);
 
   const filtered = items.filter(item => {
     const s = search.toLowerCase();
@@ -49,6 +52,9 @@ export default function InventoryPage() {
   const outOfStock = items.filter(i => i.qty <= 0).length;
   const lowStock = items.filter(i => i.qty > 0 && i.qty <= 5).length;
   const totalValue = items.reduce((s, i) => s + i.total, 0);
+
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function openEdit(item: Item) { setForm({ ...item }); setEditing(item); setModal('edit'); }
 
@@ -126,7 +132,7 @@ export default function InventoryPage() {
                   <th>Stock Status</th><th className="text-right">Retail</th><th className="text-right">Total Value</th><th></th>
                 </tr></thead>
                 <tbody>
-                  {filtered.map(item => (
+                  {paginated.map(item => (
                     <tr key={item.rowIndex}>
                       <td className="font-mono text-xs text-blue-500 dark:text-blue-400 font-bold">{item.modelNum}</td>
                       <td className="max-w-xs"><span className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 block">{item.description}</span></td>
@@ -154,6 +160,39 @@ export default function InventoryPage() {
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} items
+            </p>
+            <div className="flex gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-[#21262d] border-gray-300 dark:border-[#30363d] text-gray-600 dark:text-gray-300 disabled:opacity-40">
+                ← Prev
+              </button>
+              {Array.from({ length: pageCount }, (_, i) => i + 1)
+                .filter(n => n === 1 || n === pageCount || Math.abs(n - page) <= 2)
+                .reduce<(number | string)[]>((acc, n, i, arr) => {
+                  if (i > 0 && (n as number) - (arr[i - 1] as number) > 1) acc.push('...');
+                  acc.push(n); return acc;
+                }, [])
+                .map((n, i) => n === '...' ? (
+                  <span key={`e${i}`} className="px-2 py-1.5 text-gray-400 text-xs">…</span>
+                ) : (
+                  <button key={n} onClick={() => setPage(n as number)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${page === n ? 'bg-amber-400 border-amber-400 text-gray-900' : 'bg-white dark:bg-[#21262d] border-gray-300 dark:border-[#30363d] text-gray-600 dark:text-gray-300 hover:border-amber-400'}`}>
+                    {n}
+                  </button>
+                ))}
+              <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-[#21262d] border-gray-300 dark:border-[#30363d] text-gray-600 dark:text-gray-300 disabled:opacity-40">
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Modal */}

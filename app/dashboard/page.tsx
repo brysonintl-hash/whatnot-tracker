@@ -107,7 +107,8 @@ export default function DashboardPage() {
         return d >= lm && d <= lme;
       }
       if (preset === 'custom' && customDate) {
-        const sel = startOfDay(new Date(customDate));
+        const [cy, cm, cd] = customDate.split('-').map(Number);
+        const sel = new Date(cy, cm - 1, cd);
         return d.getTime() === sel.getTime();
       }
       return true;
