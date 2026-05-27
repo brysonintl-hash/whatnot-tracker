@@ -178,13 +178,18 @@ export default function SalesPage() {
 
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-              {[
-                { label: 'Revenue', value: `$${fmt(filtered.reduce((s, o) => s + o.sold, 0))}`, color: 'text-gray-900 dark:text-white' },
-                { label: 'Profit', value: `$${fmt(filtered.reduce((s, o) => s + o.profit, 0))}`, color: filtered.reduce((s, o) => s + o.profit, 0) >= 0 ? 'text-green-500' : 'text-red-500' },
-                { label: 'Avg Margin', value: `${(filtered.reduce((s, o) => s + o.margin, 0) / (filtered.length || 1)).toFixed(1)}%`, color: 'text-amber-500' },
-                { label: 'Orders', value: fmtInt(filtered.length), color: 'text-gray-900 dark:text-white' },
-                { label: 'Shows', value: fmtInt(byTab.length), color: 'text-gray-900 dark:text-white' },
-              ].map(kpi => (
+              {(() => {
+                const rev = filtered.reduce((s, o) => s + o.sold, 0);
+                const profit = filtered.reduce((s, o) => s + o.profit, 0);
+                const margin = rev > 0 ? (profit / rev) * 100 : 0;
+                return [
+                  { label: 'Revenue', value: `$${fmt(rev)}`, color: 'text-gray-900 dark:text-white' },
+                  { label: 'Profit', value: `$${fmt(profit)}`, color: profit >= 0 ? 'text-green-500' : 'text-red-500' },
+                  { label: 'Avg Margin', value: `${margin.toFixed(1)}%`, color: 'text-amber-500' },
+                  { label: 'Orders', value: fmtInt(filtered.length), color: 'text-gray-900 dark:text-white' },
+                  { label: 'Shows', value: fmtInt(byTab.length), color: 'text-gray-900 dark:text-white' },
+                ];
+              })().map(kpi => (
                 <div key={kpi.label} className="card p-4">
                   <p className="text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">{kpi.label}</p>
                   <p className={`text-2xl font-black ${kpi.color}`}>{kpi.value}</p>

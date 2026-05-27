@@ -117,7 +117,7 @@ export default function DashboardPage() {
 
   const totalSales = filtered.reduce((s, o) => s + o.sold, 0);
   const totalProfit = filtered.reduce((s, o) => s + o.profit, 0);
-  const avgMargin = filtered.length ? filtered.reduce((s, o) => s + o.margin, 0) / filtered.length : 0;
+  const avgMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
   const byHost = filtered.reduce<Record<string, { sales: number; profit: number; orders: number }>>((acc, o) => {
     const h = o.host;
