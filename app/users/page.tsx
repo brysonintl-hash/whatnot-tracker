@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 
 type Session = { username: string; role: Role; name: string };
-type User = { id: string; username: string; name: string; role: Role; createdAt: string };
+type User = { id: string; username: string; name: string; role: Role; status: 'active' | 'pending'; createdAt: string };
 
 const ROLES: Role[] = ['admin', 'manager', 'shipper', 'host'];
 
@@ -79,12 +79,22 @@ export default function UsersPage() {
         <main className="flex-1 overflow-y-auto p-6">
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {ROLES.map(r => (
-              <div key={r} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2 capitalize">{r}s</p>
-                <p className="text-2xl font-black text-slate-900">{users.filter(u => u.role === r).length}</p>
-              </div>
-            ))}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Total Accounts</p>
+              <p className="text-2xl font-black text-slate-900">{users.length}</p>
+            </div>
+            <div className="bg-amber-50 rounded-xl border border-amber-200 shadow-sm p-5">
+              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-2">Pending Approval</p>
+              <p className="text-2xl font-black text-amber-600">{users.filter(u => u.status === 'pending').length}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Active Users</p>
+              <p className="text-2xl font-black text-slate-900">{users.filter(u => u.status === 'active').length}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Roles Assigned</p>
+              <p className="text-2xl font-black text-slate-900">{ROLES.length}</p>
+            </div>
           </div>
 
           {/* Users table */}
@@ -122,20 +132,28 @@ export default function UsersPage() {
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-500 font-mono">{u.username}</td>
                         <td className="py-3 px-4">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${ROLE_STYLE[u.role] ?? ''}`}>{u.role}</span>
+                          {u.status === 'pending' ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">Pending</span>
+                          ) : (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${ROLE_STYLE[u.role] ?? ''}`}>{u.role}</span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           {u.username === session.username ? (
                             <span className="text-[10px] text-slate-400">— your account</span>
                           ) : (
-                            <select
-                              value={u.role}
-                              disabled={saving === u.id}
-                              onChange={e => changeRole(u.id, e.target.value as Role)}
-                              className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
-                            >
-                              {ROLES.map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
-                            </select>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={u.status === 'pending' ? '' : u.role}
+                                disabled={saving === u.id}
+                                onChange={e => changeRole(u.id, e.target.value as Role)}
+                                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                              >
+                                {u.status === 'pending' && <option value="" disabled>Assign role...</option>}
+                                {ROLES.map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
+                              </select>
+                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 font-bold">↑ Activate</span>}
+                            </div>
                           )}
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</td>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { updateUserRole, deleteUser, findById } from '@/lib/userStore';
+import { activateUser, updateUserRole, deleteUser, findById } from '@/lib/userStore';
 import type { Role } from '@/lib/types';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -12,7 +12,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   if (user.username === session.username) return NextResponse.json({ error: 'Cannot change your own role' }, { status: 400 });
 
-  updateUserRole(params.id, role as Role);
+  if (user.status === 'pending') {
+    activateUser(params.id, role as Role);
+  } else {
+    updateUserRole(params.id, role as Role);
+  }
   return NextResponse.json({ success: true });
 }
 

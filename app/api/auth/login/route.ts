@@ -6,9 +6,8 @@ export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
   const user = findByCredentials(username, password);
 
-  if (!user) {
-    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+  if (user.status === 'pending') return NextResponse.json({ error: 'Your account is pending admin approval. Please wait.' }, { status: 403 });
 
   const token = await signToken({ username: user.username, role: user.role, name: user.name });
   const res = NextResponse.json({ success: true, role: user.role });
