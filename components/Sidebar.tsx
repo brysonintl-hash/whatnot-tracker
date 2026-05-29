@@ -71,7 +71,7 @@ const NAV: Record<Role, Section[]> = {
 };
 
 const ROLE_COLOR: Record<Role, string> = {
-  admin: 'bg-red-500', manager: 'bg-blue-500',
+  admin: 'bg-red-500', manager: 'bg-blue-500', employee: 'bg-emerald-500',
   shipper: 'bg-violet-500', host: 'bg-amber-500',
 };
 
