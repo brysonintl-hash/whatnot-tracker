@@ -47,7 +47,7 @@ export default function UsersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role }),
     });
-    setUsers(us => us.map(u => u.id === id ? { ...u, role } : u));
+    setUsers(us => us.map(u => u.id === id ? { ...u, role, status: 'active' as const } : u));
     setSaving(null);
   }
 
