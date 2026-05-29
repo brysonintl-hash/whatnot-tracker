@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import type { Role } from './types';
 
 export type StoredUser = {
@@ -10,71 +12,100 @@ export type StoredUser = {
   createdAt: string;
 };
 
-const store = new Map<string, StoredUser>();
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data');
+const FILE = join(DATA_DIR, 'users.json');
 
-function seed() {
-  if (store.size > 0) return;
-  const defaults: StoredUser[] = [
-    { id: '1', username: process.env.ADMIN_USERNAME || 'admin', password: process.env.ADMIN_PASSWORD || 'admin123', name: 'Administrator', role: 'admin', status: 'active', createdAt: new Date().toISOString() },
-    { id: '2', username: process.env.MANAGER_USERNAME || 'manager', password: process.env.MANAGER_PASSWORD || 'manager123', name: 'Manager', role: 'manager', status: 'active', createdAt: new Date().toISOString() },
-    { id: '3', username: process.env.SHIPPER_USERNAME || 'shipper', password: process.env.SHIPPER_PASSWORD || 'shipper123', name: 'Shipper', role: 'shipper', status: 'active', createdAt: new Date().toISOString() },
-    { id: '4', username: process.env.HOST_USERNAME || 'host', password: process.env.HOST_PASSWORD || 'host123', name: 'Host', role: 'host', status: 'active', createdAt: new Date().toISOString() },
-  ];
-  defaults.forEach(u => store.set(u.id, u));
+function defaultAdmin(): StoredUser {
+  return {
+    id: '1',
+    username: process.env.ADMIN_USERNAME || 'admin',
+    password: process.env.ADMIN_PASSWORD || 'admin123',
+    name: 'Administrator',
+    role: 'admin',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function readFile(): StoredUser[] {
+  try {
+    if (existsSync(FILE)) return JSON.parse(readFileSync(FILE, 'utf8'));
+  } catch {}
+  return [defaultAdmin()];
+}
+
+function writeFile(users: StoredUser[]): void {
+  try {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(FILE, JSON.stringify(users, null, 2));
+  } catch (e) {
+    console.error('userStore write error:', e);
+  }
+}
+
+function ensureAdmin(users: StoredUser[]): StoredUser[] {
+  const admin = defaultAdmin();
+  const idx = users.findIndex(u => u.id === '1');
+  if (idx === -1) return [admin, ...users];
+  users[idx] = { ...users[idx], username: admin.username, password: admin.password };
+  return users;
 }
 
 export function getAllUsers(): StoredUser[] {
-  seed();
-  return Array.from(store.values());
+  const users = ensureAdmin(readFile());
+  return users;
 }
 
 export function findByCredentials(username: string, password: string): StoredUser | null {
-  seed();
   return getAllUsers().find(u => u.username === username && u.password === password) ?? null;
 }
 
 export function findByUsername(username: string): StoredUser | null {
-  seed();
   return getAllUsers().find(u => u.username === username) ?? null;
 }
 
 export function findById(id: string): StoredUser | null {
-  seed();
-  return store.get(id) ?? null;
+  return getAllUsers().find(u => u.id === id) ?? null;
 }
 
 export function createUser(data: { username: string; password: string; name: string; role: Role }): StoredUser {
-  seed();
+  const users = getAllUsers();
   const user: StoredUser = { ...data, status: 'pending', id: Date.now().toString(), createdAt: new Date().toISOString() };
-  store.set(user.id, user);
+  writeFile([...users, user]);
   return user;
 }
 
 export function activateUser(id: string, role: Role): boolean {
-  seed();
-  const user = store.get(id);
-  if (!user) return false;
-  store.set(id, { ...user, role, status: 'active' });
+  const users = getAllUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return false;
+  users[idx] = { ...users[idx], role, status: 'active' };
+  writeFile(users);
   return true;
 }
 
 export function updateUserRole(id: string, role: Role): boolean {
-  seed();
-  const user = store.get(id);
-  if (!user) return false;
-  store.set(id, { ...user, role });
+  const users = getAllUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return false;
+  users[idx] = { ...users[idx], role };
+  writeFile(users);
   return true;
 }
 
 export function updateUserPassword(id: string, password: string): boolean {
-  seed();
-  const user = store.get(id);
-  if (!user) return false;
-  store.set(id, { ...user, password });
+  const users = getAllUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return false;
+  users[idx] = { ...users[idx], password };
+  writeFile(users);
   return true;
 }
 
 export function deleteUser(id: string): boolean {
-  seed();
-  return store.delete(id);
+  const users = getAllUsers();
+  const filtered = users.filter(u => u.id !== id);
+  if (filtered.length === users.length) return false;
+  writeFile(filtered);
+  return true;
 }
