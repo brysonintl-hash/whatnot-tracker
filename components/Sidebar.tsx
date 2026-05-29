@@ -50,6 +50,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
     ]},
   ],
+  employee: [],
   shipper: [
     { title: 'Shipping', items: [
       { href: '/shipper', label: 'Dashboard', icon: I.grid },
