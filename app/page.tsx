@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation';
 const ROLE_HOME: Record<string, string> = {
   admin: '/admin',
   manager: '/manager',
-  employee: '/employee',
   shipper: '/shipper',
   host: '/host',
 };

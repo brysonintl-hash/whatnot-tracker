@@ -50,14 +50,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
     ]},
   ],
-  employee: [
-    { title: 'My Workspace', items: [
-      { href: '/employee', label: 'Dashboard', icon: I.grid },
-      { href: '/employee/timeclock', label: 'Time Clock', icon: I.clock },
-      { href: '/employee/tasks', label: 'My Tasks', icon: I.check },
-      { href: '/employee/attendance', label: 'Attendance', icon: I.cal },
-    ]},
-  ],
   shipper: [
     { title: 'Shipping', items: [
       { href: '/shipper', label: 'Dashboard', icon: I.grid },
@@ -79,7 +71,7 @@ const NAV: Record<Role, Section[]> = {
 };
 
 const ROLE_COLOR: Record<Role, string> = {
-  admin: 'bg-red-500', manager: 'bg-blue-500', employee: 'bg-emerald-500',
+  admin: 'bg-red-500', manager: 'bg-blue-500',
   shipper: 'bg-violet-500', host: 'bg-amber-500',
 };
 
@@ -156,6 +148,15 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
             <div className="text-slate-400 text-[10px] capitalize font-medium">{role}</div>
           </div>
         </div>
+        <Link
+          href="/change-password"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-medium transition-colors mb-1"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+          Change Password
+        </Link>
         <button
           onClick={toggleTheme}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-medium transition-colors mb-1"
