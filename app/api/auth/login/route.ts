@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUser } from '@/lib/users';
+import { findByCredentials } from '@/lib/userStore';
 import { signToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
-  const user = findUser(username, password);
+  const user = findByCredentials(username, password);
 
   if (!user) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });

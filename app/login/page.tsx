@@ -1,68 +1,25 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-const ROLES = [
-  {
-    id: 'admin', label: 'Admin', description: 'Full access',
-    border: 'border-red-400', bg: 'bg-red-50', text: 'text-red-500',
-    username: 'admin',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'manager', label: 'Manager', description: 'Team ops',
-    border: 'border-blue-400', bg: 'bg-blue-50', text: 'text-blue-500',
-    username: 'manager',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'shipper', label: 'Shipper', description: 'Shipments',
-    border: 'border-violet-400', bg: 'bg-violet-50', text: 'text-violet-500',
-    username: 'shipper',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-      </svg>
-    ),
-  },
-  {
-    id: 'host', label: 'Host', description: 'Shows',
-    border: 'border-amber-400', bg: 'bg-amber-50', text: 'text-amber-500',
-    username: 'host',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-      </svg>
-    ),
-  },
-];
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 const ROLE_HOME: Record<string, string> = {
-  admin: '/admin', manager: '/manager', shipper: '/shipper', host: '/host',
+  admin: '/admin', manager: '/manager', employee: '/employee', shipper: '/shipper', host: '/host',
 };
 
 export default function LoginPage() {
   const router = useRouter();
-  const [selectedRole, setSelectedRole] = useState('');
+  const params = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  function selectRole(role: typeof ROLES[0]) {
-    setSelectedRole(role.id);
-    setUsername(role.username);
-    setError('');
-  }
+  useEffect(() => {
+    if (params.get('registered')) setSuccess('Account created! Wait for an admin to assign your role, then sign in.');
+  }, [params]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,8 +38,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
-  const active = ROLES.find(r => r.id === selectedRole);
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -149,32 +104,12 @@ export default function LoginPage() {
 
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
             <h2 className="text-2xl font-black text-slate-900 mb-1">Welcome back</h2>
-            <p className="text-slate-500 text-sm mb-8">Select your portal and sign in to continue</p>
+            <p className="text-slate-500 text-sm mb-8">Sign in to your account</p>
 
-            <div className="grid grid-cols-4 gap-2 mb-6">
-              {ROLES.map(role => (
-                <button
-                  key={role.id}
-                  type="button"
-                  onClick={() => selectRole(role)}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
-                    selectedRole === role.id
-                      ? `${role.border} ${role.bg} ${role.text}`
-                      : 'border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 bg-white'
-                  }`}
-                >
-                  {role.icon}
-                  <span className="text-[10px] font-bold leading-none">{role.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {selectedRole && (
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${active?.bg} mb-5 text-xs font-semibold ${active?.text}`}>
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Signing in as: <span className="font-black capitalize">{active?.label} Portal</span>
+            {success && (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm font-medium mb-5">
+                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                {success}
               </div>
             )}
 
@@ -219,6 +154,11 @@ export default function LoginPage() {
                 {loading ? 'Signing in...' : 'Sign In →'}
               </button>
             </form>
+
+            <p className="text-center text-xs text-slate-400 mt-5">
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="text-red-600 font-bold hover:underline">Register</Link>
+            </p>
           </div>
 
           <p className="text-center text-xs text-slate-400 mt-5">Stack Bargains Logistics Platform · v2.0</p>
