@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'WhatNot Tracker',
-  description: 'Sales & Inventory Dashboard',
+  title: 'Stack Bargains',
+  description: 'Enterprise Logistics & Inventory Platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

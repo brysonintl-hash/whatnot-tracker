@@ -22,7 +22,7 @@ const HOST_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC
 
 function KPI({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
       <div className="flex items-start justify-between mb-3">
         <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">{label}</p>
         <div className={`w-8 h-8 rounded-lg ${color} bg-opacity-10 flex items-center justify-center`} style={{ backgroundColor: color + '15' }}>
@@ -82,13 +82,13 @@ export default function AdminPage() {
   if (!session) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role="admin" userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900">Admin Dashboard</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Admin Dashboard</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -146,7 +146,7 @@ export default function AdminPage() {
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
                 <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                  <h2 className="font-bold text-slate-900 text-sm mb-4">Sales by Show (Last 12)</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Sales by Show (Last 12)</h2>
                   <Bar
                     data={{
                       labels: byTab.map(([t]) => t),
@@ -156,7 +156,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                  <h2 className="font-bold text-slate-900 text-sm mb-4">Revenue by Host</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Revenue by Host</h2>
                   <div className="flex items-center justify-center h-44">
                     <Doughnut
                       data={{

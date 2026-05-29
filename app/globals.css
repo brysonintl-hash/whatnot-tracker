@@ -53,3 +53,15 @@ tr:hover td {
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
 .dark ::-webkit-scrollbar-track { background: #0d1117; }
 .dark ::-webkit-scrollbar-thumb { background: #30363d; }
+
+/* Enterprise layout dark mode */
+.sb-page { @apply bg-slate-50 dark:bg-slate-900; }
+.sb-header { @apply bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm; }
+.sb-card { @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm; }
+.sb-title { @apply text-slate-900 dark:text-white; }
+.sb-sub { @apply text-slate-500 dark:text-slate-400; }
+.sb-muted { @apply text-slate-400 dark:text-slate-500; }
+.sb-border { @apply border-slate-200 dark:border-slate-700; }
+.sb-surface { @apply bg-slate-50 dark:bg-slate-900/50; }
+.sb-row { @apply border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors; }
+.sb-th { @apply text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide py-3 px-4 border-b border-slate-100 dark:border-slate-700 bg-transparent; }
