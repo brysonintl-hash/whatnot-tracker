@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import OnlineUsers from '@/components/OnlineUsers';
+import type { Role } from '@/lib/types';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 
@@ -72,7 +73,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
-      if (!s || s.role !== 'admin') { router.push('/login'); return; }
+      if (!s || (s.role !== 'admin' && s.role !== 'manager')) { router.push('/login'); return; }
       setSession(s);
     });
     Promise.all([
@@ -232,7 +233,7 @@ export default function AdminPage() {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden" onClick={() => setFilterOpen(null)}>
-      <Sidebar role="admin" userName={session.name} />
+      <Sidebar role={session.role as Role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">

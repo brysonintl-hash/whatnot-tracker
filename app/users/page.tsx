@@ -11,11 +11,11 @@ type User = { id: string; username: string; name: string; role: Role; status: 'a
 const ROLES: Role[] = ['admin', 'manager', 'shipper', 'host'];
 
 const ROLE_STYLE: Record<string, string> = {
-  admin: 'bg-red-50 text-red-700 border-red-200',
-  manager: 'bg-blue-50 text-blue-700 border-blue-200',
-  shipper: 'bg-violet-50 text-violet-700 border-violet-200',
-  host: 'bg-amber-50 text-amber-700 border-amber-200',
-  employee: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  admin: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+  manager: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  shipper: 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+  host: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+  employee: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
 };
 
 export default function UsersPage() {
@@ -59,7 +59,11 @@ export default function UsersPage() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  if (!session) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
+  if (!session) return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+      <div className="text-slate-400 text-sm">Loading...</div>
+    </div>
+  );
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
@@ -70,37 +74,29 @@ export default function UsersPage() {
             <h1 className="text-lg font-black text-slate-900 dark:text-white">User Management</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full font-bold">Admin</span>
-            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-black text-sm">{session.name[0]}</div>
-          </div>
+          <span className="text-xs bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-full font-bold">Admin</span>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Total Accounts</p>
-              <p className="text-2xl font-black text-slate-900">{users.length}</p>
-            </div>
-            <div className="bg-amber-50 rounded-xl border border-amber-200 shadow-sm p-5">
-              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-2">Pending Approval</p>
-              <p className="text-2xl font-black text-amber-600">{users.filter(u => u.status === 'pending').length}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Active Users</p>
-              <p className="text-2xl font-black text-slate-900">{users.filter(u => u.status === 'active').length}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Roles Assigned</p>
-              <p className="text-2xl font-black text-slate-900">{ROLES.length}</p>
-            </div>
+            {[
+              { label: 'Total Accounts', value: users.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Pending Approval', value: users.filter(u => u.status === 'pending').length, cls: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', textCls: 'text-amber-600 dark:text-amber-400', labelCls: 'text-amber-600 dark:text-amber-400' },
+              { label: 'Active Users', value: users.filter(u => u.status === 'active').length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Roles Assigned', value: ROLES.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+            ].map(k => (
+              <div key={k.label} className={`${k.cls} rounded-xl border shadow-sm p-5`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${k.labelCls}`}>{k.label}</p>
+                <p className={`text-2xl font-black ${k.textCls}`}>{k.value}</p>
+              </div>
+            ))}
           </div>
 
           {/* Users table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="font-bold text-slate-900 text-sm">All Accounts</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+              <h2 className="font-bold text-slate-900 dark:text-white text-sm">All Accounts</h2>
               <span className="text-xs text-slate-400">{users.length} total</span>
             </div>
 
@@ -110,30 +106,27 @@ export default function UsersPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">Name</th>
-                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Username</th>
-                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Current Role</th>
-                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Change Role</th>
-                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Joined</th>
-                      <th className="py-3 px-5" />
+                    <tr className="border-b border-slate-100 dark:border-slate-700">
+                      {['Name', 'Username', 'Current Role', 'Change Role', 'Joined', ''].map(h => (
+                        <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {users.map(u => (
-                      <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                      <tr key={u.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                         <td className="py-3 px-5">
                           <div className="flex items-center gap-2.5">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-black text-xs flex-shrink-0 ${
                               u.role === 'admin' ? 'bg-red-500' : u.role === 'manager' ? 'bg-blue-500' : u.role === 'shipper' ? 'bg-violet-500' : 'bg-amber-500'
                             }`}>{u.name[0]}</div>
-                            <span className="text-xs font-semibold text-slate-700">{u.name}</span>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{u.name}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-xs text-slate-500 font-mono">{u.username}</td>
+                        <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 font-mono">{u.username}</td>
                         <td className="py-3 px-4">
                           {u.status === 'pending' ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">Pending</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">Pending</span>
                           ) : (
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${ROLE_STYLE[u.role] ?? ''}`}>{u.role}</span>
                           )}
@@ -147,12 +140,12 @@ export default function UsersPage() {
                                 value={u.status === 'pending' ? '' : u.role}
                                 disabled={saving === u.id}
                                 onChange={e => changeRole(u.id, e.target.value as Role)}
-                                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                                className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                               >
                                 {u.status === 'pending' && <option value="" disabled>Assign role...</option>}
                                 {ROLES.map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                               </select>
-                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 font-bold">↑ Activate</span>}
+                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">↑ Activate</span>}
                             </div>
                           )}
                         </td>
@@ -160,7 +153,7 @@ export default function UsersPage() {
                         <td className="py-3 px-5">
                           {u.username !== session.username && (
                             <button onClick={() => removeUser(u.id)}
-                              className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors">
+                              className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded-lg transition-colors">
                               Delete
                             </button>
                           )}

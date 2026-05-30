@@ -35,6 +35,8 @@ export default function SettingsPage() {
 
   // Delete account
   const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -84,16 +86,22 @@ export default function SettingsPage() {
     setPwSaving(false);
   }
 
-  async function deleteAccount() {
-    if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
-    if (!confirm('This is permanent. All your data will be removed. Continue?')) return;
+  async function deleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleteError('');
+    if (!deletePassword) { setDeleteError('Please enter your password.'); return; }
+    if (!confirm('This is permanent. Your account and all data will be removed. Continue?')) return;
     setDeleting(true);
-    const res = await fetch('/api/auth/delete-account', { method: 'DELETE' });
+    const res = await fetch('/api/auth/delete-account', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: deletePassword }),
+    });
     if (res.ok) {
       router.push('/login');
     } else {
       const data = await res.json();
-      alert(data.error || 'Failed to delete account.');
+      setDeleteError(data.error || 'Failed to delete account.');
       setDeleting(false);
     }
   }
@@ -191,23 +199,42 @@ export default function SettingsPage() {
               <h2 className="font-bold text-red-600 text-sm">Danger Zone</h2>
             </div>
             <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Delete My Account</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {session.role === 'admin'
-                      ? 'Admin accounts cannot be deleted for security.'
-                      : 'Permanently removes your account and all your data.'}
-                  </p>
-                </div>
-                <button
-                  onClick={deleteAccount}
-                  disabled={deleting || session.role === 'admin'}
-                  className="px-4 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-bold rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {deleting ? 'Deleting...' : 'Delete Account'}
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Delete My Account</p>
+              <p className="text-xs text-slate-400 mb-4">
+                {session.role === 'admin'
+                  ? 'Admin accounts cannot be deleted for security.'
+                  : 'Permanently removes your account and all your data. Enter your password to confirm.'}
+              </p>
+              {session.role !== 'admin' && (
+                <form onSubmit={deleteAccount} className="space-y-3">
+                  {deleteError && (
+                    <div className="px-4 py-2.5 rounded-lg text-sm font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
+                      {deleteError}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={e => setDeletePassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="flex-1 text-sm px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                    <button
+                      type="submit"
+                      disabled={deleting || !deletePassword}
+                      className="px-4 py-2.5 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-bold rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      {deleting ? 'Deleting...' : 'Delete Account'}
+                    </button>
+                  </div>
+                </form>
+              )}
+              {session.role === 'admin' && (
+                <button disabled className="px-4 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-400 text-sm font-bold rounded-lg opacity-40 cursor-not-allowed">
+                  Delete Account
                 </button>
-              </div>
+              )}
             </div>
           </div>
         </main>

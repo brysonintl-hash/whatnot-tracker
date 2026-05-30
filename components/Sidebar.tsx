@@ -64,9 +64,7 @@ const NAV: Record<Role, Section[]> = {
   shipper: [
     { title: 'Shipping', items: [
       { href: '/shipper', label: 'Dashboard', icon: I.grid },
-      { href: '/shipper/shipments', label: 'Shipments', icon: I.pkg },
       { href: '/shipper/tracking', label: 'Tracking', icon: I.map },
-      { href: '/shipper/performance', label: 'My Performance', icon: I.bar },
     ]},
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },

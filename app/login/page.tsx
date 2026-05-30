@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTheme } from '@/lib/useTheme';
 
 const ROLE_HOME: Record<string, string> = {
   admin: '/admin', manager: '/manager', employee: '/employee', shipper: '/shipper', host: '/host',
@@ -11,6 +12,7 @@ const ROLE_HOME: Record<string, string> = {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -40,7 +42,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-white dark:bg-slate-900">
       {/* Left branding panel */}
       <div className="hidden lg:flex w-[45%] bg-slate-900 flex-col justify-between p-14 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
@@ -95,16 +97,16 @@ function LoginForm() {
       </div>
 
       {/* Right login panel */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
+      <div className="flex-1 flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
         <div className="w-full max-w-[420px]">
           <div className="flex items-center gap-2 mb-8 lg:hidden">
             <div className="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center font-black text-white text-sm">SB</div>
-            <span className="font-black text-slate-900 text-lg">Stack Bargains</span>
+            <span className="font-black text-slate-900 dark:text-white text-lg">Stack Bargains</span>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
-            <h2 className="text-2xl font-black text-slate-900 mb-1">Welcome back</h2>
-            <p className="text-slate-500 text-sm mb-8">Sign in to your account</p>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Welcome back</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Sign in to your account</p>
 
             {success && (
               <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm font-medium mb-5">
@@ -115,25 +117,25 @@ function LoginForm() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Username</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Username</label>
                 <input
                   type="text"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
                   placeholder="Enter username"
                   required
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-slate-400"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-slate-400"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Password</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Enter password"
                   required
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-slate-400"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-slate-400"
                 />
               </div>
 
@@ -155,13 +157,13 @@ function LoginForm() {
               </button>
             </form>
 
-            <p className="text-center text-xs text-slate-400 mt-5">
+            <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-5">
               Don&apos;t have an account?{' '}
               <Link href="/register" className="text-red-600 font-bold hover:underline">Register</Link>
             </p>
           </div>
 
-          <p className="text-center text-xs text-slate-400 mt-5">Stack Bargains Logistics Platform · v2.0</p>
+          <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-5">Stack Bargains Logistics Platform · v2.0</p>
         </div>
       </div>
     </div>

@@ -187,17 +187,17 @@ function ManagementView({ session }: { session: Session }) {
                   { label: 'Paid Out', value: `$${paidTotal.toFixed(2)}`, color: 'border-l-violet-400' },
                   { label: 'Remaining', value: `$${(totalPay - paidTotal).toFixed(2)}`, color: 'border-l-amber-400' },
                 ].map(k => (
-                  <div key={k.label} className={`bg-white rounded-xl border border-slate-200 border-l-4 ${k.color} shadow-sm p-5`}>
-                    <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
-                    <p className="text-2xl font-black text-slate-900">{k.value}</p>
+                  <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.color} shadow-sm p-5`}>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{k.value}</p>
                   </div>
                 ))}
               </div>
 
               {/* Staff Summary */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <h2 className="font-bold text-slate-900 text-sm">Weekly Staff Summary</h2>
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Weekly Staff Summary</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} –{' '}
                     {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -208,7 +208,7 @@ function ManagementView({ session }: { session: Session }) {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead><tr className="border-b border-slate-100">
+                      <thead><tr className="border-b border-slate-100 dark:border-slate-700">
                         {['Name', 'Role', 'Total Hours', 'Rate / hr', 'Total Pay', 'Payment'].map(h => (
                           <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">{h}</th>
                         ))}
@@ -220,15 +220,15 @@ function ManagementView({ session }: { session: Session }) {
                           const isPaid = payments.find(p => p.userId === m.userId)?.paid ?? false;
                           const paidAt = payments.find(p => p.userId === m.userId)?.paidAt;
                           return (
-                            <tr key={m.userId} className="border-b border-slate-50 hover:bg-slate-50">
+                            <tr key={m.userId} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                               <td className="py-3 px-5">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-600">{m.name[0]}</div>
-                                  <span className="text-xs font-semibold text-slate-700">{m.name}</span>
+                                  <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-xs font-black text-slate-600 dark:text-slate-300">{m.name[0]}</div>
+                                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{m.name}</span>
                                 </div>
                               </td>
-                              <td className="py-3 px-5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">{m.role}</span></td>
-                              <td className="py-3 px-5 text-xs font-bold text-slate-900">{fmtHours(m.totalHours)}</td>
+                              <td className="py-3 px-5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 capitalize">{m.role}</span></td>
+                              <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{fmtHours(m.totalHours)}</td>
                               <td className="py-3 px-5">
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-slate-400">$</span>
@@ -239,19 +239,19 @@ function ManagementView({ session }: { session: Session }) {
                                     value={rateInputs[m.userId] ?? rate.toString()}
                                     onChange={e => setRateInputs(prev => ({ ...prev, [m.userId]: e.target.value }))}
                                     onBlur={() => saveRate(m.userId, m.username, m.name)}
-                                    className="w-20 text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="w-20 text-xs border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
                                   />
                                   <span className="text-xs text-slate-400">/hr</span>
                                 </div>
                               </td>
-                              <td className="py-3 px-5 text-xs font-black text-emerald-600">${pay.toFixed(2)}</td>
+                              <td className="py-3 px-5 text-xs font-black text-emerald-600 dark:text-emerald-400">${pay.toFixed(2)}</td>
                               <td className="py-3 px-5">
                                 {isPaid ? (
                                   <div className="flex flex-col gap-0.5">
                                     <button
                                       onClick={() => togglePaid(m.userId)}
                                       disabled={savingPay === m.userId}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold hover:bg-emerald-100 transition-colors disabled:opacity-50"
                                     >
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                       Paid
@@ -262,7 +262,7 @@ function ManagementView({ session }: { session: Session }) {
                                   <button
                                     onClick={() => togglePaid(m.userId)}
                                     disabled={savingPay === m.userId}
-                                    className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition-colors disabled:opacity-50"
+                                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-[11px] font-bold hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition-colors disabled:opacity-50"
                                   >
                                     {savingPay === m.userId ? 'Saving...' : 'Mark Paid'}
                                   </button>
@@ -278,9 +278,9 @@ function ManagementView({ session }: { session: Session }) {
               </div>
 
               {/* Detailed time log */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-                  <h2 className="font-bold text-slate-900 text-sm">Time Log — This Week</h2>
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center gap-3">
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Time Log — This Week</h2>
                   <span className="text-xs text-slate-400">{weekEntries.length} entries</span>
                   <div className="ml-auto flex items-center gap-2">
                     <button
@@ -303,7 +303,7 @@ function ManagementView({ session }: { session: Session }) {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-slate-100">
+                    <thead><tr className="border-b border-slate-100 dark:border-slate-700">
                       {['Date', 'Name', 'Role', 'Clock In', 'Clock Out', 'Hours', 'Note', ''].map((h, i) => (
                         <th key={i} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">{h}</th>
                       ))}
@@ -313,14 +313,14 @@ function ManagementView({ session }: { session: Session }) {
                         <tr><td colSpan={8} className="py-8 text-center text-slate-400 text-sm">No entries this week</td></tr>
                       ) : (
                         [...weekEntries].reverse().map(e => (
-                          <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 group">
+                          <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
                             <td className="py-3 px-4 text-xs text-slate-400">{e.date}</td>
-                            <td className="py-3 px-4 text-xs font-semibold text-slate-700">{e.name}</td>
-                            <td className="py-3 px-4"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize">{e.role}</span></td>
-                            <td className="py-3 px-4 text-xs text-slate-700">{fmtTime(e.clockIn)}</td>
-                            <td className="py-3 px-4 text-xs text-slate-700">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
-                            <td className="py-3 px-4 text-xs font-bold text-slate-900">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
-                            <td className="py-3 px-4 text-xs text-slate-500 max-w-[160px] truncate">{e.note || '—'}</td>
+                            <td className="py-3 px-4 text-xs font-semibold text-slate-700 dark:text-slate-300">{e.name}</td>
+                            <td className="py-3 px-4"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 capitalize">{e.role}</span></td>
+                            <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
+                            <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
+                            <td className="py-3 px-4 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
+                            <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 max-w-[160px] truncate">{e.note || '—'}</td>
                             <td className="py-3 px-4">
                               <button
                                 onClick={() => deleteTimeEntry(e.id)}
@@ -418,19 +418,19 @@ function StaffView({ session }: { session: Session }) {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Clock card */}
-                <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm p-8 flex flex-col items-center text-center">
-                  <div className="text-4xl font-black font-mono text-slate-900 mb-1">
+                <div className="lg:col-span-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 flex flex-col items-center text-center">
+                  <div className="text-4xl font-black font-mono text-slate-900 dark:text-white mb-1">
                     {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </div>
                   <p className="text-slate-400 text-xs mb-6">{now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
 
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${active ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${active ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-slate-100 dark:bg-slate-700'}`}>
                     <svg className={`w-9 h-9 ${active ? 'text-emerald-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
 
-                  <p className="font-bold text-slate-700 text-sm mb-1">{active ? 'Currently Clocked In' : 'Not Clocked In'}</p>
+                  <p className="font-bold text-slate-700 dark:text-slate-300 text-sm mb-1">{active ? 'Currently Clocked In' : 'Not Clocked In'}</p>
                   {active && <p className="text-xs text-slate-400 mb-4">Since {fmtTime(active.clockIn)}</p>}
 
                   {active && (
@@ -441,7 +441,7 @@ function StaffView({ session }: { session: Session }) {
                         value={note}
                         onChange={e => setNote(e.target.value)}
                         placeholder="e.g. Overtime, Early leave..."
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                       />
                     </div>
                   )}
@@ -467,8 +467,8 @@ function StaffView({ session }: { session: Session }) {
                     { label: 'Status', value: active ? 'Clocked In' : 'Clocked Out', color: active ? 'text-emerald-600' : 'text-slate-400', border: active ? 'border-l-emerald-400' : 'border-l-slate-300' },
                     { label: "Today's Entries", value: entries.filter(e => e.date === new Date().toLocaleDateString('en-US')).length.toString(), color: 'text-amber-600', border: 'border-l-amber-400' },
                   ].map(k => (
-                    <div key={k.label} className={`bg-white rounded-xl border border-slate-200 border-l-4 ${k.border} shadow-sm p-5`}>
-                      <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
+                    <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.border} shadow-sm p-5`}>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
                       <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
                     </div>
                   ))}
@@ -476,9 +476,9 @@ function StaffView({ session }: { session: Session }) {
               </div>
 
               {/* My time log */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <h2 className="font-bold text-slate-900 text-sm">My Time Log — This Week</h2>
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">My Time Log — This Week</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} –{' '}
                     {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -486,7 +486,7 @@ function StaffView({ session }: { session: Session }) {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-slate-100">
+                    <thead><tr className="border-b border-slate-100 dark:border-slate-700">
                       {['Date', 'Clock In', 'Clock Out', 'Hours', 'Note'].map(h => (
                         <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">{h}</th>
                       ))}
@@ -496,12 +496,12 @@ function StaffView({ session }: { session: Session }) {
                         <tr><td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No entries this week</td></tr>
                       ) : (
                         [...weekEntries].reverse().map(e => (
-                          <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50">
+                          <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                             <td className="py-3 px-5 text-xs text-slate-400">{e.date}</td>
-                            <td className="py-3 px-5 text-xs font-semibold text-slate-700">{fmtTime(e.clockIn)}</td>
-                            <td className="py-3 px-5 text-xs text-slate-700">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
-                            <td className="py-3 px-5 text-xs font-bold text-slate-900">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
-                            <td className="py-3 px-5 text-xs text-slate-500">{e.note || '—'}</td>
+                            <td className="py-3 px-5 text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
+                            <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
+                            <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
+                            <td className="py-3 px-5 text-xs text-slate-500 dark:text-slate-400">{e.note || '—'}</td>
                           </tr>
                         ))
                       )}
