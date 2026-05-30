@@ -15,15 +15,6 @@ type Order = {
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
 
-const DATE_PRESETS = [
-  { label: 'All Time', value: 'all' },
-  { label: 'Today', value: 'today' },
-  { label: 'Last 7 Days', value: '7days' },
-  { label: 'This Month', value: 'month' },
-  { label: 'Last Month', value: 'lastmonth' },
-  { label: 'Custom', value: 'custom' },
-];
-
 function parseTabDate(tab: string): Date {
   const parts = tab.split('/');
   if (parts.length !== 3) return new Date(0);
@@ -31,12 +22,34 @@ function parseTabDate(tab: string): Date {
   return new Date(2000 + y, m - 1, d);
 }
 
+// "5/29/26" -> "2026-05-29"
+function tabToISO(tab: string): string {
+  const parts = tab.split('/');
+  if (parts.length !== 3) return '';
+  const [m, d, y] = parts.map(Number);
+  return `${2000 + y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+// "2026-05-29" -> "5/29/26"
+function isoToTab(iso: string): string {
+  const parts = iso.split('-').map(Number);
+  if (parts.length !== 3) return '';
+  const [y, m, d] = parts;
+  return `${m}/${d}/${y - 2000}`;
+}
+
+// "2026-05-29" -> "May 29, 2026"
+function isoToDisplay(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 function parseTimestamp(ts: string): number | null {
   if (!ts) return null;
-  // "2026-05-29 15:14:18"
-  const m = ts.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/);
-  if (m) {
-    const d = new Date(`${m[1]}T${m[2]}`);
+  const match = ts.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/);
+  if (match) {
+    const d = new Date(`${match[1]}T${match[2]}`);
     return isNaN(d.getTime()) ? null : d.getTime();
   }
   return null;
@@ -55,27 +68,62 @@ function fmtDuration(hours: number): string {
   return `${h}h ${m}m`;
 }
 
-type ShowStat = {
-  tab: string;
-  sales: number;
-  profit: number;
-  orders: number;
-  units: number;
-  avgMargin: number;
-  durationHours: number;
-};
-
 type HostStat = {
   host: string;
+  colorIdx: number;
   totalSales: number;
   totalProfit: number;
   totalOrders: number;
   totalUnits: number;
   avgMargin: number;
-  totalDurationHours: number;
-  showCount: number;
-  shows: ShowStat[];
+  durationHours: number;
 };
+
+function computeHostStats(orders: Order[]): HostStat[] {
+  const hostOrder: Record<string, number> = {};
+  let colorIdx = 0;
+
+  const map: Record<string, {
+    sales: number; profit: number; orders: number; units: number; margins: number[];
+    minTs: number | null; maxTs: number | null; colorIdx: number;
+  }> = {};
+
+  orders.forEach(o => {
+    const h = o.host;
+    if (!h) return;
+    if (!map[h]) {
+      map[h] = { sales: 0, profit: 0, orders: 0, units: 0, margins: [], minTs: null, maxTs: null, colorIdx: colorIdx++ };
+      hostOrder[h] = colorIdx;
+    }
+    map[h].sales += o.sold;
+    map[h].profit += o.profit;
+    map[h].orders++;
+    map[h].units += o.qty;
+    map[h].margins.push(o.margin);
+
+    const ts = parseTimestamp(o.timestamp);
+    if (ts !== null) {
+      if (map[h].minTs === null || ts < map[h].minTs!) map[h].minTs = ts;
+      if (map[h].maxTs === null || ts > map[h].maxTs!) map[h].maxTs = ts;
+    }
+  });
+
+  return Object.entries(map)
+    .map(([host, d]) => {
+      const durationMs = (d.minTs !== null && d.maxTs !== null && d.maxTs > d.minTs) ? d.maxTs - d.minTs : 0;
+      return {
+        host,
+        colorIdx: d.colorIdx,
+        totalSales: d.sales,
+        totalProfit: d.profit,
+        totalOrders: d.orders,
+        totalUnits: d.units,
+        avgMargin: d.margins.reduce((a, b) => a + b, 0) / (d.margins.length || 1),
+        durationHours: durationMs / 3600000,
+      };
+    })
+    .sort((a, b) => b.totalSales - a.totalSales);
+}
 
 export default function PerformancePage() {
   const router = useRouter();
@@ -84,9 +132,7 @@ export default function PerformancePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [preset, setPreset] = useState('all');
-  const [customDate, setCustomDate] = useState('');
-  const [expandedHost, setExpandedHost] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -106,90 +152,35 @@ export default function PerformancePage() {
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
-  const filtered = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return orders.filter(o => {
-      const d = parseTabDate(o.tab);
-      if (preset === 'today') return d >= todayStart;
-      if (preset === '7days') { const w = new Date(todayStart); w.setDate(todayStart.getDate() - 7); return d >= w; }
-      if (preset === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      if (preset === 'lastmonth') { const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1); const lme = new Date(now.getFullYear(), now.getMonth(), 0); return d >= lm && d <= lme; }
-      if (preset === 'custom' && customDate) { const [cy, cm, cd] = customDate.split('-').map(Number); const sel = new Date(cy, cm - 1, cd); return d.getTime() === sel.getTime(); }
-      return true;
-    });
-  }, [orders, preset, customDate]);
+  // All available show dates sorted newest → oldest
+  const showDates = useMemo(() => {
+    const tabs = Array.from(new Set(orders.map(o => o.tab).filter(Boolean)));
+    return tabs
+      .sort((a, b) => parseTabDate(b).getTime() - parseTabDate(a).getTime())
+      .map(tabToISO)
+      .filter(Boolean);
+  }, [orders]);
 
-  const hostStats = useMemo((): HostStat[] => {
-    // Accumulate per-host, per-show data
-    const map: Record<string, {
-      sales: number; profit: number; orders: number; units: number; margins: number[];
-      shows: Record<string, { sales: number; profit: number; orders: number; units: number; margins: number[]; minTs: number | null; maxTs: number | null }>;
-    }> = {};
+  // Default to most recent date once data loads
+  useEffect(() => {
+    if (showDates.length > 0 && !selectedDate) {
+      setSelectedDate(showDates[0]);
+    }
+  }, [showDates]);
 
-    filtered.forEach(o => {
-      const h = o.host;
-      if (!h) return;
-      if (!map[h]) map[h] = { sales: 0, profit: 0, orders: 0, units: 0, margins: [], shows: {} };
+  // Prev / Next navigable dates
+  const currentIdx = showDates.indexOf(selectedDate);
+  const prevDate = currentIdx < showDates.length - 1 ? showDates[currentIdx + 1] : null; // older
+  const nextDate = currentIdx > 0 ? showDates[currentIdx - 1] : null;                   // newer
 
-      map[h].sales += o.sold;
-      map[h].profit += o.profit;
-      map[h].orders++;
-      map[h].units += o.qty;
-      map[h].margins.push(o.margin);
+  // Orders for selected date
+  const dayOrders = useMemo(() => {
+    if (!selectedDate) return [];
+    const targetTab = isoToTab(selectedDate);
+    return orders.filter(o => o.tab === targetTab);
+  }, [orders, selectedDate]);
 
-      if (!map[h].shows[o.tab]) map[h].shows[o.tab] = { sales: 0, profit: 0, orders: 0, units: 0, margins: [], minTs: null, maxTs: null };
-      const show = map[h].shows[o.tab];
-      show.sales += o.sold;
-      show.profit += o.profit;
-      show.orders++;
-      show.units += o.qty;
-      show.margins.push(o.margin);
-
-      const ts = parseTimestamp(o.timestamp);
-      if (ts !== null) {
-        if (show.minTs === null || ts < show.minTs) show.minTs = ts;
-        if (show.maxTs === null || ts > show.maxTs) show.maxTs = ts;
-      }
-    });
-
-    return Object.entries(map)
-      .map(([host, data]) => {
-        let totalDurationMs = 0;
-        const shows: ShowStat[] = Object.entries(data.shows)
-          .map(([tab, s]) => {
-            const durationMs = (s.minTs !== null && s.maxTs !== null && s.maxTs > s.minTs) ? s.maxTs - s.minTs : 0;
-            totalDurationMs += durationMs;
-            return {
-              tab,
-              sales: s.sales,
-              profit: s.profit,
-              orders: s.orders,
-              units: s.units,
-              avgMargin: s.margins.reduce((a, b) => a + b, 0) / (s.margins.length || 1),
-              durationHours: durationMs / 3600000,
-            };
-          })
-          .sort((a, b) => parseTabDate(b.tab).getTime() - parseTabDate(a.tab).getTime());
-
-        const totalDurationHours = totalDurationMs / 3600000;
-        return {
-          host,
-          totalSales: data.sales,
-          totalProfit: data.profit,
-          totalOrders: data.orders,
-          totalUnits: data.units,
-          avgMargin: data.margins.reduce((a, b) => a + b, 0) / (data.margins.length || 1),
-          totalDurationHours,
-          showCount: shows.length,
-          shows,
-        };
-      })
-      .sort((a, b) => b.totalSales - a.totalSales);
-  }, [filtered]);
-
-  const btnActive = 'bg-amber-400 border-amber-400 text-slate-900';
-  const btnInactive = 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400';
+  const hostStats = useMemo(() => computeHostStats(dayOrders), [dayOrders]);
 
   if (!session) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
@@ -201,23 +192,13 @@ export default function PerformancePage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Performance</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {DATE_PRESETS.map(p => (
-              <button key={p.value} onClick={() => setPreset(p.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${preset === p.value ? btnActive : btnInactive}`}>
-                {p.label}
-              </button>
-            ))}
-            {preset === 'custom' && (
-              <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
-                className="text-xs py-1.5 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
-            )}
-          </div>
+          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -228,98 +209,145 @@ export default function PerformancePage() {
               <p className="font-bold text-red-600 mb-1">Error loading data</p>
               <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">{error}</p>
             </div>
-          ) : hostStats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center">
-              <div className="text-4xl mb-3">📊</div>
-              <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No host data found</p>
-              <p className="text-slate-400 text-xs mt-1">No orders with host information in the selected period</p>
-            </div>
           ) : (
-            <div className="space-y-5">
-              {hostStats.map((hs, i) => {
-                const color = HOST_COLORS[i % HOST_COLORS.length];
-                const revenuePerHour = hs.totalDurationHours > 0 ? hs.totalSales / hs.totalDurationHours : null;
-                const ordersPerHour = hs.totalDurationHours > 0 ? hs.totalOrders / hs.totalDurationHours : null;
-                const isExpanded = expandedHost === hs.host;
+            <>
+              {/* Date picker bar */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 mb-6 flex items-center justify-between gap-4">
+                <button
+                  onClick={() => prevDate && setSelectedDate(prevDate)}
+                  disabled={!prevDate}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  Prev Show
+                </button>
 
-                return (
-                  <div key={hs.host} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                    {/* Host header */}
-                    <div className="p-5 border-b-4" style={{ borderBottomColor: color }}>
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-xl shadow-sm flex-shrink-0"
-                            style={{ backgroundColor: color }}>
-                            {hs.host[0]?.toUpperCase()}
+                <div className="flex items-center gap-3 flex-1 justify-center">
+                  <div className="text-center">
+                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-1">Show Date</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white">
+                      {selectedDate ? isoToDisplay(selectedDate) : '—'}
+                    </p>
+                  </div>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    className="text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                  />
+                </div>
+
+                <button
+                  onClick={() => nextDate && setSelectedDate(nextDate)}
+                  disabled={!nextDate}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next Show
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+
+              {/* Results */}
+              {dayOrders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center">
+                  <div className="text-4xl mb-3">📅</div>
+                  <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No show data for this date</p>
+                  <p className="text-slate-400 text-xs mt-1">Try a different date or use the arrows to navigate</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary row */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="font-black text-slate-900 dark:text-white text-base">
+                        {isoToDisplay(selectedDate)}
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {hostStats.length} host{hostStats.length !== 1 ? 's' : ''} · {dayOrders.length} orders
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Host cards */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+                    {hostStats.map(hs => {
+                      const color = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
+                      const revenuePerHour = hs.durationHours > 0 ? hs.totalSales / hs.durationHours : null;
+                      const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+
+                      const stats = [
+                        {
+                          label: 'Total Sales',
+                          value: `$${fmtMoney(hs.totalSales)}`,
+                          valueClass: 'text-slate-900 dark:text-white font-black',
+                        },
+                        {
+                          label: 'Orders / Units',
+                          value: `${hs.totalOrders} / ${hs.totalUnits}`,
+                          valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
+                        },
+                        {
+                          label: 'Show Duration',
+                          value: fmtDuration(hs.durationHours),
+                          valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
+                        },
+                        {
+                          label: 'Gross Profit',
+                          value: `$${fmtMoney(hs.totalProfit)}`,
+                          valueClass: `font-black ${hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`,
+                        },
+                        {
+                          label: 'Overall Margin',
+                          value: `${hs.avgMargin.toFixed(1)}%`,
+                          valueClass: `font-black ${hs.avgMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.avgMargin >= 0 ? 'text-amber-500' : 'text-red-500'}`,
+                        },
+                        {
+                          label: 'Revenue per Hour',
+                          value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—',
+                          valueClass: 'text-amber-500 font-black',
+                        },
+                        {
+                          label: 'Orders per Hour',
+                          value: ordersPerHour !== null ? ordersPerHour.toFixed(1) : '—',
+                          valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
+                        },
+                      ];
+
+                      return (
+                        <div
+                          key={hs.host}
+                          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
+                        >
+                          {/* Host name bar */}
+                          <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: `3px solid ${color}` }}>
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-sm"
+                              style={{ backgroundColor: color }}
+                            >
+                              {hs.host[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 dark:text-white text-base leading-tight">{hs.host}</p>
+                              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Host</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-black text-slate-900 dark:text-white text-base">{hs.host}</p>
-                            <p className="text-xs text-slate-400">{hs.showCount} show{hs.showCount !== 1 ? 's' : ''} in period</p>
+
+                          {/* Stats list */}
+                          <div className="px-5 py-4 space-y-3">
+                            {stats.map(s => (
+                              <div key={s.label} className="flex items-center justify-between gap-2">
+                                <span className="text-sm text-slate-500 dark:text-slate-400">{s.label}</span>
+                                <span className={`text-sm ${s.valueClass}`}>{s.value}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <button
-                          onClick={() => setExpandedHost(isExpanded ? null : hs.host)}
-                          className="text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          {isExpanded ? 'Hide Shows ↑' : 'View Shows ↓'}
-                        </button>
-                      </div>
-
-                      {/* Stats grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-5">
-                        {[
-                          { label: 'Total Sales', value: `$${fmtMoney(hs.totalSales)}`, color: 'text-slate-900 dark:text-white' },
-                          { label: 'Gross Profit', value: `$${fmtMoney(hs.totalProfit)}`, color: hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' },
-                          { label: 'Overall Margin', value: `${hs.avgMargin.toFixed(1)}%`, color: hs.avgMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.avgMargin >= 0 ? 'text-amber-500' : 'text-red-500' },
-                          { label: 'Orders / Units', value: `${hs.totalOrders} / ${hs.totalUnits}`, color: 'text-slate-700 dark:text-slate-300' },
-                          { label: 'Show Duration', value: fmtDuration(hs.totalDurationHours), color: 'text-slate-700 dark:text-slate-300' },
-                          { label: 'Revenue / Hour', value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—', color: 'text-amber-500' },
-                          { label: 'Orders / Hour', value: ordersPerHour !== null ? ordersPerHour.toFixed(1) : '—', color: 'text-slate-700 dark:text-slate-300' },
-                        ].map(stat => (
-                          <div key={stat.label} className="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3 text-center">
-                            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-1">{stat.label}</p>
-                            <p className={`font-black text-sm ${stat.color}`}>{stat.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Show breakdown */}
-                    {isExpanded && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-700">
-                              {['Show Date', 'Sales', 'Profit', 'Margin', 'Orders / Units', 'Duration', 'Rev / Hr', 'Orders / Hr'].map(h => (
-                                <th key={h} className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 ${h === 'Show Date' ? 'text-left' : 'text-right'}`}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {hs.shows.map(show => {
-                              const rph = show.durationHours > 0 ? show.sales / show.durationHours : null;
-                              const oph = show.durationHours > 0 ? show.orders / show.durationHours : null;
-                              return (
-                                <tr key={show.tab} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
-                                  <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-300">{show.tab}</td>
-                                  <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-white">${fmtMoney(show.sales)}</td>
-                                  <td className={`px-4 py-2.5 text-right font-bold ${show.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmtMoney(show.profit)}</td>
-                                  <td className={`px-4 py-2.5 text-right font-semibold ${show.avgMargin >= 15 ? 'text-emerald-600' : show.avgMargin >= 0 ? 'text-amber-500' : 'text-red-500'}`}>{show.avgMargin.toFixed(1)}%</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400">{show.orders} / {show.units}</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400">{fmtDuration(show.durationHours)}</td>
-                                  <td className="px-4 py-2.5 text-right text-amber-500 font-semibold">{rph !== null ? `$${fmtMoney(rph)}` : '—'}</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400">{oph !== null ? oph.toFixed(1) : '—'}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </>
+              )}
+            </>
           )}
         </main>
       </div>
