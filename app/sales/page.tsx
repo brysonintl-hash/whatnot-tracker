@@ -113,17 +113,6 @@ export default function SalesPage() {
     return Object.entries(m).sort((a, b) => parseTabDate(a[0]).getTime() - parseTabDate(b[0]).getTime());
   }, [filtered]);
 
-  const byHost = useMemo(() => {
-    const m: Record<string, { sales: number; profit: number; orders: number; margins: number[] }> = {};
-    orders.forEach(o => {
-      const h = o.host;
-      if (!h) return;
-      if (!m[h]) m[h] = { sales: 0, profit: 0, orders: 0, margins: [] };
-      m[h].sales += o.sold; m[h].profit += o.profit; m[h].orders++; m[h].margins.push(o.margin);
-    });
-    return m;
-  }, [orders]);
-
   const topBuyers = useMemo(() => {
     const m: Record<string, { spent: number; orders: number }> = {};
     filtered.forEach(o => { if (!m[o.buyer]) m[o.buyer] = { spent: 0, orders: 0 }; m[o.buyer].spent += o.sold; m[o.buyer].orders++; });
@@ -283,34 +272,6 @@ export default function SalesPage() {
                 </div>
               </div>
 
-              {/* Host performance */}
-              <h2 className="font-bold text-slate-900 dark:text-white mb-3 text-sm">Host Performance</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {Object.entries(byHost).map(([host, data], i) => {
-                  const avg = data.margins.reduce((s, m) => s + m, 0) / (data.margins.length || 1);
-                  return (
-                    <div key={host} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 border-t-4" style={{ borderTopColor: HOST_COLORS[i % HOST_COLORS.length] }}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-lg shadow" style={{ backgroundColor: HOST_COLORS[i % HOST_COLORS.length] }}>{host[0]}</div>
-                        <span className="font-black text-slate-900 dark:text-white text-lg">{host}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        {[
-                          { label: 'Revenue', val: `$${fmt(data.sales)}`, cls: 'text-slate-900 dark:text-white' },
-                          { label: 'Profit', val: `$${fmt(data.profit)}`, cls: data.profit >= 0 ? 'text-emerald-600' : 'text-red-500' },
-                          { label: 'Orders', val: data.orders.toString(), cls: 'text-slate-700 dark:text-slate-300' },
-                          { label: 'Avg Margin', val: `${avg.toFixed(1)}%`, cls: avg >= 15 ? 'text-emerald-600' : avg >= 0 ? 'text-amber-500' : 'text-red-500' },
-                        ].map(s => (
-                          <div key={s.label} className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-2.5">
-                            <p className="text-slate-400 dark:text-slate-500 text-xs mb-0.5">{s.label}</p>
-                            <p className={`font-black ${s.cls}`}>{s.val}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </>
           )}
         </main>

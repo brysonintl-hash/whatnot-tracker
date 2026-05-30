@@ -32,7 +32,6 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
-      { href: '/shipper', label: 'Shipping', icon: I.truck },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
     ]},
     { title: 'Team', items: [
