@@ -19,7 +19,7 @@ export default function OnlineUsers() {
     const fetch_ = () =>
       fetch('/api/presence').then(r => r.json()).then(d => { if (Array.isArray(d)) setUsers(d); }).catch(() => {});
     fetch_();
-    const t = setInterval(fetch_, 30000);
+    const t = setInterval(fetch_, 10000);
     return () => clearInterval(t);
   }, []);
 

@@ -81,6 +81,23 @@ export function getActiveEntry(userId: string): TimeEntry | null {
   return getEntries().find(e => e.userId === userId && !e.clockOut) ?? null;
 }
 
+export function clearAllEntries(): void {
+  ensureDir();
+  writeFileSync(ENTRIES_FILE, JSON.stringify([], null, 2));
+}
+
+export function clearWeekEntries(sunISO: string, satISO: string): void {
+  const sun = new Date(sunISO);
+  const sat = new Date(satISO);
+  const entries = getEntries();
+  const kept = entries.filter(e => {
+    const d = new Date(e.clockIn);
+    return d < sun || d > sat;
+  });
+  ensureDir();
+  writeFileSync(ENTRIES_FILE, JSON.stringify(kept, null, 2));
+}
+
 export function deleteEntry(entryId: string): boolean {
   const entries = getEntries();
   const filtered = entries.filter(e => e.id !== entryId);

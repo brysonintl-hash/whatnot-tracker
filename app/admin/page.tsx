@@ -48,7 +48,7 @@ function KPI({ label, value, sub, color, icon }: { label: string; value: string;
   );
 }
 
-type SortCol = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | null;
+type SortCol = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | 'timestamp' | null;
 type SortDir = 'asc' | 'desc';
 
 export default function AdminPage() {
@@ -156,7 +156,8 @@ export default function AdminPage() {
       else if (sortCol === 'host') { av = a.host; bv = b.host; }
       else if (sortCol === 'tab') { av = parseTabDate(a.tab).getTime(); bv = parseTabDate(b.tab).getTime(); }
       else if (sortCol === 'sold') { av = a.sold; bv = b.sold; }
-      else { av = a.profit; bv = b.profit; }
+      else if (sortCol === 'profit') { av = a.profit; bv = b.profit; }
+      else { av = a.timestamp || ''; bv = b.timestamp || ''; }
       if (typeof av === 'number') return sortDir === 'asc' ? av - (bv as number) : (bv as number) - av;
       return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
@@ -395,7 +396,7 @@ export default function AdminPage() {
                         <SortHeader col="tab" label="Show" />
                         <SortHeader col="sold" label="Revenue" align="right" />
                         <SortHeader col="profit" label="Profit" align="right" />
-                        <th className="text-left text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide py-3 px-4">Time</th>
+                        <SortHeader col="timestamp" label="Time" />
                       </tr>
                     </thead>
                     <tbody>

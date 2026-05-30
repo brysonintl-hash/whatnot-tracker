@@ -54,6 +54,7 @@ function ManagementView({ session }: { session: Session }) {
   const [rateInputs, setRateInputs] = useState<Record<string, string>>({});
   const [savingPay, setSavingPay] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [loading, setLoading] = useState(true);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -118,6 +119,22 @@ function ManagementView({ session }: { session: Session }) {
       if (idx === -1) return [...prev, { userId, username, name, ratePerHour: rate }];
       return prev.map((r, i) => i === idx ? { ...r, ratePerHour: rate } : r);
     });
+  }
+
+  async function clearHistory(scope: 'week' | 'all') {
+    const msg = scope === 'week'
+      ? 'Clear all time entries for this week? This cannot be undone.'
+      : 'Clear ALL time history? This will delete every entry permanently.';
+    if (!confirm(msg)) return;
+    setClearing(true);
+    const params = scope === 'week'
+      ? `scope=week&sun=${sun.toISOString()}&sat=${sat.toISOString()}`
+      : 'scope=all';
+    await fetch(`/api/timekeeping?${params}`, { method: 'DELETE' });
+    setEntries(prev => scope === 'week'
+      ? prev.filter(e => { const d = new Date(e.clockIn); return d < sun || d > sat; })
+      : []);
+    setClearing(false);
   }
 
   async function deleteTimeEntry(id: string) {
@@ -262,9 +279,27 @@ function ManagementView({ session }: { session: Session }) {
 
               {/* Detailed time log */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
                   <h2 className="font-bold text-slate-900 text-sm">Time Log — This Week</h2>
                   <span className="text-xs text-slate-400">{weekEntries.length} entries</span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={() => clearHistory('week')}
+                      disabled={clearing || weekEntries.length === 0}
+                      className="px-3 py-1.5 text-[11px] font-bold rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-40 transition-colors"
+                    >
+                      {clearing ? 'Clearing...' : 'Clear This Week'}
+                    </button>
+                    {session.role === 'admin' && (
+                      <button
+                        onClick={() => clearHistory('all')}
+                        disabled={clearing}
+                        className="px-3 py-1.5 text-[11px] font-bold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                      >
+                        Clear All History
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

@@ -26,7 +26,7 @@ export function updatePresence(userId: string, username: string, name: string, r
   writeFileSync(FILE, JSON.stringify(data, null, 2));
 }
 
-export function getOnlineUsers(withinMs = 3 * 60 * 1000): PresenceRecord[] {
+export function getOnlineUsers(withinMs = 30 * 1000): PresenceRecord[] {
   try {
     if (!existsSync(FILE)) return [];
     const data: Record<string, PresenceRecord> = JSON.parse(readFileSync(FILE, 'utf8'));

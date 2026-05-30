@@ -1,126 +1,217 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Navbar from '@/components/Navbar';
+import { useRouter } from 'next/navigation';
+import Sidebar from '@/components/Sidebar';
+import { useTheme } from '@/lib/useTheme';
+import type { Role } from '@/lib/types';
 
-type Host = { id: string; name: string; color: string };
+type Session = { username: string; role: Role; name: string };
 
-const COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
+const TIMEZONES = [
+  { label: 'Eastern Time (ET)', value: 'America/New_York' },
+  { label: 'Central Time (CT)', value: 'America/Chicago' },
+  { label: 'Mountain Time (MT)', value: 'America/Denver' },
+  { label: 'Pacific Time (PT)', value: 'America/Los_Angeles' },
+  { label: 'Alaska Time (AKT)', value: 'America/Anchorage' },
+  { label: 'Hawaii Time (HT)', value: 'Pacific/Honolulu' },
+  { label: 'UTC', value: 'UTC' },
+];
 
 export default function SettingsPage() {
-  const [hosts, setHosts] = useState<Host[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(COLORS[0]);
-  const [adding, setAdding] = useState(false);
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null>(null);
+  const isDark = useTheme();
 
-  async function load() {
-    const res = await fetch('/api/hosts');
-    setHosts(await res.json());
-    setLoading(false);
+  // Change password
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwMsg, setPwMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  // Timezone
+  const [timezone, setTimezone] = useState('America/New_York');
+
+  // Delete account
+  const [deleting, setDeleting] = useState(false);
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  useEffect(() => {
+    fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
+      if (!s) { router.push('/login'); return; }
+      setSession(s);
+    });
+    const saved = localStorage.getItem('timezone');
+    if (saved) setTimezone(saved);
+  }, []);
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
   }
 
-  useEffect(() => { load(); }, []);
+  function saveTimezone(tz: string) {
+    setTimezone(tz);
+    localStorage.setItem('timezone', tz);
+  }
 
-  async function addHost(e: React.FormEvent) {
+  async function changePassword(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    setAdding(true);
-    await fetch('/api/hosts', {
+    setPwMsg(null);
+    if (newPw !== confirmPw) { setPwMsg({ type: 'err', text: 'New passwords do not match.' }); return; }
+    if (newPw.length < 4) { setPwMsg({ type: 'err', text: 'Password must be at least 4 characters.' }); return; }
+    setPwSaving(true);
+    const res = await fetch('/api/auth/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), color }),
+      body: JSON.stringify({ currentPassword: oldPw, newPassword: newPw }),
     });
-    setName('');
-    await load();
-    setAdding(false);
+    const data = await res.json();
+    if (res.ok) {
+      setPwMsg({ type: 'ok', text: 'Password changed successfully.' });
+      setOldPw(''); setNewPw(''); setConfirmPw('');
+    } else {
+      setPwMsg({ type: 'err', text: data.error || 'Failed to change password.' });
+    }
+    setPwSaving(false);
   }
 
-  async function deleteHost(id: string) {
-    if (!confirm('Remove this host?')) return;
-    await fetch('/api/hosts', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    await load();
+  async function deleteAccount() {
+    if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+    if (!confirm('This is permanent. All your data will be removed. Continue?')) return;
+    setDeleting(true);
+    const res = await fetch('/api/auth/delete-account', { method: 'DELETE' });
+    if (res.ok) {
+      router.push('/login');
+    } else {
+      const data = await res.json();
+      alert(data.error || 'Failed to delete account.');
+      setDeleting(false);
+    }
   }
+
+  if (!session) return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-[#0d1117]">
-      <Navbar />
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Host Management</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Add your show hosts — their stats will appear on the dashboard</p>
-        </div>
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
+      <Sidebar role={session.role} userName={session.name} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+          <div>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Settings</h1>
+            <p className="text-xs text-slate-400">{today}</p>
+          </div>
+          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+        </header>
 
-        {/* Add host form */}
-        <div className="card p-5 mb-6">
-          <h2 className="font-bold text-gray-900 dark:text-white mb-4">Add New Host</h2>
-          <form onSubmit={addHost} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Host Name</label>
-              <input
-                type="text" value={name} onChange={e => setName(e.target.value)}
-                placeholder="e.g. Jason, Devon..." className="w-full" required
-              />
+        <main className="flex-1 overflow-y-auto p-6 max-w-2xl">
+          {/* Appearance */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+              <h2 className="font-bold text-slate-900 dark:text-white text-sm">Appearance</h2>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Color</label>
-              <div className="flex gap-2">
-                {COLORS.map(c => (
-                  <button key={c} type="button" onClick={() => setColor(c)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${color === c ? 'border-gray-900 scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
+            <div className="p-6 space-y-5">
+              {/* Theme toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dark Mode</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Toggle between light and dark theme</p>
+                </div>
+                <button
+                  onClick={toggleTheme}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${isDark ? 'bg-red-500' : 'bg-slate-200'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isDark ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              {/* Timezone */}
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Timezone</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Used for displaying dates and times</p>
+                </div>
+                <select
+                  value={timezone}
+                  onChange={e => saveTimezone(e.target.value)}
+                  className="text-sm border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white"
+                >
+                  {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                </select>
               </div>
             </div>
-            <button type="submit" disabled={adding} className="btn-primary">
-              {adding ? 'Adding...' : '+ Add Host'}
-            </button>
-          </form>
-        </div>
-
-        {/* Hosts list */}
-        <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200 dark:border-[#30363d]">
-            <h2 className="font-bold text-gray-900 dark:text-white">Your Hosts</h2>
           </div>
-          {loading ? (
-            <div className="p-8 text-center text-gray-400">Loading...</div>
-          ) : hosts.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">No hosts added yet</div>
-          ) : (
-            <div className="divide-y divide-gray-100 dark:divide-[#21262d]">
-              {hosts.map(host => (
-                <div key={host.id} className="flex items-center gap-4 px-5 py-4">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-lg shrink-0"
-                    style={{ backgroundColor: host.color }}>
-                    {host.name[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900 dark:text-white">{host.name}</p>
-                    <p className="text-xs text-gray-400">Host · Stats appear on Dashboard & Sales pages</p>
-                  </div>
-                  <button onClick={() => deleteHost(host.id)} className="btn-danger">Remove</button>
+
+          {/* Change Password */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+              <h2 className="font-bold text-slate-900 dark:text-white text-sm">Change Password</h2>
+            </div>
+            <form onSubmit={changePassword} className="p-6 space-y-4">
+              {pwMsg && (
+                <div className={`px-4 py-3 rounded-lg text-sm font-medium ${pwMsg.type === 'ok' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'}`}>
+                  {pwMsg.text}
+                </div>
+              )}
+              {[
+                { label: 'Current Password', value: oldPw, set: setOldPw },
+                { label: 'New Password', value: newPw, set: setNewPw },
+                { label: 'Confirm New Password', value: confirmPw, set: setConfirmPw },
+              ].map(f => (
+                <div key={f.label}>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">{f.label}</label>
+                  <input
+                    type="password"
+                    value={f.value}
+                    onChange={e => f.set(e.target.value)}
+                    required
+                    className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+                  />
                 </div>
               ))}
-            </div>
-          )}
-        </div>
+              <div className="flex justify-end">
+                <button type="submit" disabled={pwSaving} className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50">
+                  {pwSaving ? 'Saving...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
 
-        <div className="mt-6 card p-5">
-          <h2 className="font-bold text-gray-900 dark:text-white mb-2">How Hosts Work</h2>
-          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 list-disc list-inside">
-            <li>When connected to Google Sheets, host names are pulled from column M of each show tab</li>
-            <li>Make sure the name in your spreadsheet matches exactly what you add here</li>
-            <li>Host stats (sales, profit, margin) are calculated automatically from your orders</li>
-            <li>In Demo Mode, only Jason appears as a sample host</li>
-          </ul>
-        </div>
-      </main>
+          {/* Danger Zone */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-red-200 dark:border-red-900 shadow-sm">
+            <div className="px-6 py-4 border-b border-red-100 dark:border-red-900">
+              <h2 className="font-bold text-red-600 text-sm">Danger Zone</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Delete My Account</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {session.role === 'admin'
+                      ? 'Admin accounts cannot be deleted for security.'
+                      : 'Permanently removes your account and all your data.'}
+                  </p>
+                </div>
+                <button
+                  onClick={deleteAccount}
+                  disabled={deleting || session.role === 'admin'}
+                  className="px-4 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-bold rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -38,7 +38,10 @@ const NAV: Record<Role, Section[]> = {
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
       { href: '/users', label: 'User Management', icon: I.users },
     ]},
-    { title: 'System', items: [{ href: '/settings', label: 'Settings', icon: I.settings }] },
+    { title: 'System', items: [
+      { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
+      { href: '/settings', label: 'Settings', icon: I.settings },
+    ]},
   ],
   manager: [
     { title: 'Overview', items: [{ href: '/manager', label: 'Dashboard', icon: I.grid }] },
@@ -49,6 +52,10 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
+    ]},
+    { title: 'System', items: [
+      { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
+      { href: '/settings', label: 'Settings', icon: I.settings },
     ]},
   ],
   employee: [],
@@ -62,6 +69,9 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
     ]},
+    { title: 'Account', items: [
+      { href: '/settings', label: 'Settings', icon: I.settings },
+    ]},
   ],
   host: [
     { title: 'Shows', items: [
@@ -74,6 +84,9 @@ const NAV: Record<Role, Section[]> = {
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
+    ]},
+    { title: 'Account', items: [
+      { href: '/settings', label: 'Settings', icon: I.settings },
     ]},
   ],
 };
@@ -103,7 +116,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   useEffect(() => {
     const ping = () => fetch('/api/presence', { method: 'POST' }).catch(() => {});
     ping();
-    const t = setInterval(ping, 30000);
+    const t = setInterval(ping, 10000);
     return () => clearInterval(t);
   }, []);
 
@@ -128,7 +141,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       {/* Logo */}
       <div className="h-16 flex items-center px-5 border-b border-slate-800 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center font-black text-slate-900 text-xs shadow">SB</div>
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-white text-xs shadow">SB</div>
           <div>
             <div className="text-white font-black text-sm leading-none">Stack Bargains</div>
             <div className="text-slate-500 text-[10px] capitalize mt-0.5">{role} Portal</div>
