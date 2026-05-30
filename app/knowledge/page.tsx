@@ -37,6 +37,7 @@ export default function KnowledgePage() {
   const [category, setCategory] = useState('Other');
   const [filter, setFilter] = useState('All');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -78,7 +79,10 @@ export default function KnowledgePage() {
   }
 
   const allCats = ['All', ...CATEGORIES.filter(c => links.some(l => l.category === c))];
-  const displayed = filter === 'All' ? links : links.filter(l => l.category === filter);
+  const searchLower = search.toLowerCase();
+  const displayed = links
+    .filter(l => filter === 'All' || l.category === filter)
+    .filter(l => !search || l.title.toLowerCase().includes(searchLower) || l.url.toLowerCase().includes(searchLower));
 
   if (!session) return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
 
@@ -141,6 +145,18 @@ export default function KnowledgePage() {
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search links..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
           </div>
 
           {/* Filter tabs */}

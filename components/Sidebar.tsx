@@ -23,6 +23,7 @@ const I = {
   pkg: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
   map: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
   tv: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+  clip: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-3-3v6" /></svg>,
 };
 
 const NAV: Record<Role, Section[]> = {
@@ -32,6 +33,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/shipper', label: 'Shipping', icon: I.truck },
+      { href: '/pendings', label: 'Pendings', icon: I.clip },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -48,6 +50,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
+      { href: '/pendings', label: 'Pendings', icon: I.clip },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -66,6 +69,9 @@ const NAV: Record<Role, Section[]> = {
       { href: '/shipper/tracking', label: 'Tracking', icon: I.map },
       { href: '/shipper/performance', label: 'My Performance', icon: I.bar },
     ]},
+    { title: 'Tasks', items: [
+      { href: '/pendings', label: 'Pendings', icon: I.clip },
+    ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
     ]},
@@ -81,6 +87,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
+      { href: '/pendings', label: 'Pendings', icon: I.clip },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -99,18 +106,38 @@ const ROLE_COLOR: Record<Role, string> = {
 export default function Sidebar({ role, userName }: { role: Role; userName: string }) {
   const pathname = usePathname();
   const router = useRouter();
-  const isDark = useTheme();
+  useTheme();
   const sections = NAV[role] ?? [];
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingUserCount, setPendingUserCount] = useState(0);
+  const [pendingTaskCount, setPendingTaskCount] = useState(0);
 
   useEffect(() => {
     if (role !== 'admin') return;
     fetch('/api/users')
       .then(r => r.json())
       .then((users: { status: string }[]) => {
-        setPendingCount(users.filter(u => u.status === 'pending').length);
+        setPendingUserCount(users.filter(u => u.status === 'pending').length);
       })
       .catch(() => {});
+  }, [role]);
+
+  useEffect(() => {
+    const fetchCount = () => {
+      fetch('/api/pendings')
+        .then(r => r.json())
+        .then((tasks: { status: string; urgent: boolean; followUp: boolean }[]) => {
+          if (!Array.isArray(tasks)) return;
+          if (role === 'admin' || role === 'manager') {
+            setPendingTaskCount(tasks.filter(t => t.status === 'open').length);
+          } else {
+            setPendingTaskCount(tasks.filter(t => t.status === 'open' && (t.urgent || t.followUp)).length);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchCount();
+    const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
   }, [role]);
 
   useEffect(() => {
@@ -119,17 +146,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
     const t = setInterval(ping, 10000);
     return () => clearInterval(t);
   }, []);
-
-  function toggleTheme() {
-    const html = document.documentElement;
-    if (html.classList.contains('dark')) {
-      html.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    } else {
-      html.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    }
-  }
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -156,6 +172,10 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
             <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">{section.title}</p>
             {section.items.map(item => {
               const active = pathname === item.href || (item.href !== '/admin' && item.href !== '/manager' && item.href !== '/employee' && item.href !== '/shipper' && item.href !== '/host' && pathname.startsWith(item.href));
+              const isUsers = item.href === '/users';
+              const isPendings = item.href === '/pendings';
+              const usersBadge = isUsers && pendingUserCount > 0;
+              const pendingsBadge = isPendings && pendingTaskCount > 0;
               return (
                 <Link
                   key={item.href}
@@ -168,13 +188,17 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   {item.label}
-                  {item.href === '/users' && pendingCount > 0 && (
+                  {usersBadge && (
                     <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                      {pendingCount}
+                      {pendingUserCount}
                     </span>
                   )}
-                  {active && item.href !== '/users' && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                  {active && item.href === '/users' && pendingCount === 0 && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {pendingsBadge && (
+                    <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                      {pendingTaskCount}
+                    </span>
+                  )}
+                  {active && !usersBadge && !pendingsBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
                 </Link>
               );
             })}
@@ -193,26 +217,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
             <div className="text-slate-400 text-[10px] capitalize font-medium">{role}</div>
           </div>
         </div>
-        <Link
-          href="/change-password"
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-medium transition-colors mb-1"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-          Change Password
-        </Link>
-        <button
-          onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-medium transition-colors mb-1"
-        >
-          {isDark ? (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-          )}
-          {isDark ? 'Light Mode' : 'Dark Mode'}
-        </button>
         <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 text-sm font-medium transition-colors"
