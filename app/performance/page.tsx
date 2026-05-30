@@ -47,11 +47,29 @@ function isoToDisplay(iso: string): string {
 
 function parseTimestamp(ts: string): number | null {
   if (!ts) return null;
-  const match = ts.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/);
-  if (match) {
-    const d = new Date(`${match[1]}T${match[2]}`);
+  // "YYYY-MM-DD HH:MM:SS"
+  const iso = ts.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/);
+  if (iso) {
+    const d = new Date(`${iso[1]}T${iso[2]}`);
     return isNaN(d.getTime()) ? null : d.getTime();
   }
+  // "M/D/YYYY H:MM:SS" or "M/D/YYYY H:MM:SS AM/PM"
+  const us = ts.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})(\s*[AP]M)?$/i);
+  if (us) {
+    let h = parseInt(us[4]);
+    const ampm = us[7]?.trim().toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    const d = new Date(parseInt(us[3]), parseInt(us[1]) - 1, parseInt(us[2]), h, parseInt(us[5]), parseInt(us[6]));
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+  return null;
+}
+
+// "02h 14m" or "2h 14m" or "00h 51m" → fractional hours
+function parseDurationStr(ts: string): number | null {
+  const m = ts.match(/^(\d+)h\s*(\d+)m$/);
+  if (m) return parseInt(m[1]) + parseInt(m[2]) / 60;
   return null;
 }
 
@@ -75,42 +93,51 @@ type HostStat = {
   totalProfit: number;
   totalOrders: number;
   totalUnits: number;
-  avgMargin: number;
+  overallMargin: number;
   durationHours: number;
 };
 
 function computeHostStats(orders: Order[]): HostStat[] {
-  const hostOrder: Record<string, number> = {};
   let colorIdx = 0;
 
   const map: Record<string, {
-    sales: number; profit: number; orders: number; units: number; margins: number[];
-    minTs: number | null; maxTs: number | null; colorIdx: number;
+    sales: number; profit: number; orders: number; units: number;
+    minTs: number | null; maxTs: number | null;
+    durStr: number | null; // from "HHh MMm" format
+    colorIdx: number;
   }> = {};
 
   orders.forEach(o => {
     const h = o.host;
     if (!h) return;
     if (!map[h]) {
-      map[h] = { sales: 0, profit: 0, orders: 0, units: 0, margins: [], minTs: null, maxTs: null, colorIdx: colorIdx++ };
-      hostOrder[h] = colorIdx;
+      map[h] = { sales: 0, profit: 0, orders: 0, units: 0, minTs: null, maxTs: null, durStr: null, colorIdx: colorIdx++ };
     }
     map[h].sales += o.sold;
     map[h].profit += o.profit;
     map[h].orders++;
     map[h].units += o.qty;
-    map[h].margins.push(o.margin);
 
     const ts = parseTimestamp(o.timestamp);
     if (ts !== null) {
       if (map[h].minTs === null || ts < map[h].minTs!) map[h].minTs = ts;
       if (map[h].maxTs === null || ts > map[h].maxTs!) map[h].maxTs = ts;
+    } else {
+      // Try duration string format ("02h 14m")
+      const dur = parseDurationStr(o.timestamp);
+      if (dur !== null && (map[h].durStr === null || dur > map[h].durStr!)) {
+        map[h].durStr = dur;
+      }
     }
   });
 
   return Object.entries(map)
     .map(([host, d]) => {
-      const durationMs = (d.minTs !== null && d.maxTs !== null && d.maxTs > d.minTs) ? d.maxTs - d.minTs : 0;
+      const durationFromTs = (d.minTs !== null && d.maxTs !== null && d.maxTs > d.minTs)
+        ? (d.maxTs - d.minTs) / 3600000
+        : 0;
+      const durationHours = durationFromTs > 0 ? durationFromTs : (d.durStr ?? 0);
+      const overallMargin = d.sales > 0 ? (d.profit / d.sales) * 100 : 0;
       return {
         host,
         colorIdx: d.colorIdx,
@@ -118,8 +145,8 @@ function computeHostStats(orders: Order[]): HostStat[] {
         totalProfit: d.profit,
         totalOrders: d.orders,
         totalUnits: d.units,
-        avgMargin: d.margins.reduce((a, b) => a + b, 0) / (d.margins.length || 1),
-        durationHours: durationMs / 3600000,
+        overallMargin,
+        durationHours,
       };
     })
     .sort((a, b) => b.totalSales - a.totalSales);
@@ -298,8 +325,8 @@ export default function PerformancePage() {
                         },
                         {
                           label: 'Overall Margin',
-                          value: `${hs.avgMargin.toFixed(1)}%`,
-                          valueClass: `font-black ${hs.avgMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.avgMargin >= 0 ? 'text-amber-500' : 'text-red-500'}`,
+                          value: `${hs.overallMargin.toFixed(1)}%`,
+                          valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}`,
                         },
                         {
                           label: 'Revenue per Hour',
