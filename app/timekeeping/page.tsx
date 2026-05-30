@@ -8,6 +8,7 @@ import type { Role } from '@/lib/types';
 type Session = { username: string; role: Role; name: string };
 type Entry = { id: string; userId: string; username: string; name: string; role: string; clockIn: string; clockOut: string | null; note: string; date: string };
 type Rate = { userId: string; username: string; name: string; ratePerHour: number };
+type Payment = { userId: string; weekStart: string; paid: boolean; paidAt: string };
 
 function hoursFromEntry(e: Entry): number {
   if (!e.clockOut) return 0;
@@ -24,12 +25,24 @@ function fmtHours(h: number) {
   return `${hh}h ${mm.toString().padStart(2, '0')}m`;
 }
 
+// Week = Sunday 00:00 → Saturday 23:59
 function getWeekRange() {
   const now = new Date();
-  const day = now.getDay();
-  const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1)); mon.setHours(0, 0, 0, 0);
-  const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23, 59, 59, 999);
-  return { mon, sun };
+  const day = now.getDay(); // 0=Sun
+  const sun = new Date(now);
+  sun.setDate(now.getDate() - day);
+  sun.setHours(0, 0, 0, 0);
+  const sat = new Date(sun);
+  sat.setDate(sun.getDate() + 6);
+  sat.setHours(23, 59, 59, 999);
+  return { sun, sat };
+}
+
+function weekStartKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // ─── Admin / Manager View ───────────────────────────────────────────────────
@@ -37,31 +50,36 @@ function getWeekRange() {
 function ManagementView({ session }: { session: Session }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [rates, setRates] = useState<Rate[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [rateInputs, setRateInputs] = useState<Record<string, string>>({});
+  const [savingPay, setSavingPay] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const { sun, sat } = getWeekRange();
+  const weekStart = weekStartKey(sun);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/timekeeping').then(r => r.json()),
       fetch('/api/timekeeping/rates').then(r => r.json()),
-    ]).then(([e, r]) => {
+      fetch(`/api/timekeeping/payments?weekStart=${weekStart}`).then(r => r.json()),
+    ]).then(([e, r, p]) => {
       setEntries(Array.isArray(e) ? e : []);
       const ratesArr = Array.isArray(r) ? r : [];
       setRates(ratesArr);
       const inputs: Record<string, string> = {};
       ratesArr.forEach((rt: Rate) => { inputs[rt.userId] = rt.ratePerHour.toString(); });
       setRateInputs(inputs);
+      setPayments(Array.isArray(p) ? p : []);
       setLoading(false);
     });
-  }, []);
-
-  const { mon, sun } = getWeekRange();
+  }, [weekStart]);
 
   const weekEntries = useMemo(() =>
     entries.filter(e => {
       const d = new Date(e.clockIn);
-      return d >= mon && d <= sun;
+      return d >= sun && d <= sat;
     }), [entries]);
 
   const staffSummary = useMemo(() => {
@@ -79,6 +97,12 @@ function ManagementView({ session }: { session: Session }) {
     const rate = rates.find(r => r.userId === m.userId)?.ratePerHour ?? 0;
     return s + m.totalHours * rate;
   }, 0);
+  const paidTotal = staffSummary.reduce((s, m) => {
+    const isPaid = payments.find(p => p.userId === m.userId)?.paid;
+    if (!isPaid) return s;
+    const rate = rates.find(r => r.userId === m.userId)?.ratePerHour ?? 0;
+    return s + m.totalHours * rate;
+  }, 0);
 
   async function saveRate(userId: string, username: string, name: string) {
     const rate = parseFloat(rateInputs[userId] || '0');
@@ -93,6 +117,26 @@ function ManagementView({ session }: { session: Session }) {
       if (idx === -1) return [...prev, { userId, username, name, ratePerHour: rate }];
       return prev.map((r, i) => i === idx ? { ...r, ratePerHour: rate } : r);
     });
+  }
+
+  async function togglePaid(userId: string) {
+    setSavingPay(userId);
+    const current = payments.find(p => p.userId === userId);
+    const newPaid = !current?.paid;
+    const res = await fetch('/api/timekeeping/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, weekStart, paid: newPaid }),
+    });
+    const data = await res.json();
+    if (data.record) {
+      setPayments(prev => {
+        const idx = prev.findIndex(p => p.userId === userId);
+        if (idx === -1) return [...prev, data.record];
+        return prev.map((p, i) => i === idx ? data.record : p);
+      });
+    }
+    setSavingPay(null);
   }
 
   return (
@@ -115,8 +159,8 @@ function ManagementView({ session }: { session: Session }) {
                 {[
                   { label: 'Total Hours This Week', value: fmtHours(totalHours), color: 'border-l-blue-400' },
                   { label: 'Total Payroll This Week', value: `$${totalPay.toFixed(2)}`, color: 'border-l-emerald-400' },
-                  { label: 'Staff Tracked', value: staffSummary.length.toString(), color: 'border-l-violet-400' },
-                  { label: 'Total Entries', value: weekEntries.length.toString(), color: 'border-l-amber-400' },
+                  { label: 'Paid Out', value: `$${paidTotal.toFixed(2)}`, color: 'border-l-violet-400' },
+                  { label: 'Remaining', value: `$${(totalPay - paidTotal).toFixed(2)}`, color: 'border-l-amber-400' },
                 ].map(k => (
                   <div key={k.label} className={`bg-white rounded-xl border border-slate-200 border-l-4 ${k.color} shadow-sm p-5`}>
                     <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
@@ -129,7 +173,10 @@ function ManagementView({ session }: { session: Session }) {
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h2 className="font-bold text-slate-900 text-sm">Weekly Staff Summary</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">{mon.toLocaleDateString()} – {sun.toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} –{' '}
+                    {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </p>
                 </div>
                 {staffSummary.length === 0 ? (
                   <div className="p-8 text-center text-slate-400 text-sm">No time entries this week</div>
@@ -137,7 +184,7 @@ function ManagementView({ session }: { session: Session }) {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead><tr className="border-b border-slate-100">
-                        {['Name', 'Role', 'Total Hours', 'Rate / hr', 'Total Pay'].map(h => (
+                        {['Name', 'Role', 'Total Hours', 'Rate / hr', 'Total Pay', 'Payment'].map(h => (
                           <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">{h}</th>
                         ))}
                       </tr></thead>
@@ -145,6 +192,8 @@ function ManagementView({ session }: { session: Session }) {
                         {staffSummary.map(m => {
                           const rate = rates.find(r => r.userId === m.userId)?.ratePerHour ?? 0;
                           const pay = m.totalHours * rate;
+                          const isPaid = payments.find(p => p.userId === m.userId)?.paid ?? false;
+                          const paidAt = payments.find(p => p.userId === m.userId)?.paidAt;
                           return (
                             <tr key={m.userId} className="border-b border-slate-50 hover:bg-slate-50">
                               <td className="py-3 px-5">
@@ -171,6 +220,29 @@ function ManagementView({ session }: { session: Session }) {
                                 </div>
                               </td>
                               <td className="py-3 px-5 text-xs font-black text-emerald-600">${pay.toFixed(2)}</td>
+                              <td className="py-3 px-5">
+                                {isPaid ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    <button
+                                      onClick={() => togglePaid(m.userId)}
+                                      disabled={savingPay === m.userId}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                      Paid
+                                    </button>
+                                    {paidAt && <span className="text-[9px] text-slate-400 pl-1">{new Date(paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => togglePaid(m.userId)}
+                                    disabled={savingPay === m.userId}
+                                    className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition-colors disabled:opacity-50"
+                                  >
+                                    {savingPay === m.userId ? 'Saving...' : 'Mark Paid'}
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           );
                         })}
@@ -264,10 +336,10 @@ function StaffView({ session }: { session: Session }) {
     setSaving(false);
   }
 
-  const { mon, sun } = getWeekRange();
+  const { sun, sat } = getWeekRange();
   const weekEntries = entries.filter(e => {
     const d = new Date(e.clockIn);
-    return d >= mon && d <= sun;
+    return d >= sun && d <= sat;
   });
   const totalHours = weekEntries.reduce((s, e) => s + hoursFromEntry(e), 0);
 
@@ -335,7 +407,7 @@ function StaffView({ session }: { session: Session }) {
                     { label: 'Hours This Week', value: fmtHours(totalHours), color: 'text-blue-600', border: 'border-l-blue-400' },
                     { label: 'Entries This Week', value: weekEntries.length.toString(), color: 'text-slate-900', border: 'border-l-slate-400' },
                     { label: 'Status', value: active ? 'Clocked In' : 'Clocked Out', color: active ? 'text-emerald-600' : 'text-slate-400', border: active ? 'border-l-emerald-400' : 'border-l-slate-300' },
-                    { label: 'Today\'s Entries', value: entries.filter(e => e.date === new Date().toLocaleDateString('en-US')).length.toString(), color: 'text-amber-600', border: 'border-l-amber-400' },
+                    { label: "Today's Entries", value: entries.filter(e => e.date === new Date().toLocaleDateString('en-US')).length.toString(), color: 'text-amber-600', border: 'border-l-amber-400' },
                   ].map(k => (
                     <div key={k.label} className={`bg-white rounded-xl border border-slate-200 border-l-4 ${k.border} shadow-sm p-5`}>
                       <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
@@ -349,6 +421,10 @@ function StaffView({ session }: { session: Session }) {
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h2 className="font-bold text-slate-900 text-sm">My Time Log — This Week</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} –{' '}
+                    {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

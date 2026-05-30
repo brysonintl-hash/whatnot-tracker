@@ -20,9 +20,17 @@ export type UserRate = {
   ratePerHour: number;
 };
 
+export type PaymentRecord = {
+  userId: string;
+  weekStart: string;
+  paid: boolean;
+  paidAt: string;
+};
+
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data');
 const ENTRIES_FILE = join(DATA_DIR, 'timekeeping.json');
 const RATES_FILE = join(DATA_DIR, 'rates.json');
+const PAYMENTS_FILE = join(DATA_DIR, 'payments.json');
 
 function ensureDir() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
@@ -71,6 +79,23 @@ export function clockOut(entryId: string, note: string): TimeEntry | null {
 
 export function getActiveEntry(userId: string): TimeEntry | null {
   return getEntries().find(e => e.userId === userId && !e.clockOut) ?? null;
+}
+
+export function getPayments(): PaymentRecord[] {
+  try {
+    if (existsSync(PAYMENTS_FILE)) return JSON.parse(readFileSync(PAYMENTS_FILE, 'utf8'));
+  } catch {}
+  return [];
+}
+
+export function setPayment(userId: string, weekStart: string, paid: boolean): PaymentRecord {
+  const payments = getPayments();
+  const idx = payments.findIndex(p => p.userId === userId && p.weekStart === weekStart);
+  const record: PaymentRecord = { userId, weekStart, paid, paidAt: new Date().toISOString() };
+  const updated = idx === -1 ? [...payments, record] : payments.map((p, i) => i === idx ? record : p);
+  ensureDir();
+  writeFileSync(PAYMENTS_FILE, JSON.stringify(updated, null, 2));
+  return record;
 }
 
 export function setRate(userId: string, username: string, name: string, ratePerHour: number) {

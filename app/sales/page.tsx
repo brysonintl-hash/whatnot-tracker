@@ -14,7 +14,7 @@ type Session = { username: string; role: Role; name: string };
 type Order = {
   tab: string; orderId: string; buyer: string; modelNum: string; productName: string;
   qty: number; sold: number; cost: number; earn: number; profit: number; margin: number;
-  showDuration: string; host: string;
+  timestamp: string; host: string;
 };
 
 function parseTabDate(tab: string): Date {
