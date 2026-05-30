@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
 
@@ -58,6 +59,9 @@ const NAV: Record<Role, Section[]> = {
       { href: '/shipper/tracking', label: 'Tracking', icon: I.map },
       { href: '/shipper/performance', label: 'My Performance', icon: I.bar },
     ]},
+    { title: 'Time', items: [
+      { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
+    ]},
   ],
   host: [
     { title: 'Shows', items: [
@@ -67,6 +71,9 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
+    ]},
+    { title: 'Time', items: [
+      { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
     ]},
   ],
 };
@@ -81,6 +88,17 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const router = useRouter();
   const isDark = useTheme();
   const sections = NAV[role] ?? [];
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    fetch('/api/users')
+      .then(r => r.json())
+      .then((users: { status: string }[]) => {
+        setPendingCount(users.filter(u => u.status === 'pending').length);
+      })
+      .catch(() => {});
+  }, [role]);
 
   function toggleTheme() {
     const html = document.documentElement;
@@ -130,7 +148,13 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   {item.label}
-                  {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {item.href === '/users' && pendingCount > 0 && (
+                    <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                      {pendingCount}
+                    </span>
+                  )}
+                  {active && item.href !== '/users' && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {active && item.href === '/users' && pendingCount === 0 && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
                 </Link>
               );
             })}
