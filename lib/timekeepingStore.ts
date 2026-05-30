@@ -81,6 +81,15 @@ export function getActiveEntry(userId: string): TimeEntry | null {
   return getEntries().find(e => e.userId === userId && !e.clockOut) ?? null;
 }
 
+export function deleteEntry(entryId: string): boolean {
+  const entries = getEntries();
+  const filtered = entries.filter(e => e.id !== entryId);
+  if (filtered.length === entries.length) return false;
+  ensureDir();
+  writeFileSync(ENTRIES_FILE, JSON.stringify(filtered, null, 2));
+  return true;
+}
+
 export function getPayments(): PaymentRecord[] {
   try {
     if (existsSync(PAYMENTS_FILE)) return JSON.parse(readFileSync(PAYMENTS_FILE, 'utf8'));

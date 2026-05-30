@@ -100,6 +100,13 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       .catch(() => {});
   }, [role]);
 
+  useEffect(() => {
+    const ping = () => fetch('/api/presence', { method: 'POST' }).catch(() => {});
+    ping();
+    const t = setInterval(ping, 30000);
+    return () => clearInterval(t);
+  }, []);
+
   function toggleTheme() {
     const html = document.documentElement;
     if (html.classList.contains('dark')) {

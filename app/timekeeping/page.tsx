@@ -53,6 +53,7 @@ function ManagementView({ session }: { session: Session }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [rateInputs, setRateInputs] = useState<Record<string, string>>({});
   const [savingPay, setSavingPay] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -117,6 +118,13 @@ function ManagementView({ session }: { session: Session }) {
       if (idx === -1) return [...prev, { userId, username, name, ratePerHour: rate }];
       return prev.map((r, i) => i === idx ? { ...r, ratePerHour: rate } : r);
     });
+  }
+
+  async function deleteTimeEntry(id: string) {
+    setDeletingId(id);
+    await fetch(`/api/timekeeping/${id}`, { method: 'DELETE' });
+    setEntries(prev => prev.filter(e => e.id !== id));
+    setDeletingId(null);
   }
 
   async function togglePaid(userId: string) {
@@ -254,22 +262,23 @@ function ManagementView({ session }: { session: Session }) {
 
               {/* Detailed time log */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="px-5 py-4 border-b border-slate-100">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                   <h2 className="font-bold text-slate-900 text-sm">Time Log — This Week</h2>
+                  <span className="text-xs text-slate-400">{weekEntries.length} entries</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr className="border-b border-slate-100">
-                      {['Date', 'Name', 'Role', 'Clock In', 'Clock Out', 'Hours', 'Note'].map(h => (
-                        <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">{h}</th>
+                      {['Date', 'Name', 'Role', 'Clock In', 'Clock Out', 'Hours', 'Note', ''].map((h, i) => (
+                        <th key={i} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">{h}</th>
                       ))}
                     </tr></thead>
                     <tbody>
                       {weekEntries.length === 0 ? (
-                        <tr><td colSpan={7} className="py-8 text-center text-slate-400 text-sm">No entries this week</td></tr>
+                        <tr><td colSpan={8} className="py-8 text-center text-slate-400 text-sm">No entries this week</td></tr>
                       ) : (
                         [...weekEntries].reverse().map(e => (
-                          <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50">
+                          <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 group">
                             <td className="py-3 px-4 text-xs text-slate-400">{e.date}</td>
                             <td className="py-3 px-4 text-xs font-semibold text-slate-700">{e.name}</td>
                             <td className="py-3 px-4"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize">{e.role}</span></td>
@@ -277,6 +286,20 @@ function ManagementView({ session }: { session: Session }) {
                             <td className="py-3 px-4 text-xs text-slate-700">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
                             <td className="py-3 px-4 text-xs font-bold text-slate-900">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
                             <td className="py-3 px-4 text-xs text-slate-500 max-w-[160px] truncate">{e.note || '—'}</td>
+                            <td className="py-3 px-4">
+                              <button
+                                onClick={() => deleteTimeEntry(e.id)}
+                                disabled={deletingId === e.id}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-30"
+                                title="Delete entry"
+                              >
+                                {deletingId === e.id ? (
+                                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                )}
+                              </button>
+                            </td>
                           </tr>
                         ))
                       )}
