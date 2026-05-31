@@ -4,7 +4,7 @@ import { signToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
-  const user = findByCredentials(username, password);
+  const user = await findByCredentials(username, password);
 
   if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   if (user.status === 'pending') return NextResponse.json({ error: 'Your account is pending admin approval. Please wait.' }, { status: 403 });

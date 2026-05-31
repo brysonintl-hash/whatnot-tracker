@@ -17,15 +17,15 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Password is required to delete your account.' }, { status: 400 });
   }
 
-  const verified = findByCredentials(session.username, password);
+  const verified = await findByCredentials(session.username, password);
   if (!verified) {
     return NextResponse.json({ error: 'Incorrect password.' }, { status: 400 });
   }
 
-  const user = findByUsername(session.username);
+  const user = await findByUsername(session.username);
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  deleteUser(user.id);
+  await deleteUser(user.id);
 
   const res = NextResponse.json({ success: true });
   res.cookies.set('auth_token', '', { maxAge: 0, path: '/' });

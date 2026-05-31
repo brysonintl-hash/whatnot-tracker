@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const user = findByUsername(session.username);
+  const user = await findByUsername(session.username);
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   const active = getActiveEntry(user.id);
