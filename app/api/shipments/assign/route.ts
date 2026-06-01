@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import {
   upsertAssignment, removeAssignment, updateStatus,
-  bulkAssign, pingShipment, acknowledgePing,
+  bulkAssign, pingShipment, acknowledgePing, getAssignments,
 } from '@/lib/shipmentStore';
 
 export async function POST(req: NextRequest) {
@@ -23,6 +23,32 @@ export async function POST(req: NextRequest) {
     }
     bulkAssign(items, assignedTo, assignedToName, assignedToRole, session.username, notes || '');
     return NextResponse.json({ success: true, count: items.length });
+  }
+
+  // === BULK RESOLVE ===
+  if (action === 'bulk-resolve') {
+    const { items } = body;
+    if (!items?.length) return NextResponse.json({ error: 'No items' }, { status: 400 });
+    const assignments = getAssignments();
+    const isAdmin = session.role === 'admin' || session.role === 'manager';
+    for (const item of items) {
+      const a = assignments.find(x => x.shipmentId === item.shipmentId && x.tab === item.tab);
+      if (!a) continue;
+      if (!isAdmin && a.assignedTo !== session.username) continue; // host/shipper can only resolve their own
+      updateStatus(item.shipmentId, item.tab, 'resolved');
+    }
+    return NextResponse.json({ success: true });
+  }
+
+  // === BULK UNASSIGN ===
+  if (action === 'bulk-unassign') {
+    if (session.role !== 'admin' && session.role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const { items } = body;
+    if (!items?.length) return NextResponse.json({ error: 'No items' }, { status: 400 });
+    for (const item of items) removeAssignment(item.shipmentId, item.tab);
+    return NextResponse.json({ success: true });
   }
 
   // === PING ===

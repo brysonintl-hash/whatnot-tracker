@@ -48,9 +48,14 @@ export default function ShippingPage() {
   const [assignForm, setAssignForm] = useState<Record<string, { username: string; name: string; role: string; notes: string }>>({});
 
   // Ping state
-  const [pingTarget, setPingTarget] = useState<string | null>(null); // "id|tab"
+  const [pingTarget, setPingTarget] = useState<string | null>(null);
   const [pingMsg, setPingMsg] = useState('');
   const [pingSaving, setPingSaving] = useState(false);
+
+  // Bulk edit state
+  const [editMode, setEditMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -194,6 +199,39 @@ export default function ShippingPage() {
     load();
   }
 
+  function toggleSelect(k: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    const all = displayed.map(s => key(s));
+    if (selected.size === all.length) setSelected(new Set());
+    else setSelected(new Set(all));
+  }
+
+  function keyToItem(k: string) {
+    const idx = k.indexOf('|');
+    return { shipmentId: k.slice(0, idx), tab: k.slice(idx + 1) };
+  }
+
+  async function bulkAction(action: 'bulk-resolve' | 'bulk-unassign') {
+    const items = Array.from(selected).map(keyToItem);
+    setBulkSaving(true);
+    await fetch('/api/shipments/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, items }),
+    });
+    setBulkSaving(false);
+    setSelected(new Set());
+    setEditMode(false);
+    load();
+  }
+
   if (!session) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
       <div className="text-slate-400 text-sm">Loading...</div>
@@ -209,7 +247,16 @@ export default function ShippingPage() {
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Shipments</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
-          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setEditMode(m => !m); setSelected(new Set()); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${editMode ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              {editMode ? 'Cancel Edit' : 'Edit'}
+            </button>
+            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -321,6 +368,32 @@ export default function ShippingPage() {
                 </div>
               )}
 
+              {/* Bulk action bar */}
+              {editMode && (
+                <div className="flex items-center gap-3 mb-4 bg-slate-900 dark:bg-slate-700 rounded-xl px-4 py-3 flex-wrap">
+                  <span className="text-white text-xs font-bold">
+                    {selected.size} selected
+                  </span>
+                  <div className="flex gap-2 ml-auto">
+                    {isAdminOrManager && selected.size > 0 && (
+                      <button onClick={() => bulkAction('bulk-unassign')} disabled={bulkSaving}
+                        className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
+                        {bulkSaving ? '...' : `Unassign (${selected.size})`}
+                      </button>
+                    )}
+                    {selected.size > 0 && (
+                      <button onClick={() => bulkAction('bulk-resolve')} disabled={bulkSaving}
+                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
+                        {bulkSaving ? '...' : `Resolve (${selected.size})`}
+                      </button>
+                    )}
+                    <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-bold rounded-lg transition-colors">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Table */}
               {displayed.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
@@ -337,6 +410,14 @@ export default function ShippingPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                        {editMode && (
+                          <th className="py-3 pl-4 pr-2 w-10">
+                            <input type="checkbox"
+                              checked={selected.size === displayed.length && displayed.length > 0}
+                              onChange={toggleAll}
+                              className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
+                          </th>
+                        )}
                         <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">Shipment #</th>
                         <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
                         <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
@@ -357,7 +438,17 @@ export default function ShippingPage() {
 
                         return (
                           <tr key={k}
-                            className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+                            className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : selected.has(k) ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+
+                            {/* Checkbox */}
+                            {editMode && (
+                              <td className="py-3 pl-4 pr-2">
+                                <input type="checkbox"
+                                  checked={selected.has(k)}
+                                  onChange={() => toggleSelect(k)}
+                                  className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
+                              </td>
+                            )}
 
                             {/* Shipment ID (plain text, no link) */}
                             <td className="py-3 px-5">

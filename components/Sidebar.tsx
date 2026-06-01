@@ -66,7 +66,6 @@ const NAV: Record<Role, Section[]> = {
   employee: [],
   shipper: [
     { title: 'Shipping', items: [
-      { href: '/shipper', label: 'Dashboard', icon: I.grid },
       { href: '/shipper/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Tasks', items: [
@@ -81,10 +80,6 @@ const NAV: Record<Role, Section[]> = {
     ]},
   ],
   host: [
-    { title: 'Shows', items: [
-      { href: '/host', label: 'Dashboard', icon: I.grid },
-      { href: '/host/shows', label: 'My Shows', icon: I.tv },
-    ]},
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
@@ -112,6 +107,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const sections = NAV[role] ?? [];
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
+  const [shipmentCount, setShipmentCount] = useState(0);
 
   useEffect(() => {
     if (role !== 'admin') return;
@@ -135,6 +131,19 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
             setPendingTaskCount(tasks.filter(t => t.status === 'open' && (t.urgent || t.followUp)).length);
           }
         })
+        .catch(() => {});
+    };
+    fetchCount();
+    const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== 'host' && role !== 'shipper') return;
+    const fetchCount = () => {
+      fetch('/api/shipments/mycount')
+        .then(r => r.json())
+        .then(d => setShipmentCount(d.count || 0))
         .catch(() => {});
     };
     fetchCount();
@@ -176,8 +185,11 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
               const active = pathname === item.href || (item.href !== '/admin' && item.href !== '/manager' && item.href !== '/employee' && item.href !== '/shipper' && item.href !== '/host' && pathname.startsWith(item.href));
               const isUsers = item.href === '/users';
               const isPendings = item.href === '/pendings';
+              const isShipments = item.href === '/shipping';
               const usersBadge = isUsers && pendingUserCount > 0;
               const pendingsBadge = isPendings && pendingTaskCount > 0;
+              const shipmentsBadge = isShipments && (role === 'host' || role === 'shipper') && shipmentCount > 0;
+              const hasBadge = usersBadge || pendingsBadge || shipmentsBadge;
               return (
                 <Link
                   key={item.href}
@@ -200,7 +212,12 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                       {pendingTaskCount}
                     </span>
                   )}
-                  {active && !usersBadge && !pendingsBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {shipmentsBadge && (
+                    <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                      {shipmentCount}
+                    </span>
+                  )}
+                  {active && !hasBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
                 </Link>
               );
             })}
