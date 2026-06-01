@@ -84,6 +84,47 @@ export async function getSalesData(): Promise<SaleOrder[]> {
   return allOrders;
 }
 
+export type ShipmentRecord = { shipmentId: string; tab: string };
+
+export async function getShipmentData(): Promise<ShipmentRecord[]> {
+  const auth = getAuth();
+  const spreadsheetId = process.env.SHIPMENT_SHEET_ID;
+  if (!auth || !spreadsheetId) return [];
+
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetNames = (meta.data.sheets || [])
+      .map(s => s.properties?.title || '')
+      .filter(Boolean);
+
+    const all: ShipmentRecord[] = [];
+    const BATCH = 50;
+
+    for (let i = 0; i < sheetNames.length; i += BATCH) {
+      const batch = sheetNames.slice(i, i + BATCH);
+      const ranges = batch.map(tab => `'${tab}'!A1:A2000`);
+      const batchRes = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges });
+
+      (batchRes.data.valueRanges || []).forEach((vr, idx) => {
+        const tab = batch[idx];
+        const rows = vr.values || [];
+        rows.forEach(row => {
+          const val = (row[0] || '').toString().trim();
+          if (val && val.toLowerCase() !== 'shipment' && /^\d+$/.test(val)) {
+            all.push({ shipmentId: val, tab });
+          }
+        });
+      });
+    }
+
+    return all;
+  } catch (e) {
+    console.error('getShipmentData error:', e);
+    return [];
+  }
+}
+
 export async function getInventoryData(): Promise<InventoryItem[]> {
   if (isDemo()) return sampleInventory;
 

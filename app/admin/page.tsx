@@ -182,14 +182,14 @@ export default function AdminPage() {
     setFilterOpen(null);
   }
 
-  function SortHeader({ col, label, align = 'left' }: { col: SortCol; label: string; align?: 'left' | 'right' }) {
+  function SortHeader({ col, label, align = 'left' }: { col: SortCol; label: string; align?: 'left' | 'right' | 'center' }) {
     const isActive = sortCol === col;
     const colKey = col ?? '';
     return (
       <th className="relative">
         <button
           onClick={(e) => { e.stopPropagation(); setFilterOpen(filterOpen === colKey ? null : colKey); }}
-          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide py-3 px-4 hover:text-slate-700 dark:hover:text-slate-200 transition-colors w-full ${align === 'right' ? 'justify-end' : 'justify-start'} ${isActive ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}
+          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide py-3 px-4 hover:text-slate-700 dark:hover:text-slate-200 transition-colors w-full ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'} ${isActive ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}
         >
           {label}
           <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -392,12 +392,12 @@ export default function AdminPage() {
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-700">
                         <SortHeader col="product" label="Product" />
-                        <SortHeader col="buyer" label="Buyer" />
-                        <SortHeader col="host" label="Host" />
-                        <SortHeader col="tab" label="Show" />
-                        <SortHeader col="sold" label="Revenue" align="right" />
-                        <SortHeader col="profit" label="Profit" align="right" />
-                        <SortHeader col="timestamp" label="Time" />
+                        <SortHeader col="buyer" label="Buyer" align="center" />
+                        <SortHeader col="host" label="Host" align="center" />
+                        <SortHeader col="tab" label="Show" align="center" />
+                        <SortHeader col="sold" label="Revenue" align="center" />
+                        <SortHeader col="profit" label="Profit" align="center" />
+                        <SortHeader col="timestamp" label="Time" align="center" />
                       </tr>
                     </thead>
                     <tbody>
@@ -407,12 +407,12 @@ export default function AdminPage() {
                         pagedOrders.map((o, i) => (
                           <tr key={i} className="border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                             <td className="py-3 px-4 text-slate-700 dark:text-slate-300 text-xs font-medium max-w-[180px] truncate">{o.productName || o.modelNum}</td>
-                            <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">{o.buyer}</td>
-                            <td className="py-3 px-4"><span className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">{o.host}</span></td>
-                            <td className="py-3 px-4 text-slate-400 dark:text-slate-500 text-xs">{o.tab}</td>
-                            <td className="py-3 px-4 text-right font-semibold text-slate-900 dark:text-white text-xs">${o.sold.toFixed(2)}</td>
-                            <td className={`py-3 px-4 text-right font-bold text-xs ${o.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${o.profit.toFixed(2)}</td>
-                            <td className="py-3 px-4 text-slate-400 dark:text-slate-500 text-xs whitespace-nowrap">{fmtTimestamp(o.timestamp)}</td>
+                            <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs text-center">{o.buyer}</td>
+                            <td className="py-3 px-4 text-center"><span className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">{o.host}</span></td>
+                            <td className="py-3 px-4 text-slate-400 dark:text-slate-500 text-xs text-center">{o.tab}</td>
+                            <td className="py-3 px-4 text-center font-semibold text-slate-900 dark:text-white text-xs">${o.sold.toFixed(2)}</td>
+                            <td className={`py-3 px-4 text-center font-bold text-xs ${o.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${o.profit.toFixed(2)}</td>
+                            <td className="py-3 px-4 text-slate-400 dark:text-slate-500 text-xs whitespace-nowrap text-center">{fmtTimestamp(o.timestamp)}</td>
                           </tr>
                         ))
                       )}

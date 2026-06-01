@@ -180,7 +180,7 @@ export default function InventoryPage() {
                         <td className="py-3 px-4 max-w-xs"><span className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 block">{item.description}</span></td>
                         <td className="py-3 px-4 font-mono text-xs text-slate-400">{item.upc}</td>
                         <td className="py-3 px-4 font-mono text-xs text-slate-400">{item.asin}</td>
-                        <td className="py-3 px-4 text-center font-black text-lg text-slate-900 dark:text-white">{item.qty}</td>
+                        <td className="py-3 px-4 text-center font-black text-lg text-slate-900 dark:text-white">{item.qty.toLocaleString()}</td>
                         <td className="py-3 px-4"><QtyBadge qty={item.qty} /></td>
                         <td className="py-3 px-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">${item.retail.toFixed(2)}</td>
                         <td className="py-3 px-4 text-right font-black text-sm text-emerald-600">${item.total.toFixed(2)}</td>

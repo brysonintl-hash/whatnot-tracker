@@ -24,6 +24,7 @@ const I = {
   map: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
   tv: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   clip: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-3-3v6" /></svg>,
+  ship: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
 };
 
 const NAV: Record<Role, Section[]> = {
@@ -33,6 +34,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
+      { href: '/shipping', label: 'Shipments', icon: I.ship },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -50,6 +52,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
+      { href: '/shipping', label: 'Shipments', icon: I.ship },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -68,6 +71,7 @@ const NAV: Record<Role, Section[]> = {
     ]},
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
+      { href: '/shipping', label: 'Shipments', icon: I.ship },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -85,6 +89,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
+      { href: '/shipping', label: 'Shipments', icon: I.ship },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
