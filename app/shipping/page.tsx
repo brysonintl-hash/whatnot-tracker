@@ -9,23 +9,15 @@ import type { Role } from '@/lib/types';
 type Session = { username: string; role: Role; name: string };
 
 type Assignment = {
-  shipmentId: string;
-  tab: string;
-  assignedTo: string;
-  assignedToName: string;
-  assignedToRole: string;
-  assignedBy: string;
-  assignedAt: string;
+  shipmentId: string; tab: string;
+  assignedTo: string; assignedToName: string; assignedToRole: string;
+  assignedBy: string; assignedAt: string;
   status: 'pending' | 'in-progress' | 'resolved';
   notes: string;
+  pinged: boolean; pingMessage: string; pingAt: string;
 };
 
-type ShipmentRow = {
-  shipmentId: string;
-  tab: string;
-  assignment: Assignment | null;
-};
-
+type ShipmentRow = { shipmentId: string; tab: string; assignment: Assignment | null };
 type User = { username: string; name: string; role: Role };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -33,12 +25,7 @@ const STATUS_STYLE: Record<string, string> = {
   'in-progress': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
   resolved: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
 };
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Pending',
-  'in-progress': 'In Progress',
-  resolved: 'Resolved',
-};
+const STATUS_LABEL: Record<string, string> = { pending: 'Pending', 'in-progress': 'In Progress', resolved: 'Resolved' };
 
 export default function ShippingPage() {
   const router = useRouter();
@@ -49,15 +36,26 @@ export default function ShippingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'pending' | 'in-progress' | 'resolved'>('all');
-  const [assigning, setAssigning] = useState<string | null>(null); // "shipmentId|tab" being saved
+
+  // Auto-assign state
+  const [autoUser, setAutoUser] = useState('');
+  const [autoCount, setAutoCount] = useState('');
+  const [autoNotes, setAutoNotes] = useState('');
+  const [autoSaving, setAutoSaving] = useState(false);
+
+  // Single-assign state per row
+  const [assigning, setAssigning] = useState<string | null>(null);
   const [assignForm, setAssignForm] = useState<Record<string, { username: string; name: string; role: string; notes: string }>>({});
+
+  // Ping state
+  const [pingTarget, setPingTarget] = useState<string | null>(null); // "id|tab"
+  const [pingMsg, setPingMsg] = useState('');
+  const [pingSaving, setPingSaving] = useState(false);
+
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   async function load() {
-    const [sRes, uRes] = await Promise.all([
-      fetch('/api/shipments'),
-      fetch('/api/users'),
-    ]);
+    const [sRes, uRes] = await Promise.all([fetch('/api/shipments'), fetch('/api/users')]);
     const [sData, uData] = await Promise.all([sRes.json(), uRes.json()]);
     setShipments(Array.isArray(sData) ? sData : []);
     setUsers(Array.isArray(uData) ? uData.filter((u: User) => u.role === 'host' || u.role === 'shipper') : []);
@@ -72,7 +70,6 @@ export default function ShippingPage() {
     load();
   }, []);
 
-  // All tabs from shipments
   const allTabs = useMemo(() => {
     const tabs = Array.from(new Set(shipments.map(s => s.tab))).sort((a, b) => {
       const parse = (t: string) => { const [m, d, y] = t.split('/').map(Number); return new Date(2000 + y, m - 1, d).getTime(); };
@@ -81,66 +78,118 @@ export default function ShippingPage() {
     return tabs;
   }, [shipments]);
 
-  // Auto-select latest tab
   useEffect(() => {
     if (allTabs.length > 0 && !selectedTab) setSelectedTab(allTabs[0]);
   }, [allTabs]);
 
   const isAdminOrManager = session?.role === 'admin' || session?.role === 'manager';
 
-  // For admin/manager: filter by tab. For host/shipper: show only their assignments
+  const tabShipments = useMemo(() =>
+    selectedTab ? shipments.filter(s => s.tab === selectedTab) : [],
+    [shipments, selectedTab]);
+
+  const unassignedInTab = useMemo(() => tabShipments.filter(s => !s.assignment), [tabShipments]);
+
   const displayed = useMemo(() => {
     if (!session) return [];
     if (isAdminOrManager) {
-      const tabFiltered = selectedTab ? shipments.filter(s => s.tab === selectedTab) : shipments;
-      return tabFiltered.filter(s => {
+      return tabShipments.filter(s => {
         if (statusFilter === 'all') return true;
         if (statusFilter === 'unassigned') return !s.assignment;
         return s.assignment?.status === statusFilter;
       });
     }
     return shipments.filter(s => s.assignment?.assignedTo === session.username);
-  }, [shipments, session, selectedTab, statusFilter, isAdminOrManager]);
+  }, [shipments, tabShipments, session, statusFilter, isAdminOrManager]);
 
-  function getFormKey(shipmentId: string, tab: string) { return `${shipmentId}|${tab}`; }
+  function key(s: ShipmentRow) { return `${s.shipmentId}|${s.tab}`; }
 
-  function getAssignForm(shipmentId: string, tab: string, assignment: Assignment | null) {
-    const key = getFormKey(shipmentId, tab);
-    if (assignForm[key]) return assignForm[key];
-    if (assignment) return { username: assignment.assignedTo, name: assignment.assignedToName, role: assignment.assignedToRole, notes: assignment.notes };
+  function getForm(s: ShipmentRow) {
+    const k = key(s);
+    if (assignForm[k]) return assignForm[k];
+    if (s.assignment) return { username: s.assignment.assignedTo, name: s.assignment.assignedToName, role: s.assignment.assignedToRole, notes: s.assignment.notes };
     return { username: '', name: '', role: '', notes: '' };
   }
 
-  async function saveAssignment(shipmentId: string, tab: string) {
-    const key = getFormKey(shipmentId, tab);
-    const form = assignForm[key];
-    if (!form?.username) return;
-    setAssigning(key);
+  async function autoAssign() {
+    const count = parseInt(autoCount);
+    if (!autoUser || !count || count <= 0) return;
+    const user = users.find(u => u.username === autoUser);
+    if (!user) return;
+    const pool = unassignedInTab.slice(0, count);
+    if (!pool.length) { alert('No unassigned shipments available.'); return; }
+    setAutoSaving(true);
     await fetch('/api/shipments/assign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipmentId, tab, assignedTo: form.username, assignedToName: form.name, assignedToRole: form.role, notes: form.notes }),
+      body: JSON.stringify({
+        action: 'auto-assign',
+        items: pool.map(s => ({ shipmentId: s.shipmentId, tab: s.tab })),
+        assignedTo: user.username,
+        assignedToName: user.name,
+        assignedToRole: user.role,
+        notes: autoNotes,
+      }),
     });
-    setAssigning(null);
-    setAssignForm(f => { const n = { ...f }; delete n[key]; return n; });
+    setAutoSaving(false);
+    setAutoCount('');
+    setAutoNotes('');
     load();
   }
 
-  async function unassign(shipmentId: string, tab: string) {
+  async function saveAssignment(s: ShipmentRow) {
+    const k = key(s);
+    const form = assignForm[k];
+    if (!form?.username) return;
+    setAssigning(k);
+    await fetch('/api/shipments/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shipmentId: s.shipmentId, tab: s.tab, assignedTo: form.username, assignedToName: form.name, assignedToRole: form.role, notes: form.notes }),
+    });
+    setAssigning(null);
+    setAssignForm(f => { const n = { ...f }; delete n[k]; return n; });
+    load();
+  }
+
+  async function unassign(s: ShipmentRow) {
     if (!confirm('Remove assignment?')) return;
     await fetch('/api/shipments/assign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipmentId, tab, remove: true }),
+      body: JSON.stringify({ shipmentId: s.shipmentId, tab: s.tab, remove: true }),
     });
     load();
   }
 
-  async function updateStatus(shipmentId: string, tab: string, status: string) {
+  async function updateStatus(s: ShipmentRow, status: string) {
     await fetch('/api/shipments/assign', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipmentId, tab, status }),
+      body: JSON.stringify({ shipmentId: s.shipmentId, tab: s.tab, status }),
+    });
+    load();
+  }
+
+  async function sendPing(s: ShipmentRow) {
+    const k = key(s);
+    setPingSaving(true);
+    await fetch('/api/shipments/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ping', shipmentId: s.shipmentId, tab: s.tab, pingMessage: pingMsg }),
+    });
+    setPingSaving(false);
+    setPingTarget(null);
+    setPingMsg('');
+    load();
+  }
+
+  async function acknowledge(s: ShipmentRow) {
+    await fetch('/api/shipments/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'acknowledge', shipmentId: s.shipmentId, tab: s.tab }),
     });
     load();
   }
@@ -150,9 +199,6 @@ export default function ShippingPage() {
       <div className="text-slate-400 text-sm">Loading...</div>
     </div>
   );
-
-  const unassignedCount = isAdminOrManager && selectedTab ? shipments.filter(s => s.tab === selectedTab && !s.assignment).length : 0;
-  const totalForTab = isAdminOrManager && selectedTab ? shipments.filter(s => s.tab === selectedTab).length : 0;
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
@@ -171,50 +217,115 @@ export default function ShippingPage() {
             <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Loading shipments...</div>
           ) : (
             <>
-              {/* Admin/Manager controls */}
               {isAdminOrManager && (
-                <div className="flex flex-wrap items-center gap-3 mb-6">
-                  {/* Date tab selector */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Date:</span>
-                    <select
-                      value={selectedTab}
-                      onChange={e => setSelectedTab(e.target.value)}
-                      className="text-sm border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white"
-                    >
-                      {allTabs.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                <>
+                  {/* Date + filter bar */}
+                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Date:</span>
+                      <select value={selectedTab} onChange={e => setSelectedTab(e.target.value)}
+                        className="text-sm border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white">
+                        {allTabs.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {(['all', 'unassigned', 'pending', 'in-progress', 'resolved'] as const).map(f => (
+                        <button key={f} onClick={() => setStatusFilter(f)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${statusFilter === f ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}>
+                          {f === 'all' ? `All (${tabShipments.length})` : f === 'unassigned' ? `Unassigned (${unassignedInTab.length})` : STATUS_LABEL[f]}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Status filter */}
-                  <div className="flex gap-1">
-                    {(['all', 'unassigned', 'pending', 'in-progress', 'resolved'] as const).map(f => (
-                      <button key={f} onClick={() => setStatusFilter(f)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${statusFilter === f ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}>
-                        {f === 'all' ? 'All' : f === 'unassigned' ? `Unassigned (${unassignedCount})` : STATUS_LABEL[f]}
-                      </button>
-                    ))}
-                  </div>
-
-                  {selectedTab && (
-                    <span className="text-xs text-slate-400 ml-auto">{totalForTab} shipments on {selectedTab}</span>
+                  {/* Auto-assign panel */}
+                  {unassignedInTab.length > 0 && (
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        Auto-Assign
+                        <span className="text-xs font-normal text-slate-400">{unassignedInTab.length} unassigned shipments available</span>
+                      </h3>
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Assign</label>
+                          <input
+                            type="number" min="1" max={unassignedInTab.length}
+                            value={autoCount}
+                            onChange={e => setAutoCount(e.target.value)}
+                            placeholder="qty"
+                            className="w-20 text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">To</label>
+                          <select value={autoUser} onChange={e => setAutoUser(e.target.value)}
+                            className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-400">
+                            <option value="">— select person —</option>
+                            {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
+                          </select>
+                        </div>
+                        <div className="flex-1 min-w-[140px]">
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Notes (optional)</label>
+                          <input type="text" value={autoNotes} onChange={e => setAutoNotes(e.target.value)} placeholder="e.g. handle asap"
+                            className="w-full text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400" />
+                        </div>
+                        <button
+                          onClick={autoAssign}
+                          disabled={!autoUser || !autoCount || autoSaving}
+                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
+                        >
+                          {autoSaving ? 'Assigning...' : `Assign ${autoCount || '?'} shipments`}
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </div>
+                </>
               )}
 
-              {/* Non-admin header */}
+              {/* Non-admin/manager header */}
               {!isAdminOrManager && (
-                <div className="mb-6">
+                <div className="mb-4">
                   <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1">My Assigned Shipments</h2>
-                  <p className="text-xs text-slate-400">Shipments assigned to you by admin or manager</p>
+                  <p className="text-xs text-slate-400">Shipments assigned to you</p>
                 </div>
               )}
 
+              {/* Ping modal */}
+              {pingTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPingTarget(null)}>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+                    <h3 className="font-black text-slate-900 dark:text-white mb-1">Follow Up / Ping</h3>
+                    <p className="text-xs text-slate-400 mb-4">Send a follow-up message to the assigned person</p>
+                    <textarea
+                      value={pingMsg}
+                      onChange={e => setPingMsg(e.target.value)}
+                      placeholder="Type your message..."
+                      rows={3}
+                      className="w-full text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => setPingTarget(null)} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
+                      <button
+                        onClick={() => {
+                          const s = displayed.find(s => key(s) === pingTarget);
+                          if (s) sendPing(s);
+                        }}
+                        disabled={pingSaving}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {pingSaving ? 'Sending...' : 'Send Ping'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
               {displayed.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
                   <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                   </svg>
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No shipments found</p>
                   <p className="text-slate-400 text-xs mt-1">
@@ -229,32 +340,31 @@ export default function ShippingPage() {
                         <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">Shipment #</th>
                         <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
                         <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
-                        {isAdminOrManager && <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Assign To</th>}
-                        {!isAdminOrManager && <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Notes</th>}
-                        <th className="py-3 px-4"></th>
+                        {isAdminOrManager
+                          ? <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Assigned To / Assign</th>
+                          : <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Notes</th>
+                        }
+                        <th className="py-3 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {displayed.map(s => {
-                        const key = getFormKey(s.shipmentId, s.tab);
-                        const form = getAssignForm(s.shipmentId, s.tab, s.assignment);
-                        const isSaving = assigning === key;
-                        const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session.username;
+                        const k = key(s);
+                        const form = getForm(s);
+                        const isSaving = assigning === k;
+                        const isPinged = s.assignment?.pinged;
+                        const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session?.username;
 
                         return (
-                          <tr key={key} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                            {/* Shipment ID — links to USPS */}
+                          <tr key={k}
+                            className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+
+                            {/* Shipment ID (plain text, no link) */}
                             <td className="py-3 px-5">
-                              <a
-                                href={`https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1=${s.shipmentId}`}
-                                target="_blank" rel="noopener noreferrer"
-                                className="font-mono text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
-                              >
-                                {s.shipmentId}
-                              </a>
+                              <span className="font-mono text-xs text-slate-800 dark:text-slate-200 font-bold select-all">{s.shipmentId}</span>
                             </td>
 
-                            {/* Date tab */}
+                            {/* Date */}
                             <td className="py-3 px-4 text-xs text-slate-400">{s.tab}</td>
 
                             {/* Status */}
@@ -270,95 +380,110 @@ export default function ShippingPage() {
                               )}
                             </td>
 
-                            {/* Admin/Manager: assign dropdown */}
+                            {/* Admin: assign controls */}
                             {isAdminOrManager && (
                               <td className="py-3 px-4">
+                                {s.assignment && (
+                                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    {s.assignment.assignedToName}
+                                    <span className="ml-1 text-[10px] font-normal text-slate-400">({s.assignment.assignedToRole})</span>
+                                    {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">· {s.assignment.notes}</span>}
+                                  </p>
+                                )}
+                                {isPinged && (
+                                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
+                                    📣 Ping sent: {s.assignment?.pingMessage || 'Follow up'}
+                                  </p>
+                                )}
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <select
                                     value={form.username}
                                     onChange={e => {
-                                      const selected = users.find(u => u.username === e.target.value);
-                                      setAssignForm(f => ({ ...f, [key]: { username: e.target.value, name: selected?.name || '', role: selected?.role || '', notes: form.notes } }));
+                                      const sel = users.find(u => u.username === e.target.value);
+                                      setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } }));
                                     }}
-                                    className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500"
                                   >
-                                    <option value="">— assign to —</option>
-                                    {users.map(u => (
-                                      <option key={u.username} value={u.username}>{u.name} ({u.role})</option>
-                                    ))}
+                                    <option value="">— assign —</option>
+                                    {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
                                   </select>
-                                  <input
-                                    type="text"
-                                    placeholder="Notes..."
-                                    value={form.notes}
-                                    onChange={e => setAssignForm(f => ({ ...f, [key]: { ...form, notes: e.target.value } }))}
-                                    className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-32"
-                                  />
+                                  <input type="text" placeholder="Notes" value={form.notes}
+                                    onChange={e => setAssignForm(f => ({ ...f, [k]: { ...form, notes: e.target.value } }))}
+                                    className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-28" />
                                 </div>
-                                {s.assignment && (
-                                  <p className="text-[10px] text-slate-400 mt-1">
-                                    Assigned to: <span className="font-bold">{s.assignment.assignedToName}</span>
-                                    {s.assignment.notes && <> · {s.assignment.notes}</>}
-                                  </p>
-                                )}
                               </td>
                             )}
 
-                            {/* Host/Shipper: notes */}
+                            {/* Host/Shipper: notes + ping indicator */}
                             {!isAdminOrManager && (
-                              <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || '—'}</td>
+                              <td className="py-3 px-4">
+                                {isPinged && (
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+                                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                                      {s.assignment?.pingMessage || 'Follow-up requested'}
+                                    </span>
+                                  </div>
+                                )}
+                                <span className="text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || '—'}</span>
+                              </td>
                             )}
 
                             {/* Actions */}
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                {isAdminOrManager && form.username && (
-                                  <button
-                                    onClick={() => saveAssignment(s.shipmentId, s.tab)}
-                                    disabled={isSaving}
-                                    className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50"
-                                  >
-                                    {isSaving ? 'Saving...' : s.assignment ? 'Update' : 'Assign'}
+                                {/* Admin: save assignment */}
+                                {isAdminOrManager && assignForm[k]?.username && (
+                                  <button onClick={() => saveAssignment(s)} disabled={isSaving}
+                                    className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50">
+                                    {isSaving ? '...' : s.assignment ? 'Update' : 'Assign'}
                                   </button>
                                 )}
+                                {/* Admin: status select for assigned */}
                                 {isAdminOrManager && s.assignment && (
-                                  <button
-                                    onClick={() => unassign(s.shipmentId, s.tab)}
-                                    className="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-[10px] font-bold rounded-lg transition-colors"
-                                  >
-                                    Unassign
-                                  </button>
-                                )}
-                                {/* Status buttons for host/shipper */}
-                                {isMyShipment && s.assignment?.status !== 'resolved' && (
-                                  <>
-                                    {s.assignment?.status === 'pending' && (
-                                      <button
-                                        onClick={() => updateStatus(s.shipmentId, s.tab, 'in-progress')}
-                                        className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors"
-                                      >
-                                        Start
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => updateStatus(s.shipmentId, s.tab, 'resolved')}
-                                      className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors"
-                                    >
-                                      Resolve
-                                    </button>
-                                  </>
-                                )}
-                                {/* Admin can also update status */}
-                                {isAdminOrManager && s.assignment && (
-                                  <select
-                                    value={s.assignment.status}
-                                    onChange={e => updateStatus(s.shipmentId, s.tab, e.target.value)}
-                                    className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none"
-                                  >
+                                  <select value={s.assignment.status} onChange={e => updateStatus(s, e.target.value)}
+                                    className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none">
                                     <option value="pending">Pending</option>
                                     <option value="in-progress">In Progress</option>
                                     <option value="resolved">Resolved</option>
                                   </select>
+                                )}
+                                {/* Admin: ping button */}
+                                {isAdminOrManager && s.assignment && (
+                                  <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
+                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
+                                    {isPinged ? '📣 Pinged' : 'Follow Up'}
+                                  </button>
+                                )}
+                                {/* Admin: unassign */}
+                                {isAdminOrManager && s.assignment && (
+                                  <button onClick={() => unassign(s)}
+                                    className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">
+                                    Remove
+                                  </button>
+                                )}
+                                {/* Host/Shipper: status + acknowledge */}
+                                {isMyShipment && (
+                                  <>
+                                    {s.assignment?.status === 'pending' && (
+                                      <button onClick={() => updateStatus(s, 'in-progress')}
+                                        className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors">
+                                        Start
+                                      </button>
+                                    )}
+                                    {s.assignment?.status !== 'resolved' && (
+                                      <button onClick={() => updateStatus(s, 'resolved')}
+                                        className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors">
+                                        Resolve
+                                      </button>
+                                    )}
+                                    {isPinged && (
+                                      <button onClick={() => acknowledge(s)}
+                                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors">
+                                        Acknowledge
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>

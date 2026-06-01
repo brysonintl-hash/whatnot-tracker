@@ -1,39 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { upsertAssignment, removeAssignment, updateStatus } from '@/lib/shipmentStore';
+import {
+  upsertAssignment, removeAssignment, updateStatus,
+  bulkAssign, pingShipment, acknowledgePing,
+} from '@/lib/shipmentStore';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { shipmentId, tab, assignedTo, assignedToName, assignedToRole, notes, remove } = body;
+  const { action } = body;
+
+  // === AUTO-ASSIGN ===
+  if (action === 'auto-assign') {
+    if (session.role !== 'admin' && session.role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const { items, assignedTo, assignedToName, assignedToRole, notes } = body;
+    if (!items?.length || !assignedTo) {
+      return NextResponse.json({ error: 'Missing items or assignedTo' }, { status: 400 });
+    }
+    bulkAssign(items, assignedTo, assignedToName, assignedToRole, session.username, notes || '');
+    return NextResponse.json({ success: true, count: items.length });
+  }
+
+  // === PING ===
+  if (action === 'ping') {
+    if (session.role !== 'admin' && session.role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const { shipmentId, tab, pingMessage } = body;
+    if (!shipmentId || !tab) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    pingShipment(shipmentId, tab, pingMessage || '');
+    return NextResponse.json({ success: true });
+  }
+
+  // === ACKNOWLEDGE PING ===
+  if (action === 'acknowledge') {
+    const { shipmentId, tab } = body;
+    if (!shipmentId || !tab) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    acknowledgePing(shipmentId, tab);
+    return NextResponse.json({ success: true });
+  }
+
+  // === REMOVE ASSIGNMENT ===
+  const { shipmentId, tab, remove, assignedTo, assignedToName, assignedToRole, notes } = body;
 
   if (!shipmentId || !tab) return NextResponse.json({ error: 'Missing shipmentId or tab' }, { status: 400 });
 
   if (remove) {
+    if (session.role !== 'admin' && session.role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     removeAssignment(shipmentId, tab);
     return NextResponse.json({ success: true });
   }
 
+  // === SINGLE ASSIGN ===
   if (session.role !== 'admin' && session.role !== 'manager') {
     return NextResponse.json({ error: 'Only admin/manager can assign shipments' }, { status: 403 });
   }
-
   if (!assignedTo) return NextResponse.json({ error: 'assignedTo is required' }, { status: 400 });
 
   upsertAssignment({
-    shipmentId,
-    tab,
-    assignedTo,
-    assignedToName,
-    assignedToRole,
+    shipmentId, tab, assignedTo, assignedToName, assignedToRole,
     assignedBy: session.username,
     assignedAt: new Date().toISOString(),
     status: 'pending',
     notes: notes || '',
+    pinged: false, pingMessage: '', pingAt: '',
   });
-
   return NextResponse.json({ success: true });
 }
 
