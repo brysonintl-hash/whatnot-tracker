@@ -65,9 +65,6 @@ const NAV: Record<Role, Section[]> = {
   ],
   employee: [],
   shipper: [
-    { title: 'Shipping', items: [
-      { href: '/shipper/tracking', label: 'Tracking', icon: I.map },
-    ]},
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       { href: '/shipping', label: 'Shipments', icon: I.ship },

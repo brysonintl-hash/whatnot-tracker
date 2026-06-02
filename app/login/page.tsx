@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { useTheme } from '@/lib/useTheme';
 
 const ROLE_HOME: Record<string, string> = {
-  admin: '/admin', manager: '/manager', employee: '/employee', shipper: '/shipper', host: '/host',
+  admin: '/admin', manager: '/manager', employee: '/employee',
+  shipper: '/shipping',
+  host: '/inventory',
 };
 
 function LoginForm() {

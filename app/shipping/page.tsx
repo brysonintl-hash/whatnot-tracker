@@ -87,6 +87,11 @@ export default function ShippingPage() {
     if (allTabs.length > 0 && !selectedTab) setSelectedTab(allTabs[0]);
   }, [allTabs]);
 
+  // allTabs is sorted newest→oldest; prevTab = older, nextTab = newer
+  const currentTabIdx = allTabs.indexOf(selectedTab);
+  const prevTab = currentTabIdx < allTabs.length - 1 ? allTabs[currentTabIdx + 1] : null;
+  const nextTab = currentTabIdx > 0 ? allTabs[currentTabIdx - 1] : null;
+
   const isAdminOrManager = session?.role === 'admin' || session?.role === 'manager';
 
   const tabShipments = useMemo(() =>
@@ -268,12 +273,27 @@ export default function ShippingPage() {
                 <>
                   {/* Date + filter bar */}
                   <div className="flex flex-wrap items-center gap-3 mb-4">
+                    {/* Prev / Next date navigation */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Date:</span>
-                      <select value={selectedTab} onChange={e => setSelectedTab(e.target.value)}
-                        className="text-sm border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white">
-                        {allTabs.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      <button
+                        onClick={() => prevTab && setSelectedTab(prevTab)}
+                        disabled={!prevTab}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                        Prev
+                      </button>
+                      <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-900 dark:text-white min-w-[90px] text-center">
+                        {selectedTab || '—'}
+                      </div>
+                      <button
+                        onClick={() => nextTab && setSelectedTab(nextTab)}
+                        disabled={!nextTab}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      </button>
                     </div>
                     <div className="flex gap-1 flex-wrap">
                       {(['all', 'unassigned', 'pending', 'in-progress', 'resolved'] as const).map(f => (
@@ -434,6 +454,7 @@ export default function ShippingPage() {
                         const form = getForm(s);
                         const isSaving = assigning === k;
                         const isPinged = s.assignment?.pinged;
+                        const isResolved = s.assignment?.status === 'resolved';
                         const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session?.username;
 
                         return (
@@ -481,27 +502,30 @@ export default function ShippingPage() {
                                     {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">· {s.assignment.notes}</span>}
                                   </p>
                                 )}
-                                {isPinged && (
+                                {isPinged && !isResolved && (
                                   <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
                                     📣 Ping sent: {s.assignment?.pingMessage || 'Follow up'}
                                   </p>
                                 )}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <select
-                                    value={form.username}
-                                    onChange={e => {
-                                      const sel = users.find(u => u.username === e.target.value);
-                                      setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } }));
-                                    }}
-                                    className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                  >
-                                    <option value="">— assign —</option>
-                                    {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
-                                  </select>
-                                  <input type="text" placeholder="Notes" value={form.notes}
-                                    onChange={e => setAssignForm(f => ({ ...f, [k]: { ...form, notes: e.target.value } }))}
-                                    className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-28" />
-                                </div>
+                                {/* Editable controls only when NOT resolved */}
+                                {!isResolved && (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <select
+                                      value={form.username}
+                                      onChange={e => {
+                                        const sel = users.find(u => u.username === e.target.value);
+                                        setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } }));
+                                      }}
+                                      className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    >
+                                      <option value="">— assign —</option>
+                                      {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
+                                    </select>
+                                    <input type="text" placeholder="Notes" value={form.notes}
+                                      onChange={e => setAssignForm(f => ({ ...f, [k]: { ...form, notes: e.target.value } }))}
+                                      className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-28" />
+                                  </div>
+                                )}
                               </td>
                             )}
 
@@ -523,56 +547,69 @@ export default function ShippingPage() {
                             {/* Actions */}
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                {/* Admin: save assignment */}
-                                {isAdminOrManager && assignForm[k]?.username && (
-                                  <button onClick={() => saveAssignment(s)} disabled={isSaving}
-                                    className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50">
-                                    {isSaving ? '...' : s.assignment ? 'Update' : 'Assign'}
-                                  </button>
-                                )}
-                                {/* Admin: status select for assigned */}
-                                {isAdminOrManager && s.assignment && (
-                                  <select value={s.assignment.status} onChange={e => updateStatus(s, e.target.value)}
-                                    className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none">
-                                    <option value="pending">Pending</option>
-                                    <option value="in-progress">In Progress</option>
-                                    <option value="resolved">Resolved</option>
-                                  </select>
-                                )}
-                                {/* Admin: ping button */}
-                                {isAdminOrManager && s.assignment && (
-                                  <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
-                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
-                                    {isPinged ? '📣 Pinged' : 'Follow Up'}
-                                  </button>
-                                )}
-                                {/* Admin: unassign */}
-                                {isAdminOrManager && s.assignment && (
-                                  <button onClick={() => unassign(s)}
-                                    className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">
-                                    Remove
-                                  </button>
-                                )}
-                                {/* Host/Shipper: status + acknowledge */}
-                                {isMyShipment && (
+                                {isResolved ? (
+                                  /* Resolved: only show Remove for admin/manager */
                                   <>
-                                    {s.assignment?.status === 'pending' && (
-                                      <button onClick={() => updateStatus(s, 'in-progress')}
-                                        className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors">
-                                        Start
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Resolved</span>
+                                    {isAdminOrManager && (
+                                      <button onClick={() => unassign(s)}
+                                        className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">
+                                        Remove
                                       </button>
                                     )}
-                                    {s.assignment?.status !== 'resolved' && (
-                                      <button onClick={() => updateStatus(s, 'resolved')}
-                                        className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors">
-                                        Resolve
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Admin: save assignment */}
+                                    {isAdminOrManager && assignForm[k]?.username && (
+                                      <button onClick={() => saveAssignment(s)} disabled={isSaving}
+                                        className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50">
+                                        {isSaving ? '...' : s.assignment ? 'Update' : 'Assign'}
                                       </button>
                                     )}
-                                    {isPinged && (
-                                      <button onClick={() => acknowledge(s)}
-                                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors">
-                                        Acknowledge
+                                    {/* Admin: status select */}
+                                    {isAdminOrManager && s.assignment && (
+                                      <select value={s.assignment.status} onChange={e => updateStatus(s, e.target.value)}
+                                        className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none">
+                                        <option value="pending">Pending</option>
+                                        <option value="in-progress">In Progress</option>
+                                        <option value="resolved">Resolved</option>
+                                      </select>
+                                    )}
+                                    {/* Admin: follow up / ping (not shown when resolved) */}
+                                    {isAdminOrManager && s.assignment && (
+                                      <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
+                                        className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
+                                        {isPinged ? '📣 Pinged' : 'Follow Up'}
                                       </button>
+                                    )}
+                                    {/* Admin: remove */}
+                                    {isAdminOrManager && s.assignment && (
+                                      <button onClick={() => unassign(s)}
+                                        className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">
+                                        Remove
+                                      </button>
+                                    )}
+                                    {/* Host/Shipper: status + acknowledge */}
+                                    {isMyShipment && (
+                                      <>
+                                        {s.assignment?.status === 'pending' && (
+                                          <button onClick={() => updateStatus(s, 'in-progress')}
+                                            className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors">
+                                            Start
+                                          </button>
+                                        )}
+                                        <button onClick={() => updateStatus(s, 'resolved')}
+                                          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors">
+                                          Resolve
+                                        </button>
+                                        {isPinged && (
+                                          <button onClick={() => acknowledge(s)}
+                                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors">
+                                            Acknowledge
+                                          </button>
+                                        )}
+                                      </>
                                     )}
                                   </>
                                 )}
