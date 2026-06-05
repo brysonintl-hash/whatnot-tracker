@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import OnlineUsers from '@/components/OnlineUsers';
 import type { Role } from '@/lib/types';
-import { Bar, Doughnut } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
+import { Line, Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler);
 
 type Session = { username: string; role: string; name: string };
 type Order = {
@@ -34,19 +34,37 @@ function fmtTimestamp(ts: string): string {
 
 const HOST_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
 
-function KPI({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: React.ReactNode }) {
+function Sparkline({ data, color, height = 40 }: { data: number[]; color: string; height?: number }) {
+  if (data.length < 2) return <div style={{ height }} />;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const w = 100, h = height;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - 2 - ((v - min) / range) * (h - 4);
+    return `${x},${y}`;
+  });
+  const linePath = `M ${pts.join(' L ')}`;
+  const fillPath = `${linePath} L ${w},${h} L 0,${h} Z`;
+  const id = `sp-${color.replace('#', '')}`;
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">{label}</p>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + '15' }}>
-          <span style={{ color }}>{icon}</span>
-        </div>
-      </div>
-      <p className="text-2xl font-black text-slate-900 dark:text-white mb-1">{value}</p>
-      {sub && <p className="text-xs text-slate-400 font-medium">{sub}</p>}
-    </div>
+    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ height }}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={fillPath} fill={`url(#${id})`} />
+      <path d={linePath} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
+}
+
+function pct(curr: number, prev: number) {
+  if (prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
 }
 
 type SortCol = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | 'timestamp' | null;
@@ -131,6 +149,23 @@ export default function AdminPage() {
     filteredOrders.forEach(o => { m[o.tab] = (m[o.tab] || 0) + o.sold; });
     return Object.entries(m).sort((a, b) => parseTabDate(a[0]).getTime() - parseTabDate(b[0]).getTime()).slice(-12);
   }, [filteredOrders]);
+
+  // Previous period for "vs prev" comparison
+  const prevOrders = useMemo(() => {
+    if (dateRange === 'all' || dateRange === 'custom') return [];
+    const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
+    const now = new Date();
+    const end = new Date(now); end.setDate(now.getDate() - days);
+    const start = new Date(now); start.setDate(now.getDate() - days * 2);
+    return orders.filter(o => { const d = parseTabDate(o.tab); return d >= start && d < end; });
+  }, [orders, dateRange]);
+
+  const prevRevenue = prevOrders.reduce((s, o) => s + o.sold, 0);
+  const prevProfit = prevOrders.reduce((s, o) => s + o.profit, 0);
+  const prevMargin = prevRevenue > 0 ? (prevProfit / prevRevenue) * 100 : 0;
+
+  // Sparkline data (revenue per show, last 12)
+  const sparkData = byTab.map(([, v]) => v);
 
   const byHost = useMemo(() => {
     const m: Record<string, number> = {};
@@ -238,12 +273,12 @@ export default function AdminPage() {
         {/* Header */}
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Admin Dashboard</h1>
-            <p className="text-xs text-slate-400">{today}</p>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Dashboard</h1>
+            <p className="text-xs text-slate-400">Welcome back, {session.name} — here&apos;s how Stack Bargains is performing.</p>
           </div>
           <div className="flex items-center gap-3">
             <OnlineUsers />
-            <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full font-bold">Admin</span>
+            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
             <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-black text-sm">{session.name[0]}</div>
           </div>
         </header>
@@ -280,71 +315,105 @@ export default function AdminPage() {
                 <span className="ml-auto text-xs text-slate-400">{filteredOrders.length.toLocaleString()} orders in range</span>
               </div>
 
-              {/* KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <KPI label="Total Revenue" value={`$${fmt(revenue)}`} sub={`${filteredOrders.length.toLocaleString()} orders`} color="#F59E0B"
-                  icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                />
-                <KPI label="Gross Profit" value={`$${fmt(profit)}`} sub="after COGS" color="#10B981"
-                  icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
-                />
-                <KPI label="Avg Margin" value={`${margin.toFixed(1)}%`} sub="profit / revenue" color="#3B82F6"
-                  icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
-                />
-                <KPI label="Inventory Value" value={`$${fmt(invValue)}`} sub={`${items.length} SKUs`} color="#8B5CF6"
-                  icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
-                />
-              </div>
+              {/* KPIs — Stripe-inspired */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {/* Hero card — dark */}
+                <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
+                  <div className="flex items-start justify-between mb-1">
+                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Volume</p>
+                    {(() => { const c = pct(revenue, prevRevenue); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}% vs prev.</span> : null; })()}
+                  </div>
+                  <p className="text-3xl font-black text-white mb-3">${fmt(revenue)}</p>
+                  <Sparkline data={sparkData} color="#F59E0B" height={40} />
+                  <p className="text-slate-500 text-[11px] mt-2">{filteredOrders.length.toLocaleString()} orders</p>
+                </div>
 
-              {/* Inventory alerts */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Gross Profit */}
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">In Stock</span>
+                  <div className="flex items-start justify-between mb-1">
+                    <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Profit</p>
+                    {(() => { const c = pct(profit, prevProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                   </div>
-                  <p className="text-3xl font-black text-slate-900 dark:text-white">{(items.length - outOfStock - lowStock).toLocaleString()}</p>
+                  <p className={`text-2xl font-black mb-2 ${profit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(profit)}</p>
+                  <Sparkline data={sparkData.map((v, i) => v * (filteredOrders.length > 0 ? profit / revenue : 0))} color="#10B981" height={32} />
+                  <p className="text-slate-400 text-[11px] mt-1">after COGS</p>
                 </div>
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-amber-200 dark:border-amber-900 shadow-sm p-5">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="w-2 h-2 rounded-full bg-amber-400" />
-                    <span className="text-xs font-bold text-amber-600 uppercase tracking-wide">Low Stock (≤5)</span>
+
+                {/* Avg Margin */}
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+                  <div className="flex items-start justify-between mb-1">
+                    <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Avg Margin</p>
+                    {(() => { const c = pct(margin, prevMargin); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                   </div>
-                  <p className="text-3xl font-black text-amber-500">{lowStock.toLocaleString()}</p>
+                  <p className={`text-2xl font-black mb-2 ${margin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : margin >= 0 ? 'text-amber-500' : 'text-red-500'}`}>{margin.toFixed(1)}%</p>
+                  <Sparkline data={Array(sparkData.length).fill(margin)} color="#3B82F6" height={32} />
+                  <p className="text-slate-400 text-[11px] mt-1">profit / revenue</p>
                 </div>
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-red-200 dark:border-red-900 shadow-sm p-5">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="w-2 h-2 rounded-full bg-red-500" />
-                    <span className="text-xs font-bold text-red-600 uppercase tracking-wide">Out of Stock</span>
+
+                {/* Inventory Value */}
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+                  <div className="flex items-start justify-between mb-1">
+                    <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Inventory Value</p>
                   </div>
-                  <p className="text-3xl font-black text-red-500">{outOfStock.toLocaleString()}</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mb-2">${fmt(invValue)}</p>
+                  <div className="flex gap-2 mt-1">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400">{outOfStock} out</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">{lowStock} low</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">{items.length - outOfStock - lowStock} ok</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] mt-2">{items.length} total SKUs</p>
                 </div>
               </div>
 
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
+                {/* Revenue trend — area line chart */}
                 <div className="lg:col-span-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Sales by Show (Last 12)</h2>
-                  <Bar
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h2 className="font-bold text-slate-900 dark:text-white text-sm">Gross Volume</h2>
+                      <p className="text-xl font-black text-slate-900 dark:text-white">${fmt(revenue)}</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-1.5 rounded-sm bg-amber-400 inline-block" /> This period</span>
+                    </div>
+                  </div>
+                  <Line
                     data={{
                       labels: byTab.map(([t]) => t),
-                      datasets: [{ label: 'Sales ($)', data: byTab.map(([, v]) => v), backgroundColor: '#FBBF24', borderColor: '#F59E0B', borderWidth: 1, borderRadius: 4 }],
+                      datasets: [{
+                        label: 'Sales ($)', data: byTab.map(([, v]) => v),
+                        borderColor: '#F59E0B', backgroundColor: 'rgba(251,191,36,0.08)',
+                        borderWidth: 2, fill: true, tension: 0.4,
+                        pointRadius: 3, pointBackgroundColor: '#F59E0B', pointBorderColor: '#fff', pointBorderWidth: 1.5,
+                      }],
                     }}
-                    options={{ responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, color: '#94a3b8' } }, y: { ticks: { font: { size: 10 }, color: '#94a3b8' } }, } }}
+                    options={{
+                      responsive: true,
+                      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` $${fmt(c.raw as number)}` } } },
+                      scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+                        y: { grid: { color: 'rgba(148,163,184,0.08)' }, ticks: { font: { size: 10 }, color: '#94a3b8', callback: (v) => `$${(Number(v)/1000).toFixed(0)}k` } },
+                      },
+                    }}
                   />
                 </div>
+
+                {/* Revenue by Host donut */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex flex-col">
-                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Revenue by Host</h2>
-                  <div className="flex-1 flex items-center justify-center min-h-[260px]">
+                  <div className="mb-3">
+                    <h2 className="font-bold text-slate-900 dark:text-white text-sm">Revenue by Host</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">{Object.keys(byHost).length} hosts</p>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center min-h-[240px]">
                     <Doughnut
                       data={{
                         labels: Object.keys(byHost),
-                        datasets: [{ data: Object.values(byHost), backgroundColor: HOST_COLORS, borderWidth: 2, borderColor: '#fff' }],
+                        datasets: [{ data: Object.values(byHost), backgroundColor: HOST_COLORS, borderWidth: 3, borderColor: 'transparent', hoverBorderColor: '#fff' }],
                       }}
                       options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, color: '#94a3b8' } } },
+                        responsive: true, maintainAspectRatio: false, cutout: '68%',
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, color: '#94a3b8', usePointStyle: true, pointStyleWidth: 8 } } },
                       }}
                     />
                   </div>

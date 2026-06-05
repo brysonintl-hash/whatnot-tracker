@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
@@ -42,6 +42,8 @@ export default function PendingsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -101,6 +103,12 @@ export default function PendingsPage() {
     setEditingId(task.id);
     setForm({ name: task.customerName, link: task.customerLink, order: task.orderId, desc: task.description, tracking: task.trackingNumber, date: task.orderDate });
     setShowForm(true);
+    // Scroll to form and highlight it
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setHighlighted(true);
+      setTimeout(() => setHighlighted(false), 1800);
+    }, 60);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -200,7 +208,7 @@ export default function PendingsPage() {
         <main className="flex-1 overflow-y-auto p-6">
           {/* Form (create or edit) */}
           {showForm && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-6">
+            <div ref={formRef} className={`bg-white dark:bg-slate-800 rounded-xl border shadow-sm p-6 mb-6 transition-all duration-300 ${highlighted ? 'border-blue-400 ring-2 ring-blue-300 ring-offset-2 dark:ring-offset-slate-900' : 'border-slate-200 dark:border-slate-700'}`}>
               <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">
                 {editingId ? 'Edit Task' : 'New Pending Task'}
               </h2>

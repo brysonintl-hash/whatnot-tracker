@@ -169,17 +169,15 @@ export default function TrackingPage() {
                         {r.loading && <p className="text-sm text-slate-400">Fetching status...</p>}
 
                         {r.error && !r.loading && (
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-red-500 font-semibold">{r.error}</p>
-                            {!r.configured && (
-                              <a
-                                href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${r.trackingNumber}`}
-                                target="_blank" rel="noopener noreferrer"
-                                className="text-xs text-blue-500 hover:underline font-bold"
-                              >
-                                Check on USPS →
-                              </a>
-                            )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {r.configured && <p className="text-sm text-red-500 font-semibold">{r.error}</p>}
+                            <a
+                              href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${r.trackingNumber}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors"
+                            >
+                              Track on USPS ↗
+                            </a>
                           </div>
                         )}
 
