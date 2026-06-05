@@ -59,6 +59,28 @@ export default function ShippingPage() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
+  function downloadCSV() {
+    const myShipments = shipments.filter(s =>
+      s.assignment?.assignedTo === session?.username && s.assignment?.status !== 'resolved'
+    );
+    const rows = [
+      ['Shipment #', 'Date', 'Status', 'Notes', 'Assigned By', 'Assigned At'],
+      ...myShipments.map(s => [
+        s.shipmentId, s.tab,
+        s.assignment?.status || '',
+        (s.assignment?.notes || '').replace(/,/g, ' '),
+        s.assignment?.assignedBy || '',
+        s.assignment?.assignedAt ? new Date(s.assignment.assignedAt).toLocaleDateString() : '',
+      ]),
+    ];
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `my-shipments-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
   async function load() {
     const [sRes, uRes] = await Promise.all([fetch('/api/shipments'), fetch('/api/users')]);
     const [sData, uData] = await Promise.all([sRes.json(), uRes.json()]);
@@ -253,6 +275,13 @@ export default function ShippingPage() {
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <div className="flex items-center gap-2">
+            {!isAdminOrManager && (
+              <button onClick={downloadCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-emerald-400 hover:text-emerald-600 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Download CSV
+              </button>
+            )}
             <button
               onClick={() => { setEditMode(m => !m); setSelected(new Set()); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${editMode ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}

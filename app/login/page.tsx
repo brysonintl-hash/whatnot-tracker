@@ -7,8 +7,8 @@ import { useTheme } from '@/lib/useTheme';
 
 const ROLE_HOME: Record<string, string> = {
   admin: '/admin', manager: '/manager', employee: '/employee',
-  shipper: '/shipping',
-  host: '/inventory',
+  shipper: '/timekeeping',
+  host: '/timekeeping',
 };
 
 function LoginForm() {

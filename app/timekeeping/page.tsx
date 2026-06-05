@@ -194,6 +194,78 @@ function ManagementView({ session }: { session: Session }) {
                 ))}
               </div>
 
+              {/* ── Staff Timekeeping Dashboard ── */}
+              {staffSummary.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                    Staff Dashboard
+                    <span className="text-xs font-normal text-slate-400">{staffSummary.length} active this week</span>
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {staffSummary.map(member => {
+                      const rate = rates.find(r => r.userId === member.userId)?.ratePerHour ?? 0;
+                      const weekEarnings = member.totalHours * rate;
+                      const isPaid = payments.find(p => p.userId === member.userId)?.paid;
+                      const isActive = member.entries.some(e => !e.clockOut);
+                      const allEntries = entries.filter(e => e.userId === member.userId);
+                      const totalAllTime = allEntries.reduce((s, e) => s + hoursFromEntry(e), 0);
+                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const todayHours = member.entries
+                        .filter(e => e.date === todayStr)
+                        .reduce((s, e) => s + hoursFromEntry(e), 0);
+                      const lastEntry = member.entries[member.entries.length - 1];
+                      return (
+                        <div key={member.userId} className={`bg-white dark:bg-slate-800 rounded-xl border shadow-sm p-4 ${isActive ? 'border-emerald-300 dark:border-emerald-700' : 'border-slate-200 dark:border-slate-700'}`}>
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${member.role === 'host' ? 'bg-amber-500' : member.role === 'shipper' ? 'bg-violet-500' : 'bg-blue-500'}`}>
+                              {member.name[0]?.toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{member.name}</p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] capitalize text-slate-400">{member.role}</span>
+                                {isActive && <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-500"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Active</span>}
+                                {!isActive && <span className="text-[10px] text-slate-400">Clocked out</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs mb-3">
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Today</p>
+                              <p className="font-bold text-slate-900 dark:text-white">{fmtHours(todayHours)}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">This Week</p>
+                              <p className="font-bold text-slate-900 dark:text-white">{fmtHours(member.totalHours)}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">All Time</p>
+                              <p className="font-semibold text-slate-700 dark:text-slate-300">{fmtHours(totalAllTime)}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Earnings</p>
+                              <p className={`font-bold ${weekEarnings > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{rate > 0 ? `$${weekEarnings.toFixed(2)}` : '—'}</p>
+                            </div>
+                          </div>
+
+                          {lastEntry && (
+                            <p className="text-[10px] text-slate-400">
+                              Last: {lastEntry.clockOut ? `Out ${fmtTime(lastEntry.clockOut)}` : `In since ${fmtTime(lastEntry.clockIn)}`}
+                            </p>
+                          )}
+
+                          {isPaid && (
+                            <span className="mt-2 inline-block text-[10px] font-bold px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-full">Paid ✓</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Staff Summary */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
