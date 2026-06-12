@@ -20,8 +20,8 @@ const emptyItem: Omit<Item, 'rowIndex'> = {
 
 function QtyBadge({ qty }: { qty: number }) {
   if (qty <= 0) return <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Out of Stock</span>;
-  if (qty <= 5) return <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Low ({qty})</span>;
-  return <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold">In Stock ({qty})</span>;
+  if (qty <= 5) return <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold">Low</span>;
+  return <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold">In Stock</span>;
 }
 
 const PAGE_SIZE = 30;
@@ -185,7 +185,7 @@ export default function InventoryPage() {
                         <td className="py-3 px-4 text-center font-black text-lg text-slate-900 dark:text-white">{item.qty.toLocaleString()}</td>
                         <td className="py-3 px-4"><QtyBadge qty={item.qty} /></td>
                         <td className="py-3 px-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">${item.retail.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-black text-sm text-emerald-600">${item.total.toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right font-black text-sm text-emerald-600">${item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className="py-3 px-4">
                           {session.role !== 'host' && (
                             <div className="flex items-center gap-1 justify-end">

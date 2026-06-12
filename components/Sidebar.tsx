@@ -35,7 +35,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       { href: '/shipping', label: 'Shipments', icon: I.ship },
-      { href: '/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -54,7 +53,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       { href: '/shipping', label: 'Shipments', icon: I.ship },
-      { href: '/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -70,7 +68,6 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       { href: '/shipping', label: 'Shipments', icon: I.ship },
-      { href: '/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -85,7 +82,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/sales', label: 'Sales', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       { href: '/shipping', label: 'Shipments', icon: I.ship },
-      { href: '/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },

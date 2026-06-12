@@ -97,13 +97,16 @@ type HostStat = {
   durationHours: number;
 };
 
+// Gaps larger than this between consecutive orders are excluded from show duration
+const MAX_GAP_MS = 2 * 3600000; // 2 hours
+
 function computeHostStats(orders: Order[]): HostStat[] {
   let colorIdx = 0;
 
   const map: Record<string, {
     sales: number; profit: number; orders: number; units: number;
-    minTs: number | null; maxTs: number | null;
-    durStr: number | null; // from "HHh MMm" format
+    timestamps: number[];
+    durStr: number | null;
     colorIdx: number;
   }> = {};
 
@@ -111,7 +114,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
     const h = o.host;
     if (!h) return;
     if (!map[h]) {
-      map[h] = { sales: 0, profit: 0, orders: 0, units: 0, minTs: null, maxTs: null, durStr: null, colorIdx: colorIdx++ };
+      map[h] = { sales: 0, profit: 0, orders: 0, units: 0, timestamps: [], durStr: null, colorIdx: colorIdx++ };
     }
     map[h].sales += o.sold;
     map[h].profit += o.profit;
@@ -120,10 +123,8 @@ function computeHostStats(orders: Order[]): HostStat[] {
 
     const ts = parseTimestamp(o.timestamp);
     if (ts !== null) {
-      if (map[h].minTs === null || ts < map[h].minTs!) map[h].minTs = ts;
-      if (map[h].maxTs === null || ts > map[h].maxTs!) map[h].maxTs = ts;
+      map[h].timestamps.push(ts);
     } else {
-      // Try duration string format ("02h 14m")
       const dur = parseDurationStr(o.timestamp);
       if (dur !== null && (map[h].durStr === null || dur > map[h].durStr!)) {
         map[h].durStr = dur;
@@ -133,9 +134,15 @@ function computeHostStats(orders: Order[]): HostStat[] {
 
   return Object.entries(map)
     .map(([host, d]) => {
-      const durationFromTs = (d.minTs !== null && d.maxTs !== null && d.maxTs > d.minTs)
-        ? (d.maxTs - d.minTs) / 3600000
-        : 0;
+      let durationFromTs = 0;
+      if (d.timestamps.length >= 2) {
+        const sorted = [...d.timestamps].sort((a, b) => a - b);
+        for (let i = 1; i < sorted.length; i++) {
+          const gap = sorted[i] - sorted[i - 1];
+          if (gap <= MAX_GAP_MS) durationFromTs += gap;
+        }
+        durationFromTs /= 3600000;
+      }
       const durationHours = durationFromTs > 0 ? durationFromTs : (d.durStr ?? 0);
       const overallMargin = d.sales > 0 ? (d.profit / d.sales) * 100 : 0;
       return {
