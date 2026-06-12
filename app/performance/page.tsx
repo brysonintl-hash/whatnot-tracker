@@ -10,7 +10,7 @@ type Session = { username: string; role: Role; name: string };
 type Order = {
   tab: string; orderId: string; buyer: string; modelNum: string; productName: string;
   qty: number; sold: number; cost: number; earn: number; profit: number; margin: number;
-  timestamp: string; host: string;
+  timestamp: string; host: string; livestream: number;
 };
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
@@ -88,6 +88,7 @@ function fmtDuration(hours: number): string {
 
 type HostStat = {
   host: string;
+  livestream: number;
   colorIdx: number;
   totalSales: number;
   totalProfit: number;
@@ -102,8 +103,10 @@ const MAX_GAP_MS = 2 * 3600000; // 2 hours
 
 function computeHostStats(orders: Order[]): HostStat[] {
   let colorIdx = 0;
+  const hostColorMap: Record<string, number> = {};
 
   const map: Record<string, {
+    host: string; livestream: number;
     sales: number; profit: number; orders: number; units: number;
     timestamps: number[];
     durStr: number | null;
@@ -113,27 +116,31 @@ function computeHostStats(orders: Order[]): HostStat[] {
   orders.forEach(o => {
     const h = o.host;
     if (!h) return;
-    if (!map[h]) {
-      map[h] = { sales: 0, profit: 0, orders: 0, units: 0, timestamps: [], durStr: null, colorIdx: colorIdx++ };
+    const ls = o.livestream || 1;
+    const key = `${h}|${ls}`;
+
+    if (!(h in hostColorMap)) hostColorMap[h] = colorIdx++;
+    if (!map[key]) {
+      map[key] = { host: h, livestream: ls, sales: 0, profit: 0, orders: 0, units: 0, timestamps: [], durStr: null, colorIdx: hostColorMap[h] };
     }
-    map[h].sales += o.sold;
-    map[h].profit += o.profit;
-    map[h].orders++;
-    map[h].units += o.qty;
+    map[key].sales += o.sold;
+    map[key].profit += o.profit;
+    map[key].orders++;
+    map[key].units += o.qty;
 
     const ts = parseTimestamp(o.timestamp);
     if (ts !== null) {
-      map[h].timestamps.push(ts);
+      map[key].timestamps.push(ts);
     } else {
       const dur = parseDurationStr(o.timestamp);
-      if (dur !== null && (map[h].durStr === null || dur > map[h].durStr!)) {
-        map[h].durStr = dur;
+      if (dur !== null && (map[key].durStr === null || dur > map[key].durStr!)) {
+        map[key].durStr = dur;
       }
     }
   });
 
-  return Object.entries(map)
-    .map(([host, d]) => {
+  return Object.values(map)
+    .map(d => {
       let durationFromTs = 0;
       if (d.timestamps.length >= 2) {
         const sorted = [...d.timestamps].sort((a, b) => a - b);
@@ -146,7 +153,8 @@ function computeHostStats(orders: Order[]): HostStat[] {
       const durationHours = durationFromTs > 0 ? durationFromTs : (d.durStr ?? 0);
       const overallMargin = d.sales > 0 ? (d.profit / d.sales) * 100 : 0;
       return {
-        host,
+        host: d.host,
+        livestream: d.livestream,
         colorIdx: d.colorIdx,
         totalSales: d.sales,
         totalProfit: d.profit,
@@ -156,7 +164,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
         durationHours,
       };
     })
-    .sort((a, b) => b.totalSales - a.totalSales);
+    .sort((a, b) => a.host.localeCompare(b.host) || a.livestream - b.livestream);
 }
 
 export default function PerformancePage() {
@@ -297,7 +305,7 @@ export default function PerformancePage() {
                         {isoToDisplay(selectedDate)}
                       </h2>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {hostStats.length} host{hostStats.length !== 1 ? 's' : ''} · {dayOrders.length} orders
+                        {hostStats.length} livestream{hostStats.length !== 1 ? 's' : ''} · {dayOrders.length} orders
                       </p>
                     </div>
                   </div>
@@ -349,7 +357,7 @@ export default function PerformancePage() {
 
                       return (
                         <div
-                          key={hs.host}
+                          key={`${hs.host}|${hs.livestream}`}
                           className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
                         >
                           {/* Host name bar */}
@@ -362,7 +370,9 @@ export default function PerformancePage() {
                             </div>
                             <div>
                               <p className="font-black text-slate-900 dark:text-white text-base leading-tight">{hs.host}</p>
-                              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Host</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
+                                Livestream {hs.livestream}
+                              </p>
                             </div>
                           </div>
 

@@ -75,7 +75,8 @@ export async function getSalesData(): Promise<SaleOrder[]> {
           profit: parseMoney(row[9]),
           margin: parseMoney(row[10]),
           timestamp: row[11] || '',
-          host: parseHost(row[13]) || parseHost(row[12]) || '',
+          host: parseHost(row[12]) || '',
+          livestream: parseInt(row[13]) || 1,
         });
       }
     });
