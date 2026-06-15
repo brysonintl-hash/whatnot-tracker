@@ -91,12 +91,18 @@ export type ShipmentRecord = { shipmentId: string; tab: string };
 
 export type ClaimRecord = {
   rowIndex: number;
-  orderNumber: string;
-  dateOrder: string;
-  modelNumber: string;
-  itemName: string;
+  // General claim fields (cancellation / replacement / refund)
+  orderNumber?: string;
+  dateOrder?: string;
+  modelNumber?: string;
+  itemName?: string;
+  // USPS claim fields
+  amountRequested?: number;
+  amountApproved?: number;
+  dateSubmitted?: string;
+  trackingNumber?: string;
+  // Common
   username: string;
-  amountRefunded?: number;
   status: string;
 };
 
@@ -115,9 +121,21 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
   try {
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.SALES_SHEET_ID!;
-    const range = type === 'usps' ? `'${tab}'!A2:G2000` : `'${tab}'!A2:F2000`;
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A2:F2000` });
     const rows = res.data.values || [];
+    if (type === 'usps') {
+      // USPS: A=username, B=amountRequested, C=amountApproved, D=dateSubmitted, E=trackingNumber, F=status
+      return rows.filter(r => r[0]).map((row, idx): ClaimRecord => ({
+        rowIndex: idx + 2,
+        username: row[0] || '',
+        amountRequested: parseMoney(row[1]),
+        amountApproved: row[2] ? parseMoney(row[2]) : undefined,
+        dateSubmitted: row[3] || '',
+        trackingNumber: row[4] || '',
+        status: row[5] || '',
+      }));
+    }
+    // General: A=orderNumber, B=dateOrder, C=modelNumber, D=itemName, E=username, F=status
     return rows.filter(r => r[0]).map((row, idx): ClaimRecord => ({
       rowIndex: idx + 2,
       orderNumber: row[0] || '',
@@ -125,8 +143,7 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
       modelNumber: row[2] || '',
       itemName: row[3] || '',
       username: row[4] || '',
-      ...(type === 'usps' ? { amountRefunded: parseMoney(row[5]) } : {}),
-      status: type === 'usps' ? (row[6] || '') : (row[5] || ''),
+      status: row[5] || '',
     }));
   } catch (e) {
     console.error('getClaims error:', e);
@@ -142,11 +159,11 @@ export async function addClaim(type: string, data: Omit<ClaimRecord, 'rowIndex'>
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.SALES_SHEET_ID!;
   const values = type === 'usps'
-    ? [[data.orderNumber, data.dateOrder, data.modelNumber, data.itemName, data.username, data.amountRefunded ?? 0, data.status]]
-    : [[data.orderNumber, data.dateOrder, data.modelNumber, data.itemName, data.username, data.status]];
+    ? [[data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status]]
+    : [[data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status]];
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `'${tab}'!A:G`,
+    range: `'${tab}'!A:F`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values },
   });
@@ -177,7 +194,7 @@ export async function updateClaimStatus(type: string, rowIndex: number, status: 
   if (!tab) return;
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.SALES_SHEET_ID!;
-  const col = type === 'usps' ? 'G' : 'F';
+  const col = 'F';
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `'${tab}'!${col}${rowIndex}`,

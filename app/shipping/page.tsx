@@ -22,19 +22,25 @@ type User = { username: string; name: string; role: Role };
 
 type ClaimRecord = {
   rowIndex: number;
-  orderNumber: string;
-  dateOrder: string;
-  modelNumber: string;
-  itemName: string;
+  // General claim fields (cancellation / replacement / refund)
+  orderNumber?: string;
+  dateOrder?: string;
+  modelNumber?: string;
+  itemName?: string;
+  // USPS claim fields
+  amountRequested?: number;
+  amountApproved?: number;
+  dateSubmitted?: string;
+  trackingNumber?: string;
+  // Common
   username: string;
-  amountRefunded?: number;
   status: string;
 };
 
 type SectionType = 'shipments' | 'cancellation' | 'replacement' | 'refund' | 'usps';
 
 const SECTION_LABELS: Record<SectionType, string> = {
-  shipments: 'Shipments',
+  shipments: 'Assign Shipments',
   cancellation: 'Cancellations',
   replacement: 'Replacements',
   refund: 'Refunds',
@@ -51,7 +57,11 @@ const STATUS_STYLE: Record<string, string> = {
 };
 const STATUS_LABEL: Record<string, string> = { pending: 'Pending', 'in-progress': 'In Progress', resolved: 'Resolved' };
 
-const emptyClaimForm = { orderNumber: '', dateOrder: '', modelNumber: '', itemName: '', username: '', amountRefunded: '', status: '' };
+const emptyClaimForm = {
+  orderNumber: '', dateOrder: '', modelNumber: '', itemName: '',
+  username: '', status: '',
+  amountRequested: '', amountApproved: '', dateSubmitted: '', trackingNumber: '',
+};
 
 // ─── Claims Section Component ─────────────────────────────────────────────────
 
@@ -78,19 +88,26 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.orderNumber || !form.status) return;
+    if (isUsps ? (!form.username || !form.amountRequested || !form.status) : (!form.orderNumber || !form.status)) return;
     setSaving(true);
     await fetch('/api/claims', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify(isUsps ? {
+        type,
+        username: form.username,
+        amountRequested: parseFloat(form.amountRequested) || 0,
+        amountApproved: form.amountApproved ? parseFloat(form.amountApproved) : undefined,
+        dateSubmitted: form.dateSubmitted,
+        trackingNumber: form.trackingNumber,
+        status: form.status,
+      } : {
         type,
         orderNumber: form.orderNumber,
         dateOrder: form.dateOrder,
         modelNumber: form.modelNumber,
         itemName: form.itemName,
         username: form.username,
-        ...(isUsps ? { amountRefunded: parseFloat(form.amountRefunded) || 0 } : {}),
         status: form.status,
       }),
     });
@@ -135,46 +152,77 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
       {/* Add form */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add {SECTION_LABELS[type].slice(0, -1)}</h3>
-        <form onSubmit={handleAdd} className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <div className="col-span-2 md:col-span-1">
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Order Number *</label>
-            <input value={form.orderNumber} onChange={e => setForm(f => ({ ...f, orderNumber: e.target.value }))} placeholder="Order #" required className={`w-full ${inputCls}`} />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Date Order</label>
-            <input type="date" value={form.dateOrder} onChange={e => setForm(f => ({ ...f, dateOrder: e.target.value }))} className={`w-full ${inputCls}`} />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Model #</label>
-            <input value={form.modelNumber} onChange={e => setForm(f => ({ ...f, modelNumber: e.target.value }))} placeholder="Model #" className={`w-full ${inputCls}`} />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Item Name</label>
-            <input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Item name" className={`w-full ${inputCls}`} />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Username</label>
-            <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username" className={`w-full ${inputCls}`} />
-          </div>
-          {isUsps && (
+        {isUsps ? (
+          <form onSubmit={handleAdd} className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Amount Refunded ($)</label>
-              <input type="number" step="0.01" min="0" value={form.amountRefunded} onChange={e => setForm(f => ({ ...f, amountRefunded: e.target.value }))} placeholder="0.00" className={`w-full ${inputCls}`} />
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Username *</label>
+              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Whatnot username" required className={`w-full ${inputCls}`} />
             </div>
-          )}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Status *</label>
-            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} required className={`w-full ${inputCls}`}>
-              <option value="">— select —</option>
-              {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="col-span-2 md:col-span-3 flex justify-end">
-            <button type="submit" disabled={saving} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
-              {saving ? 'Adding...' : `Add ${SECTION_LABELS[type].slice(0, -1)}`}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Amount Requested ($) *</label>
+              <input type="number" step="0.01" min="0" value={form.amountRequested} onChange={e => setForm(f => ({ ...f, amountRequested: e.target.value }))} placeholder="0.00" required className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Amount Approved ($)</label>
+              <input type="number" step="0.01" min="0" value={form.amountApproved} onChange={e => setForm(f => ({ ...f, amountApproved: e.target.value }))} placeholder="0.00 (optional)" className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Date Submitted</label>
+              <input type="date" value={form.dateSubmitted} onChange={e => setForm(f => ({ ...f, dateSubmitted: e.target.value }))} className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Tracking Number</label>
+              <input value={form.trackingNumber} onChange={e => setForm(f => ({ ...f, trackingNumber: e.target.value }))} placeholder="Tracking #" className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Status *</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} required className={`w-full ${inputCls}`}>
+                <option value="">— select —</option>
+                {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 md:col-span-3 flex justify-end">
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
+                {saving ? 'Adding...' : 'Add USPS Claim'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleAdd} className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Order Number *</label>
+              <input value={form.orderNumber} onChange={e => setForm(f => ({ ...f, orderNumber: e.target.value }))} placeholder="Order #" required className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Date Order</label>
+              <input type="date" value={form.dateOrder} onChange={e => setForm(f => ({ ...f, dateOrder: e.target.value }))} className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Model #</label>
+              <input value={form.modelNumber} onChange={e => setForm(f => ({ ...f, modelNumber: e.target.value }))} placeholder="Model #" className={`w-full ${inputCls}`} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Item Name</label>
+              <input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Item name" className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Username</label>
+              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username" className={`w-full ${inputCls}`} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Status *</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} required className={`w-full ${inputCls}`}>
+                <option value="">— select —</option>
+                {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 md:col-span-3 flex justify-end">
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
+                {saving ? 'Adding...' : `Add ${SECTION_LABELS[type].slice(0, -1)}`}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Records table */}
@@ -188,12 +236,23 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Order #</th>
-                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
-                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Model #</th>
-                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Item Name</th>
-                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Username</th>
-                  {isUsps && <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Refunded</th>}
+                  {isUsps ? (
+                    <>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Username</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Amt Requested</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Amt Approved</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date Submitted</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Tracking #</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Order #</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Model #</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Item Name</th>
+                      <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Username</th>
+                    </>
+                  )}
                   <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
                   {isAdminOrManager && <th className="py-3 px-4 w-16" />}
                 </tr>
@@ -201,12 +260,29 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
               <tbody>
                 {claims.map(c => (
                   <tr key={c.rowIndex} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="py-3 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{c.orderNumber}</td>
-                    <td className="py-3 px-4 text-xs text-slate-400">{c.dateOrder}</td>
-                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.modelNumber || '—'}</td>
-                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">{c.itemName || '—'}</td>
-                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || '—'}</td>
-                    {isUsps && <td className="py-3 px-4 text-xs font-bold text-emerald-600">{c.amountRefunded != null ? `$${c.amountRefunded.toFixed(2)}` : '—'}</td>}
+                    {isUsps ? (
+                      <>
+                        <td className="py-3 px-4 text-xs font-bold text-blue-600 dark:text-blue-400">
+                          {c.username ? (
+                            <a href={`https://www.whatnot.com/user/${c.username}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              {c.username}
+                            </a>
+                          ) : '—'}
+                        </td>
+                        <td className="py-3 px-4 text-xs font-bold text-slate-700 dark:text-slate-200">{c.amountRequested != null ? `$${c.amountRequested.toFixed(2)}` : '—'}</td>
+                        <td className="py-3 px-4 text-xs font-bold text-emerald-600 dark:text-emerald-400">{c.amountApproved != null ? `$${c.amountApproved.toFixed(2)}` : <span className="text-slate-400 font-normal">—</span>}</td>
+                        <td className="py-3 px-4 text-xs text-slate-400">{c.dateSubmitted || '—'}</td>
+                        <td className="py-3 px-4 font-mono text-xs text-slate-600 dark:text-slate-300">{c.trackingNumber || '—'}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-3 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{c.orderNumber || '—'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-400">{c.dateOrder || '—'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.modelNumber || '—'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">{c.itemName || '—'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || '—'}</td>
+                      </>
+                    )}
                     <td className="py-3 px-4">
                       {isAdminOrManager ? (
                         <select
@@ -256,6 +332,7 @@ export default function ShippingPage() {
   const [selectedTab, setSelectedTab] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'pending' | 'in-progress' | 'resolved'>('all');
   const [activeSection, setActiveSection] = useState<SectionType>('shipments');
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
 
   // Auto-assign state
   const [autoUser, setAutoUser] = useState('');
@@ -315,6 +392,23 @@ export default function ShippingPage() {
       setSession(s);
     });
     load();
+    // Read ?tab= from URL to navigate directly to a claim section
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') as SectionType;
+    if (tab && ['cancellation', 'replacement', 'refund', 'usps'].includes(tab)) {
+      setActiveSection(tab);
+    }
+    // Prefetch unresolved counts for badge display
+    (['cancellation', 'replacement', 'refund', 'usps'] as const).forEach(t => {
+      fetch(`/api/claims?type=${t}`)
+        .then(r => r.json())
+        .then((data: ClaimRecord[]) => {
+          if (!Array.isArray(data)) return;
+          const count = data.filter(c => t === 'usps' ? c.status !== 'Approved' : c.status !== 'Resolved').length;
+          setSectionCounts(prev => ({ ...prev, [t]: count }));
+        })
+        .catch(() => {});
+    });
   }, []);
 
   const allTabs = useMemo(() => {
@@ -511,11 +605,16 @@ export default function ShippingPage() {
             <button
               key={s}
               onClick={() => setActiveSection(s)}
-              className={`px-3 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${activeSection === s
+              className={`flex items-center gap-1.5 px-3 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${activeSection === s
                 ? 'border-red-500 text-red-600 dark:text-red-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               {SECTION_LABELS[s]}
+              {s !== 'shipments' && (sectionCounts[s] ?? 0) > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-black rounded-full">
+                  {sectionCounts[s]}
+                </span>
+              )}
             </button>
           ))}
         </div>

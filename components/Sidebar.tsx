@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
 
-type NavItem = { href: string; label: string; icon: React.ReactNode };
+type NavItem = { href: string; label: string; icon: React.ReactNode; children?: NavItem[] };
 type Section = { title: string; items: NavItem[] };
 
 const I = {
@@ -27,6 +27,19 @@ const I = {
   ship: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
 };
 
+const SHIPMENTS_NAV: NavItem = {
+  href: '/shipping',
+  label: 'Shipments',
+  icon: I.ship,
+  children: [
+    { href: '/shipping', label: 'Assign Shipments', icon: I.ship },
+    { href: '/shipping?tab=cancellation', label: 'Cancellations', icon: I.clip },
+    { href: '/shipping?tab=replacement', label: 'Replacements', icon: I.clip },
+    { href: '/shipping?tab=refund', label: 'Refunds', icon: I.clip },
+    { href: '/shipping?tab=usps', label: 'USPS Claims', icon: I.clip },
+  ],
+};
+
 const NAV: Record<Role, Section[]> = {
   admin: [
     { title: 'Overview', items: [{ href: '/admin', label: 'Dashboard', icon: I.grid }] },
@@ -34,7 +47,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
-      { href: '/shipping', label: 'Shipments', icon: I.ship },
+      SHIPMENTS_NAV,
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -52,7 +65,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
-      { href: '/shipping', label: 'Shipments', icon: I.ship },
+      SHIPMENTS_NAV,
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -67,7 +80,7 @@ const NAV: Record<Role, Section[]> = {
   shipper: [
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
-      { href: '/shipping', label: 'Shipments', icon: I.ship },
+      SHIPMENTS_NAV,
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -81,7 +94,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
-      { href: '/shipping', label: 'Shipments', icon: I.ship },
+      SHIPMENTS_NAV,
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -106,6 +119,19 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [shipmentCount, setShipmentCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
+    // Auto-expand Shipments accordion when on /shipping
+    if (typeof window !== 'undefined' && window.location.pathname === '/shipping') return new Set(['/shipping']);
+    return new Set();
+  });
+
+  function toggleExpanded(href: string) {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(href)) next.delete(href); else next.add(href);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (role !== 'admin') return;
@@ -215,10 +241,60 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
               const pendingsBadge = isPendings && pendingTaskCount > 0;
               const shipmentsBadge = isShipments && (role === 'host' || role === 'shipper') && shipmentCount > 0;
               const hasBadge = usersBadge || pendingsBadge || shipmentsBadge;
+
+              // Accordion parent (Shipments with sub-items)
+              if (item.children) {
+                const isExpanded = expandedItems.has(item.href);
+                const parentActive = pathname.startsWith(item.href);
+                return (
+                  <div key={item.href}>
+                    <button
+                      onClick={() => toggleExpanded(item.href)}
+                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all ${
+                        parentActive
+                          ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+                      }`}
+                    >
+                      <span className="flex-shrink-0">{item.icon}</span>
+                      {item.label}
+                      {shipmentsBadge && (
+                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                          {shipmentCount}
+                        </span>
+                      )}
+                      <svg
+                        className={`w-3.5 h-3.5 ml-auto flex-shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-3 pl-3 border-l border-slate-700 mt-0.5 mb-1 space-y-0.5">
+                        {item.children.map(child => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            onClick={() => setMobileOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-600 flex-shrink-0" />
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Regular nav link
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all ${
                     active
                       ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
@@ -235,11 +311,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                   {pendingsBadge && (
                     <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
                       {pendingTaskCount}
-                    </span>
-                  )}
-                  {shipmentsBadge && (
-                    <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                      {shipmentCount}
                     </span>
                   )}
                   {active && !hasBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
