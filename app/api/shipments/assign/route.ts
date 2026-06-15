@@ -4,6 +4,7 @@ import {
   upsertAssignment, removeAssignment, updateStatus,
   bulkAssign, pingShipment, acknowledgePing, getAssignments,
 } from '@/lib/shipmentStore';
+import { updateShipmentInSheet } from '@/lib/sheets';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
     notes: notes || '',
     pinged: false, pingMessage: '', pingAt: '',
   });
+  updateShipmentInSheet(tab, shipmentId, assignedToName, 'pending').catch(() => {});
   return NextResponse.json({ success: true });
 }
 
@@ -109,6 +111,9 @@ export async function PATCH(req: NextRequest) {
 
   const ok = updateStatus(shipmentId, tab, status);
   if (!ok) return NextResponse.json({ error: 'Assignment not found' }, { status: 404 });
+
+  const a = getAssignments().find(x => x.shipmentId === shipmentId && x.tab === tab);
+  if (a) updateShipmentInSheet(tab, shipmentId, a.assignedToName, status).catch(() => {});
 
   return NextResponse.json({ success: true });
 }

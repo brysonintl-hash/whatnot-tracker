@@ -87,6 +87,133 @@ export async function getSalesData(): Promise<SaleOrder[]> {
 
 export type ShipmentRecord = { shipmentId: string; tab: string };
 
+// ─── Claim Records (Cancellations / Replacement / Refund / USPS Claim) ───────
+
+export type ClaimRecord = {
+  rowIndex: number;
+  orderNumber: string;
+  dateOrder: string;
+  modelNumber: string;
+  itemName: string;
+  username: string;
+  amountRefunded?: number;
+  status: string;
+};
+
+const CLAIM_TABS: Record<string, string> = {
+  cancellation: 'CANCELLATIONS',
+  replacement: 'REPLACEMENT',
+  refund: 'REFUND',
+  usps: 'USPS CLAIM',
+};
+
+export async function getClaims(type: string): Promise<ClaimRecord[]> {
+  const auth = getAuth();
+  if (!auth) return [];
+  const tab = CLAIM_TABS[type];
+  if (!tab) return [];
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const spreadsheetId = process.env.SALES_SHEET_ID!;
+    const range = type === 'usps' ? `'${tab}'!A2:G2000` : `'${tab}'!A2:F2000`;
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+    const rows = res.data.values || [];
+    return rows.filter(r => r[0]).map((row, idx): ClaimRecord => ({
+      rowIndex: idx + 2,
+      orderNumber: row[0] || '',
+      dateOrder: row[1] || '',
+      modelNumber: row[2] || '',
+      itemName: row[3] || '',
+      username: row[4] || '',
+      ...(type === 'usps' ? { amountRefunded: parseMoney(row[5]) } : {}),
+      status: type === 'usps' ? (row[6] || '') : (row[5] || ''),
+    }));
+  } catch (e) {
+    console.error('getClaims error:', e);
+    return [];
+  }
+}
+
+export async function addClaim(type: string, data: Omit<ClaimRecord, 'rowIndex'>): Promise<void> {
+  const auth = getAuth();
+  if (!auth) return;
+  const tab = CLAIM_TABS[type];
+  if (!tab) return;
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const values = type === 'usps'
+    ? [[data.orderNumber, data.dateOrder, data.modelNumber, data.itemName, data.username, data.amountRefunded ?? 0, data.status]]
+    : [[data.orderNumber, data.dateOrder, data.modelNumber, data.itemName, data.username, data.status]];
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `'${tab}'!A:G`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values },
+  });
+}
+
+export async function deleteClaim(type: string, rowIndex: number): Promise<void> {
+  const auth = getAuth();
+  if (!auth) return;
+  const tab = CLAIM_TABS[type];
+  if (!tab) return;
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheetId = meta.data.sheets?.find(s => s.properties?.title === tab)?.properties?.sheetId;
+  if (sheetId == null) return;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{ deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex } } }],
+    },
+  });
+}
+
+export async function updateClaimStatus(type: string, rowIndex: number, status: string): Promise<void> {
+  const auth = getAuth();
+  if (!auth) return;
+  const tab = CLAIM_TABS[type];
+  if (!tab) return;
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const col = type === 'usps' ? 'G' : 'F';
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${tab}'!${col}${rowIndex}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [[status]] },
+  });
+}
+
+// ─── Write assignment back to SHIPMENT RECORDS Google Sheet ──────────────────
+
+export async function updateShipmentInSheet(tab: string, shipmentId: string, assignedName: string, status: string): Promise<void> {
+  const auth = getAuth();
+  const spreadsheetId = process.env.SHIPMENT_SHEET_ID;
+  if (!auth || !spreadsheetId) return;
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A:A` });
+    const rows = res.data.values || [];
+    const rowIdx = rows.findIndex(r => r[0]?.toString() === shipmentId);
+    if (rowIdx === -1) return;
+    const rowNumber = rowIdx + 1;
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data: [
+          { range: `'${tab}'!B${rowNumber}`, values: [[assignedName]] },
+          { range: `'${tab}'!C${rowNumber}`, values: [[status]] },
+        ],
+      },
+    });
+  } catch (e) {
+    console.error('updateShipmentInSheet error:', e);
+  }
+}
+
 export async function getShipmentData(): Promise<ShipmentRecord[]> {
   const auth = getAuth();
   const spreadsheetId = process.env.SHIPMENT_SHEET_ID;

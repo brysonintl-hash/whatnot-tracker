@@ -20,12 +20,231 @@ type Assignment = {
 type ShipmentRow = { shipmentId: string; tab: string; assignment: Assignment | null };
 type User = { username: string; name: string; role: Role };
 
+type ClaimRecord = {
+  rowIndex: number;
+  orderNumber: string;
+  dateOrder: string;
+  modelNumber: string;
+  itemName: string;
+  username: string;
+  amountRefunded?: number;
+  status: string;
+};
+
+type SectionType = 'shipments' | 'cancellation' | 'replacement' | 'refund' | 'usps';
+
+const SECTION_LABELS: Record<SectionType, string> = {
+  shipments: 'Shipments',
+  cancellation: 'Cancellations',
+  replacement: 'Replacements',
+  refund: 'Refunds',
+  usps: 'USPS Claims',
+};
+
+const USPS_STATUSES = ['Under Review', 'Approved'];
+const CLAIM_STATUSES = ['Open', 'In Progress', 'Resolved'];
+
 const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
   'in-progress': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
   resolved: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
 };
 const STATUS_LABEL: Record<string, string> = { pending: 'Pending', 'in-progress': 'In Progress', resolved: 'Resolved' };
+
+const emptyClaimForm = { orderNumber: '', dateOrder: '', modelNumber: '', itemName: '', username: '', amountRefunded: '', status: '' };
+
+// ─── Claims Section Component ─────────────────────────────────────────────────
+
+function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminOrManager: boolean }) {
+  const [claims, setClaims] = useState<ClaimRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(emptyClaimForm);
+  const [saving, setSaving] = useState(false);
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+  const [savingStatusIdx, setSavingStatusIdx] = useState<number | null>(null);
+
+  const isUsps = type === 'usps';
+  const statusOptions = isUsps ? USPS_STATUSES : CLAIM_STATUSES;
+
+  async function load() {
+    setLoading(true);
+    const res = await fetch(`/api/claims?type=${type}`);
+    const data = await res.json();
+    setClaims(Array.isArray(data) ? data : []);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, [type]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.orderNumber || !form.status) return;
+    setSaving(true);
+    await fetch('/api/claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        orderNumber: form.orderNumber,
+        dateOrder: form.dateOrder,
+        modelNumber: form.modelNumber,
+        itemName: form.itemName,
+        username: form.username,
+        ...(isUsps ? { amountRefunded: parseFloat(form.amountRefunded) || 0 } : {}),
+        status: form.status,
+      }),
+    });
+    setSaving(false);
+    setForm(emptyClaimForm);
+    load();
+  }
+
+  async function handleDelete(c: ClaimRecord) {
+    if (!confirm(`Delete this ${SECTION_LABELS[type].slice(0, -1).toLowerCase()} record?`)) return;
+    setDeletingIdx(c.rowIndex);
+    await fetch('/api/claims', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, rowIndex: c.rowIndex }),
+    });
+    setDeletingIdx(null);
+    load();
+  }
+
+  async function handleStatusChange(c: ClaimRecord, status: string) {
+    setSavingStatusIdx(c.rowIndex);
+    await fetch('/api/claims', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, rowIndex: c.rowIndex, status }),
+    });
+    setSavingStatusIdx(null);
+    setClaims(prev => prev.map(r => r.rowIndex === c.rowIndex ? { ...r, status } : r));
+  }
+
+  function statusColor(s: string) {
+    if (s === 'Approved' || s === 'Resolved') return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700';
+    if (s === 'Under Review' || s === 'In Progress') return 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700';
+    return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700';
+  }
+
+  const inputCls = 'text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400';
+
+  return (
+    <div>
+      {/* Add form */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add {SECTION_LABELS[type].slice(0, -1)}</h3>
+        <form onSubmit={handleAdd} className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Order Number *</label>
+            <input value={form.orderNumber} onChange={e => setForm(f => ({ ...f, orderNumber: e.target.value }))} placeholder="Order #" required className={`w-full ${inputCls}`} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Date Order</label>
+            <input type="date" value={form.dateOrder} onChange={e => setForm(f => ({ ...f, dateOrder: e.target.value }))} className={`w-full ${inputCls}`} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Model #</label>
+            <input value={form.modelNumber} onChange={e => setForm(f => ({ ...f, modelNumber: e.target.value }))} placeholder="Model #" className={`w-full ${inputCls}`} />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Item Name</label>
+            <input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Item name" className={`w-full ${inputCls}`} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Username</label>
+            <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username" className={`w-full ${inputCls}`} />
+          </div>
+          {isUsps && (
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Amount Refunded ($)</label>
+              <input type="number" step="0.01" min="0" value={form.amountRefunded} onChange={e => setForm(f => ({ ...f, amountRefunded: e.target.value }))} placeholder="0.00" className={`w-full ${inputCls}`} />
+            </div>
+          )}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Status *</label>
+            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} required className={`w-full ${inputCls}`}>
+              <option value="">— select —</option>
+              {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="col-span-2 md:col-span-3 flex justify-end">
+            <button type="submit" disabled={saving} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
+              {saving ? 'Adding...' : `Add ${SECTION_LABELS[type].slice(0, -1)}`}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Records table */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-slate-400 text-sm">Loading...</div>
+        ) : claims.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-sm">No {SECTION_LABELS[type].toLowerCase()} records yet</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Order #</th>
+                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
+                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Model #</th>
+                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Item Name</th>
+                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Username</th>
+                  {isUsps && <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Refunded</th>}
+                  <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
+                  {isAdminOrManager && <th className="py-3 px-4 w-16" />}
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map(c => (
+                  <tr key={c.rowIndex} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                    <td className="py-3 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{c.orderNumber}</td>
+                    <td className="py-3 px-4 text-xs text-slate-400">{c.dateOrder}</td>
+                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.modelNumber || '—'}</td>
+                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">{c.itemName || '—'}</td>
+                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || '—'}</td>
+                    {isUsps && <td className="py-3 px-4 text-xs font-bold text-emerald-600">{c.amountRefunded != null ? `$${c.amountRefunded.toFixed(2)}` : '—'}</td>}
+                    <td className="py-3 px-4">
+                      {isAdminOrManager ? (
+                        <select
+                          value={c.status}
+                          onChange={e => handleStatusChange(c, e.target.value)}
+                          disabled={savingStatusIdx === c.rowIndex}
+                          className={`text-[10px] font-bold border rounded-full px-2 py-0.5 focus:outline-none ${statusColor(c.status)}`}
+                        >
+                          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(c.status)}`}>{c.status || '—'}</span>
+                      )}
+                    </td>
+                    {isAdminOrManager && (
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleDelete(c)}
+                          disabled={deletingIdx === c.rowIndex}
+                          className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded disabled:opacity-40"
+                          title="Delete"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Shipping Page ───────────────────────────────────────────────────────
 
 export default function ShippingPage() {
   const router = useRouter();
@@ -36,6 +255,7 @@ export default function ShippingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'pending' | 'in-progress' | 'resolved'>('all');
+  const [activeSection, setActiveSection] = useState<SectionType>('shipments');
 
   // Auto-assign state
   const [autoUser, setAutoUser] = useState('');
@@ -77,7 +297,7 @@ export default function ShippingPage() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `my-shipments-${new Date().toISOString().slice(0,10)}.csv`;
+    a.href = url; a.download = `my-shipments-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   }
 
@@ -109,7 +329,6 @@ export default function ShippingPage() {
     if (allTabs.length > 0 && !selectedTab) setSelectedTab(allTabs[0]);
   }, [allTabs]);
 
-  // allTabs is sorted newest→oldest; prevTab = older, nextTab = newer
   const currentTabIdx = allTabs.indexOf(selectedTab);
   const prevTab = currentTabIdx < allTabs.length - 1 ? allTabs[currentTabIdx + 1] : null;
   const nextTab = currentTabIdx > 0 ? allTabs[currentTabIdx - 1] : null;
@@ -163,9 +382,7 @@ export default function ShippingPage() {
         notes: autoNotes,
       }),
     });
-    setAutoSaving(false);
-    setAutoCount('');
-    setAutoNotes('');
+    setAutoSaving(false); setAutoCount(''); setAutoNotes('');
     load();
   }
 
@@ -204,16 +421,13 @@ export default function ShippingPage() {
   }
 
   async function sendPing(s: ShipmentRow) {
-    const k = key(s);
     setPingSaving(true);
     await fetch('/api/shipments/assign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'ping', shipmentId: s.shipmentId, tab: s.tab, pingMessage: pingMsg }),
     });
-    setPingSaving(false);
-    setPingTarget(null);
-    setPingMsg('');
+    setPingSaving(false); setPingTarget(null); setPingMsg('');
     load();
   }
 
@@ -227,17 +441,12 @@ export default function ShippingPage() {
   }
 
   function toggleSelect(k: string) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(k)) next.delete(k); else next.add(k);
-      return next;
-    });
+    setSelected(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
   }
 
   function toggleAll() {
     const all = displayed.map(s => key(s));
-    if (selected.size === all.length) setSelected(new Set());
-    else setSelected(new Set(all));
+    if (selected.size === all.length) setSelected(new Set()); else setSelected(new Set(all));
   }
 
   function keyToItem(k: string) {
@@ -253,9 +462,7 @@ export default function ShippingPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, items }),
     });
-    setBulkSaving(false);
-    setSelected(new Set());
-    setEditMode(false);
+    setBulkSaving(false); setSelected(new Set()); setEditMode(false);
     load();
   }
 
@@ -265,391 +472,352 @@ export default function ShippingPage() {
     </div>
   );
 
+  const sections: SectionType[] = ['shipments', 'cancellation', 'replacement', 'refund', 'usps'];
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        {/* Header */}
+        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Shipments</h1>
-            <p className="text-xs text-slate-400">{today}</p>
+            <p className="text-xs text-slate-400 hidden sm:block">{today}</p>
           </div>
           <div className="flex items-center gap-2">
             {!isAdminOrManager && (
               <button onClick={downloadCSV}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-emerald-400 hover:text-emerald-600 transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Download CSV
+                <span className="hidden sm:inline">Download CSV</span>
               </button>
             )}
-            <button
-              onClick={() => { setEditMode(m => !m); setSelected(new Set()); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${editMode ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              {editMode ? 'Cancel Edit' : 'Edit'}
-            </button>
+            {activeSection === 'shipments' && (
+              <button
+                onClick={() => { setEditMode(m => !m); setSelected(new Set()); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${editMode ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                {editMode ? 'Cancel' : 'Edit'}
+              </button>
+            )}
             <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
-          {loading ? (
-            <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Loading shipments...</div>
-          ) : (
-            <>
-              {isAdminOrManager && (
-                <>
-                  {/* Date + filter bar */}
-                  <div className="flex flex-wrap items-center gap-3 mb-4">
-                    {/* Prev / Next date navigation */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => prevTab && setSelectedTab(prevTab)}
-                        disabled={!prevTab}
-                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                        Prev
-                      </button>
-                      <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-900 dark:text-white min-w-[90px] text-center">
-                        {selectedTab || '—'}
-                      </div>
-                      <button
-                        onClick={() => nextTab && setSelectedTab(nextTab)}
-                        disabled={!nextTab}
-                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                      </button>
-                    </div>
-                    <div className="flex gap-1 flex-wrap">
-                      {(['all', 'unassigned', 'pending', 'in-progress', 'resolved'] as const).map(f => (
-                        <button key={f} onClick={() => setStatusFilter(f)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${statusFilter === f ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}>
-                          {f === 'all' ? `All (${tabShipments.length})` : f === 'unassigned' ? `Unassigned (${unassignedInTab.length})` : STATUS_LABEL[f]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+        {/* Section tabs */}
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 flex gap-1 overflow-x-auto flex-shrink-0">
+          {sections.map(s => (
+            <button
+              key={s}
+              onClick={() => setActiveSection(s)}
+              className={`px-3 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${activeSection === s
+                ? 'border-red-500 text-red-600 dark:text-red-400'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+            >
+              {SECTION_LABELS[s]}
+            </button>
+          ))}
+        </div>
 
-                  {/* Auto-assign panel */}
-                  {unassignedInTab.length > 0 && (
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        Auto-Assign
-                        <span className="text-xs font-normal text-slate-400">{unassignedInTab.length} unassigned shipments available</span>
-                      </h3>
-                      <div className="flex flex-wrap items-end gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Assign</label>
-                          <input
-                            type="number" min="1" max={unassignedInTab.length}
-                            value={autoCount}
-                            onChange={e => setAutoCount(e.target.value)}
-                            placeholder="qty"
-                            className="w-20 text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
-                          />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Non-shipments sections */}
+          {activeSection !== 'shipments' && (
+            <ClaimsSection type={activeSection} isAdminOrManager={isAdminOrManager} />
+          )}
+
+          {/* Shipments section */}
+          {activeSection === 'shipments' && (
+            <>
+              {loading ? (
+                <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Loading shipments...</div>
+              ) : (
+                <>
+                  {isAdminOrManager && (
+                    <>
+                      {/* Date + filter bar */}
+                      <div className="flex flex-wrap items-center gap-3 mb-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => prevTab && setSelectedTab(prevTab)}
+                            disabled={!prevTab}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                            Prev
+                          </button>
+                          <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-900 dark:text-white min-w-[80px] text-center">
+                            {selectedTab || '—'}
+                          </div>
+                          <button
+                            onClick={() => nextTab && setSelectedTab(nextTab)}
+                            disabled={!nextTab}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Next
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                          </button>
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">To</label>
-                          <select value={autoUser} onChange={e => setAutoUser(e.target.value)}
-                            className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-400">
-                            <option value="">— select person —</option>
-                            {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
-                          </select>
+                        <div className="flex gap-1 flex-wrap">
+                          {(['all', 'unassigned', 'pending', 'in-progress', 'resolved'] as const).map(f => (
+                            <button key={f} onClick={() => setStatusFilter(f)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${statusFilter === f ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}>
+                              {f === 'all' ? `All (${tabShipments.length})` : f === 'unassigned' ? `Unassigned (${unassignedInTab.length})` : STATUS_LABEL[f]}
+                            </button>
+                          ))}
                         </div>
-                        <div className="flex-1 min-w-[140px]">
-                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Notes (optional)</label>
-                          <input type="text" value={autoNotes} onChange={e => setAutoNotes(e.target.value)} placeholder="e.g. handle asap"
-                            className="w-full text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400" />
+                      </div>
+
+                      {/* Auto-assign panel */}
+                      {unassignedInTab.length > 0 && (
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            Auto-Assign
+                            <span className="text-xs font-normal text-slate-400">{unassignedInTab.length} unassigned</span>
+                          </h3>
+                          <div className="flex flex-wrap items-end gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Qty</label>
+                              <input type="number" min="1" max={unassignedInTab.length} value={autoCount} onChange={e => setAutoCount(e.target.value)} placeholder="qty"
+                                className="w-20 text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400" />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">To</label>
+                              <select value={autoUser} onChange={e => setAutoUser(e.target.value)}
+                                className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-400">
+                                <option value="">— select —</option>
+                                {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
+                              </select>
+                            </div>
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Notes</label>
+                              <input type="text" value={autoNotes} onChange={e => setAutoNotes(e.target.value)} placeholder="optional"
+                                className="w-full text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400" />
+                            </div>
+                            <button onClick={autoAssign} disabled={!autoUser || !autoCount || autoSaving}
+                              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
+                              {autoSaving ? 'Assigning...' : `Assign ${autoCount || '?'}`}
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={autoAssign}
-                          disabled={!autoUser || !autoCount || autoSaving}
-                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
-                        >
-                          {autoSaving ? 'Assigning...' : `Assign ${autoCount || '?'} shipments`}
-                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {!isAdminOrManager && (
+                    <div className="mb-4">
+                      <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1">My Assigned Shipments</h2>
+                      <p className="text-xs text-slate-400">Shipments assigned to you</p>
+                    </div>
+                  )}
+
+                  {/* Ping modal */}
+                  {pingTarget && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPingTarget(null)}>
+                      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                        <h3 className="font-black text-slate-900 dark:text-white mb-1">Follow Up / Ping</h3>
+                        <p className="text-xs text-slate-400 mb-4">Send a follow-up message</p>
+                        <textarea value={pingMsg} onChange={e => setPingMsg(e.target.value)} placeholder="Type your message..." rows={3}
+                          className="w-full text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4" />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setPingTarget(null)} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
+                          <button onClick={() => { const s = displayed.find(s => key(s) === pingTarget); if (s) sendPing(s); }} disabled={pingSaving}
+                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50">
+                            {pingSaving ? 'Sending...' : 'Send Ping'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bulk action bar */}
+                  {editMode && (
+                    <div className="flex items-center gap-3 mb-4 bg-slate-900 dark:bg-slate-700 rounded-xl px-4 py-3 flex-wrap">
+                      <span className="text-white text-xs font-bold">{selected.size} selected</span>
+                      <div className="flex gap-2 ml-auto flex-wrap">
+                        {isAdminOrManager && selected.size > 0 && (
+                          <button onClick={() => bulkAction('bulk-unassign')} disabled={bulkSaving}
+                            className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
+                            {bulkSaving ? '...' : `Unassign (${selected.size})`}
+                          </button>
+                        )}
+                        {selected.size > 0 && (
+                          <button onClick={() => bulkAction('bulk-resolve')} disabled={bulkSaving}
+                            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
+                            {bulkSaving ? '...' : `Resolve (${selected.size})`}
+                          </button>
+                        )}
+                        <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-bold rounded-lg">Clear</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Table */}
+                  {displayed.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 text-center">
+                      <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No shipments found</p>
+                      <p className="text-slate-400 text-xs mt-1">
+                        {isAdminOrManager ? 'Try a different date or filter' : 'No shipments assigned to you yet'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                              {editMode && <th className="py-3 pl-4 pr-2 w-10"><input type="checkbox" checked={selected.size === displayed.length && displayed.length > 0} onChange={toggleAll} className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" /></th>}
+                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Shipment #</th>
+                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
+                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
+                              {isAdminOrManager
+                                ? <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Assigned To / Assign</th>
+                                : <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Notes</th>
+                              }
+                              <th className="py-3 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-wide">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {displayed.map(s => {
+                              const k = key(s);
+                              const form = getForm(s);
+                              const isSaving = assigning === k;
+                              const isPinged = s.assignment?.pinged;
+                              const isResolved = s.assignment?.status === 'resolved';
+                              const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session?.username;
+
+                              return (
+                                <tr key={k}
+                                  className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : selected.has(k) ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+
+                                  {editMode && (
+                                    <td className="py-3 pl-4 pr-2">
+                                      <input type="checkbox" checked={selected.has(k)} onChange={() => toggleSelect(k)} className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
+                                    </td>
+                                  )}
+
+                                  <td className="py-3 px-4">
+                                    <span className="font-mono text-xs text-slate-800 dark:text-slate-200 font-bold select-all">{s.shipmentId}</span>
+                                  </td>
+                                  <td className="py-3 px-4 text-xs text-slate-400">{s.tab}</td>
+
+                                  <td className="py-3 px-4">
+                                    {s.assignment ? (
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.assignment.status]}`}>
+                                        {STATUS_LABEL[s.assignment.status]}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600">
+                                        Unassigned
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  {isAdminOrManager && (
+                                    <td className="py-3 px-4">
+                                      {s.assignment && (
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                          {s.assignment.assignedToName}
+                                          <span className="ml-1 text-[10px] font-normal text-slate-400">({s.assignment.assignedToRole})</span>
+                                          {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">· {s.assignment.notes}</span>}
+                                        </p>
+                                      )}
+                                      {isPinged && !isResolved && (
+                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">📣 {s.assignment?.pingMessage || 'Follow up'}</p>
+                                      )}
+                                      {!isResolved && (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <select value={form.username}
+                                            onChange={e => { const sel = users.find(u => u.username === e.target.value); setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } })); }}
+                                            className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                            <option value="">— assign —</option>
+                                            {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
+                                          </select>
+                                          <input type="text" placeholder="Notes" value={form.notes}
+                                            onChange={e => setAssignForm(f => ({ ...f, [k]: { ...form, notes: e.target.value } }))}
+                                            className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-24" />
+                                        </div>
+                                      )}
+                                    </td>
+                                  )}
+
+                                  {!isAdminOrManager && (
+                                    <td className="py-3 px-4">
+                                      {isPinged && (
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                          <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+                                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{s.assignment?.pingMessage || 'Follow-up requested'}</span>
+                                        </div>
+                                      )}
+                                      <span className="text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || '—'}</span>
+                                    </td>
+                                  )}
+
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                                      {isResolved ? (
+                                        <>
+                                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Resolved</span>
+                                          {isAdminOrManager && (
+                                            <button onClick={() => unassign(s)} className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">Remove</button>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {isAdminOrManager && assignForm[k]?.username && (
+                                            <button onClick={() => saveAssignment(s)} disabled={isSaving}
+                                              className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50">
+                                              {isSaving ? '...' : s.assignment ? 'Update' : 'Assign'}
+                                            </button>
+                                          )}
+                                          {isAdminOrManager && s.assignment && (
+                                            <select value={s.assignment.status} onChange={e => updateStatus(s, e.target.value)}
+                                              className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none">
+                                              <option value="pending">Pending</option>
+                                              <option value="in-progress">In Progress</option>
+                                              <option value="resolved">Resolved</option>
+                                            </select>
+                                          )}
+                                          {isAdminOrManager && s.assignment && (
+                                            <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
+                                              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
+                                              {isPinged ? '📣 Pinged' : 'Follow Up'}
+                                            </button>
+                                          )}
+                                          {isAdminOrManager && s.assignment && (
+                                            <button onClick={() => unassign(s)} className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">Remove</button>
+                                          )}
+                                          {isMyShipment && (
+                                            <>
+                                              {s.assignment?.status === 'pending' && (
+                                                <button onClick={() => updateStatus(s, 'in-progress')}
+                                                  className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors">Start</button>
+                                              )}
+                                              <button onClick={() => updateStatus(s, 'resolved')}
+                                                className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors">Resolve</button>
+                                              {isPinged && (
+                                                <button onClick={() => acknowledge(s)}
+                                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors">Acknowledge</button>
+                                              )}
+                                            </>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
                 </>
-              )}
-
-              {/* Non-admin/manager header */}
-              {!isAdminOrManager && (
-                <div className="mb-4">
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1">My Assigned Shipments</h2>
-                  <p className="text-xs text-slate-400">Shipments assigned to you</p>
-                </div>
-              )}
-
-              {/* Ping modal */}
-              {pingTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPingTarget(null)}>
-                  <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-                    <h3 className="font-black text-slate-900 dark:text-white mb-1">Follow Up / Ping</h3>
-                    <p className="text-xs text-slate-400 mb-4">Send a follow-up message to the assigned person</p>
-                    <textarea
-                      value={pingMsg}
-                      onChange={e => setPingMsg(e.target.value)}
-                      placeholder="Type your message..."
-                      rows={3}
-                      className="w-full text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4"
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => setPingTarget(null)} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
-                      <button
-                        onClick={() => {
-                          const s = displayed.find(s => key(s) === pingTarget);
-                          if (s) sendPing(s);
-                        }}
-                        disabled={pingSaving}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {pingSaving ? 'Sending...' : 'Send Ping'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Bulk action bar */}
-              {editMode && (
-                <div className="flex items-center gap-3 mb-4 bg-slate-900 dark:bg-slate-700 rounded-xl px-4 py-3 flex-wrap">
-                  <span className="text-white text-xs font-bold">
-                    {selected.size} selected
-                  </span>
-                  <div className="flex gap-2 ml-auto">
-                    {isAdminOrManager && selected.size > 0 && (
-                      <button onClick={() => bulkAction('bulk-unassign')} disabled={bulkSaving}
-                        className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
-                        {bulkSaving ? '...' : `Unassign (${selected.size})`}
-                      </button>
-                    )}
-                    {selected.size > 0 && (
-                      <button onClick={() => bulkAction('bulk-resolve')} disabled={bulkSaving}
-                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
-                        {bulkSaving ? '...' : `Resolve (${selected.size})`}
-                      </button>
-                    )}
-                    <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-bold rounded-lg transition-colors">
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Table */}
-              {displayed.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-center">
-                  <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                  <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No shipments found</p>
-                  <p className="text-slate-400 text-xs mt-1">
-                    {isAdminOrManager ? 'Try selecting a different date or filter' : 'No shipments have been assigned to you yet'}
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                        {editMode && (
-                          <th className="py-3 pl-4 pr-2 w-10">
-                            <input type="checkbox"
-                              checked={selected.size === displayed.length && displayed.length > 0}
-                              onChange={toggleAll}
-                              className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
-                          </th>
-                        )}
-                        <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">Shipment #</th>
-                        <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
-                        <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
-                        {isAdminOrManager
-                          ? <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Assigned To / Assign</th>
-                          : <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Notes</th>
-                        }
-                        <th className="py-3 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-wide">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayed.map(s => {
-                        const k = key(s);
-                        const form = getForm(s);
-                        const isSaving = assigning === k;
-                        const isPinged = s.assignment?.pinged;
-                        const isResolved = s.assignment?.status === 'resolved';
-                        const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session?.username;
-
-                        return (
-                          <tr key={k}
-                            className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : selected.has(k) ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
-
-                            {/* Checkbox */}
-                            {editMode && (
-                              <td className="py-3 pl-4 pr-2">
-                                <input type="checkbox"
-                                  checked={selected.has(k)}
-                                  onChange={() => toggleSelect(k)}
-                                  className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
-                              </td>
-                            )}
-
-                            {/* Shipment ID (plain text, no link) */}
-                            <td className="py-3 px-5">
-                              <span className="font-mono text-xs text-slate-800 dark:text-slate-200 font-bold select-all">{s.shipmentId}</span>
-                            </td>
-
-                            {/* Date */}
-                            <td className="py-3 px-4 text-xs text-slate-400">{s.tab}</td>
-
-                            {/* Status */}
-                            <td className="py-3 px-4">
-                              {s.assignment ? (
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.assignment.status]}`}>
-                                  {STATUS_LABEL[s.assignment.status]}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600">
-                                  Unassigned
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Admin: assign controls */}
-                            {isAdminOrManager && (
-                              <td className="py-3 px-4">
-                                {s.assignment && (
-                                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                    {s.assignment.assignedToName}
-                                    <span className="ml-1 text-[10px] font-normal text-slate-400">({s.assignment.assignedToRole})</span>
-                                    {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">· {s.assignment.notes}</span>}
-                                  </p>
-                                )}
-                                {isPinged && !isResolved && (
-                                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
-                                    📣 Ping sent: {s.assignment?.pingMessage || 'Follow up'}
-                                  </p>
-                                )}
-                                {/* Editable controls only when NOT resolved */}
-                                {!isResolved && (
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <select
-                                      value={form.username}
-                                      onChange={e => {
-                                        const sel = users.find(u => u.username === e.target.value);
-                                        setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } }));
-                                      }}
-                                      className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                    >
-                                      <option value="">— assign —</option>
-                                      {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
-                                    </select>
-                                    <input type="text" placeholder="Notes" value={form.notes}
-                                      onChange={e => setAssignForm(f => ({ ...f, [k]: { ...form, notes: e.target.value } }))}
-                                      className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-28" />
-                                  </div>
-                                )}
-                              </td>
-                            )}
-
-                            {/* Host/Shipper: notes + ping indicator */}
-                            {!isAdminOrManager && (
-                              <td className="py-3 px-4">
-                                {isPinged && (
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-                                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                      {s.assignment?.pingMessage || 'Follow-up requested'}
-                                    </span>
-                                  </div>
-                                )}
-                                <span className="text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || '—'}</span>
-                              </td>
-                            )}
-
-                            {/* Actions */}
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                {isResolved ? (
-                                  /* Resolved: only show Remove for admin/manager */
-                                  <>
-                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Resolved</span>
-                                    {isAdminOrManager && (
-                                      <button onClick={() => unassign(s)}
-                                        className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">
-                                        Remove
-                                      </button>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    {/* Admin: save assignment */}
-                                    {isAdminOrManager && assignForm[k]?.username && (
-                                      <button onClick={() => saveAssignment(s)} disabled={isSaving}
-                                        className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50">
-                                        {isSaving ? '...' : s.assignment ? 'Update' : 'Assign'}
-                                      </button>
-                                    )}
-                                    {/* Admin: status select */}
-                                    {isAdminOrManager && s.assignment && (
-                                      <select value={s.assignment.status} onChange={e => updateStatus(s, e.target.value)}
-                                        className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none">
-                                        <option value="pending">Pending</option>
-                                        <option value="in-progress">In Progress</option>
-                                        <option value="resolved">Resolved</option>
-                                      </select>
-                                    )}
-                                    {/* Admin: follow up / ping (not shown when resolved) */}
-                                    {isAdminOrManager && s.assignment && (
-                                      <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
-                                        className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
-                                        {isPinged ? '📣 Pinged' : 'Follow Up'}
-                                      </button>
-                                    )}
-                                    {/* Admin: remove */}
-                                    {isAdminOrManager && s.assignment && (
-                                      <button onClick={() => unassign(s)}
-                                        className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">
-                                        Remove
-                                      </button>
-                                    )}
-                                    {/* Host/Shipper: status + acknowledge */}
-                                    {isMyShipment && (
-                                      <>
-                                        {s.assignment?.status === 'pending' && (
-                                          <button onClick={() => updateStatus(s, 'in-progress')}
-                                            className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors">
-                                            Start
-                                          </button>
-                                        )}
-                                        <button onClick={() => updateStatus(s, 'resolved')}
-                                          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors">
-                                          Resolve
-                                        </button>
-                                        {isPinged && (
-                                          <button onClick={() => acknowledge(s)}
-                                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors">
-                                            Acknowledge
-                                          </button>
-                                        )}
-                                      </>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               )}
             </>
           )}

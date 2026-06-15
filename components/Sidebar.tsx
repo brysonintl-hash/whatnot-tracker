@@ -105,6 +105,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [shipmentCount, setShipmentCount] = useState(0);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (role !== 'admin') return;
@@ -161,16 +162,43 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   }
 
   return (
-    <aside className="w-64 h-screen bg-slate-900 flex flex-col flex-shrink-0 border-r border-slate-800">
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-40 p-2 bg-slate-900 rounded-lg text-white shadow-lg"
+        aria-label="Open menu"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+    <aside className={`
+      fixed md:static top-0 left-0 z-50 h-screen w-64 bg-slate-900 flex flex-col flex-shrink-0 border-r border-slate-800
+      transition-transform duration-200 ease-in-out
+      ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+    `}>
       {/* Logo */}
       <div className="h-16 flex items-center px-5 border-b border-slate-800 flex-shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-white text-xs shadow">SB</div>
           <div>
             <div className="text-white font-black text-sm leading-none">Stack Bargains</div>
             <div className="text-slate-500 text-[10px] capitalize mt-0.5">{role} Portal</div>
           </div>
         </div>
+        <button onClick={() => setMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors ml-auto">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
 
       {/* Nav */}
@@ -244,5 +272,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         </button>
       </div>
     </aside>
+    </>
   );
 }

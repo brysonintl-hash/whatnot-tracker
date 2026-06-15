@@ -98,6 +98,22 @@ export function clearWeekEntries(sunISO: string, satISO: string): void {
   writeFileSync(ENTRIES_FILE, JSON.stringify(kept, null, 2));
 }
 
+export function editEntry(entryId: string, clockIn: string, clockOut: string | null): TimeEntry | null {
+  const entries = getEntries();
+  const idx = entries.findIndex(e => e.id === entryId);
+  if (idx === -1) return null;
+  const d = new Date(clockIn);
+  entries[idx] = {
+    ...entries[idx],
+    clockIn,
+    clockOut: clockOut !== undefined ? clockOut : entries[idx].clockOut,
+    date: d.toLocaleDateString('en-US'),
+  };
+  ensureDir();
+  writeFileSync(ENTRIES_FILE, JSON.stringify(entries, null, 2));
+  return entries[idx];
+}
+
 export function deleteEntry(entryId: string): boolean {
   const entries = getEntries();
   const filtered = entries.filter(e => e.id !== entryId);

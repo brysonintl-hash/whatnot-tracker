@@ -56,6 +56,9 @@ function ManagementView({ session }: { session: Session }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ clockIn: string; clockOut: string }>({ clockIn: '', clockOut: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const { sun, sat } = getWeekRange();
@@ -142,6 +145,35 @@ function ManagementView({ session }: { session: Session }) {
     await fetch(`/api/timekeeping/${id}`, { method: 'DELETE' });
     setEntries(prev => prev.filter(e => e.id !== id));
     setDeletingId(null);
+  }
+
+  function toLocalInput(iso: string) {
+    // Convert ISO to "YYYY-MM-DDTHH:MM" for datetime-local input
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openEdit(e: Entry) {
+    setEditingId(e.id);
+    setEditForm({ clockIn: toLocalInput(e.clockIn), clockOut: e.clockOut ? toLocalInput(e.clockOut) : '' });
+  }
+
+  async function saveEdit(e: Entry) {
+    if (!editForm.clockIn) return;
+    setSavingEdit(true);
+    const res = await fetch(`/api/timekeeping/${e.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clockIn: new Date(editForm.clockIn).toISOString(),
+        clockOut: editForm.clockOut ? new Date(editForm.clockOut).toISOString() : e.clockOut,
+      }),
+    });
+    const data = await res.json();
+    if (data.entry) setEntries(prev => prev.map(x => x.id === data.entry.id ? data.entry : x));
+    setSavingEdit(false);
+    setEditingId(null);
   }
 
   async function togglePaid(userId: string) {
@@ -377,38 +409,70 @@ function ManagementView({ session }: { session: Session }) {
                   <table className="w-full text-sm">
                     <thead><tr className="border-b border-slate-100 dark:border-slate-700">
                       {['Date', 'Name', 'Role', 'Clock In', 'Clock Out', 'Hours', 'Note', ''].map((h, i) => (
-                        <th key={i} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">{h}</th>
+                        <th key={i} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-3">{h}</th>
                       ))}
                     </tr></thead>
                     <tbody>
                       {weekEntries.length === 0 ? (
                         <tr><td colSpan={8} className="py-8 text-center text-slate-400 text-sm">No entries this week</td></tr>
                       ) : (
-                        [...weekEntries].reverse().map(e => (
-                          <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
-                            <td className="py-3 px-4 text-xs text-slate-400">{e.date}</td>
-                            <td className="py-3 px-4 text-xs font-semibold text-slate-700 dark:text-slate-300">{e.name}</td>
-                            <td className="py-3 px-4"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 capitalize">{e.role}</span></td>
-                            <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
-                            <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
-                            <td className="py-3 px-4 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
-                            <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 max-w-[160px] truncate">{e.note || '—'}</td>
-                            <td className="py-3 px-4">
-                              <button
-                                onClick={() => deleteTimeEntry(e.id)}
-                                disabled={deletingId === e.id}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-30"
-                                title="Delete entry"
-                              >
-                                {deletingId === e.id ? (
-                                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                ) : (
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                )}
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        [...weekEntries].reverse().map(e => {
+                          const isEditing = editingId === e.id;
+                          return (
+                            <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
+                              <td className="py-3 px-3 text-xs text-slate-400">{e.date}</td>
+                              <td className="py-3 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300">{e.name}</td>
+                              <td className="py-3 px-3"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 capitalize">{e.role}</span></td>
+                              <td className="py-2 px-3 text-xs text-slate-700 dark:text-slate-300">
+                                {isEditing ? (
+                                  <input type="datetime-local" value={editForm.clockIn} onChange={ev => setEditForm(f => ({ ...f, clockIn: ev.target.value }))}
+                                    className="text-xs border border-blue-300 rounded px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-36" />
+                                ) : fmtTime(e.clockIn)}
+                              </td>
+                              <td className="py-2 px-3 text-xs text-slate-700 dark:text-slate-300">
+                                {isEditing ? (
+                                  <input type="datetime-local" value={editForm.clockOut} onChange={ev => setEditForm(f => ({ ...f, clockOut: ev.target.value }))}
+                                    className="text-xs border border-blue-300 rounded px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-36" />
+                                ) : e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}
+                              </td>
+                              <td className="py-3 px-3 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
+                              <td className="py-3 px-3 text-xs text-slate-500 dark:text-slate-400 max-w-[120px] truncate">{e.note || '—'}</td>
+                              <td className="py-2 px-3">
+                                <div className="flex items-center gap-1">
+                                  {isEditing ? (
+                                    <>
+                                      <button onClick={() => saveEdit(e)} disabled={savingEdit}
+                                        className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded transition-colors disabled:opacity-50">
+                                        {savingEdit ? '...' : 'Save'}
+                                      </button>
+                                      <button onClick={() => setEditingId(null)}
+                                        className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 rounded transition-colors">
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button onClick={() => openEdit(e)}
+                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                        title="Edit times">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                      </button>
+                                      <button onClick={() => deleteTimeEntry(e.id)} disabled={deletingId === e.id}
+                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-30"
+                                        title="Delete entry">
+                                        {deletingId === e.id ? (
+                                          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                        ) : (
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
