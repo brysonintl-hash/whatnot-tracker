@@ -37,7 +37,6 @@ type AsinResult = {
 const AMAZON_FEE_PCT = 0.15;
 const AMAZON_SHIPPING_LIGHT = 10.31; // ≤ 5 lbs
 const WHATNOT_COMMISSION = 0.08;
-const WHATNOT_PROCESSING = 0.029;
 const WHATNOT_TRANSACTION = 0.30;
 
 function getShipping(weightLbs: number | null): { cost: number | null; overweight: boolean } {
@@ -53,7 +52,7 @@ function calcProfits(amazonPrice: number | null, yourCost: number | null, whatno
     ? amazonPrice * (1 - AMAZON_FEE_PCT) - shipCost - yourCost
     : null;
   const wnProfit = whatnotPrice != null
-    ? whatnotPrice * (1 - WHATNOT_COMMISSION - WHATNOT_PROCESSING) - WHATNOT_TRANSACTION - yourCost
+    ? whatnotPrice * (1 - WHATNOT_COMMISSION) - WHATNOT_TRANSACTION - yourCost
     : null;
   return { amzProfit, wnProfit, overweight, shipCost };
 }
@@ -340,10 +339,6 @@ export default function AmazonPage() {
                             <div className="flex justify-between">
                               <span>Commission (8%)</span>
                               <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WHATNOT_COMMISSION).toFixed(2)}` : '—'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Processing (2.9%)</span>
-                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WHATNOT_PROCESSING).toFixed(2)}` : '—'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Transaction fee</span>
