@@ -74,7 +74,6 @@ export async function GET(req: NextRequest) {
     if (p.weight) {
       weight = String(p.weight);
     } else if (p.product_details && typeof p.product_details === 'object') {
-      // product_details is a plain object: { "Item Weight": "5 pounds", ... }
       const key = Object.keys(p.product_details).find(k => weightRe.test(k));
       if (key) weight = String(p.product_details[key]);
     } else if (Array.isArray(p.specifications)) {
@@ -83,6 +82,20 @@ export async function GET(req: NextRequest) {
     } else if (Array.isArray(p.attributes)) {
       const a = p.attributes.find((a: { name: string; value: string }) => weightRe.test(a.name));
       if (a) weight = a.value;
+    }
+
+    // Parse weight string into pounds for shipping rate logic
+    let weightLbs: number | null = null;
+    if (weight) {
+      const m = weight.match(/([\d.]+)\s*(pound|lb|ounce|oz|kilogram|kg|gram|g)\b/i);
+      if (m) {
+        const val = parseFloat(m[1]);
+        const unit = m[2].toLowerCase();
+        if (unit.startsWith('pound') || unit.startsWith('lb')) weightLbs = val;
+        else if (unit.startsWith('ounce') || unit === 'oz') weightLbs = val / 16;
+        else if (unit.startsWith('kilogram') || unit === 'kg') weightLbs = val * 2.20462;
+        else if (unit.startsWith('gram') || unit === 'g') weightLbs = val / 453.592;
+      }
     }
 
     return NextResponse.json({
@@ -101,6 +114,7 @@ export async function GET(req: NextRequest) {
       url: `https://www.amazon.com/dp/${asin}`,
       opportunity,
       weight,
+      weightLbs,
     });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
