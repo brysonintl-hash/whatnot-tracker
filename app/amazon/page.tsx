@@ -27,6 +27,7 @@ type AsinResult = {
   opportunity: Opportunity;
   weight: string | null;
   weightLbs: number | null;
+  estimatedMonthlySales: number | null;
   yourCost: number | null;
   whatnotPrice: number | null;
   error?: string;
@@ -93,7 +94,7 @@ export default function AmazonPage() {
       asin, title: '', brand: '', image: '', price: null, currency: 'USD',
       rating: null, reviews: null, bsr: null, bsrCategory: null, category: '',
       bullets: [], url: '', opportunity: { label: '', color: 'slate', score: 0 },
-      weight: null, weightLbs: null, yourCost, whatnotPrice, loading: true,
+      weight: null, weightLbs: null, estimatedMonthlySales: null, yourCost, whatnotPrice, loading: true,
     }, ...prev]);
     try {
       const res = await fetch(`/api/amazon?asin=${asin}`);
@@ -255,6 +256,12 @@ export default function AmazonPage() {
                                 BSR #{r.bsr.toLocaleString()} {r.bsrCategory ? `· ${r.bsrCategory}` : ''}
                               </span>
                             )}
+                            {r.estimatedMonthlySales != null && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400">
+                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                                ~{r.estimatedMonthlySales.toLocaleString()} sold/mo
+                              </span>
+                            )}
                             {r.opportunity?.label && (
                               <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${opp.bg} ${opp.text} ${opp.border}`}>
                                 <span className={`w-1 h-1 rounded-full ${opp.dot}`} />
@@ -306,6 +313,12 @@ export default function AmazonPage() {
                               <div className="flex justify-between text-[10px]">
                                 <span>Margin</span>
                                 <span className={amzMargin > 0 ? 'text-emerald-500' : 'text-red-400'}>{amzMargin.toFixed(1)}%</span>
+                              </div>
+                            )}
+                            {!overweight && amzProfit != null && amzProfit > 0 && r.estimatedMonthlySales != null && (
+                              <div className="flex justify-between text-[10px] border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
+                                <span className="font-bold text-violet-600 dark:text-violet-400">Est. monthly profit</span>
+                                <span className="font-black text-violet-600 dark:text-violet-400">~${(amzProfit * r.estimatedMonthlySales).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                               </div>
                             )}
                           </div>
