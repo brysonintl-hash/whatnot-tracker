@@ -296,28 +296,14 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                         <td className="py-3 px-4">
                           <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || '—'}</div>
                           {c.trackingNumber && (
-                            <button
-                              onClick={() => trackShipment(c)}
-                              disabled={trackingLoading === c.rowIndex}
-                              className="text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                            <a
+                              href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(c.trackingNumber)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
                             >
-                              {trackingLoading === c.rowIndex ? 'Tracking...' : 'Track'}
-                            </button>
-                          )}
-                          {trackingData[c.rowIndex] && (
-                            'error' in trackingData[c.rowIndex] ? (
-                              <div className="text-[10px] text-red-500 mt-1">{String((trackingData[c.rowIndex] as { error: unknown }).error)}</div>
-                            ) : (
-                              <div className="mt-1 space-y-0.5">
-                                <div className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{(trackingData[c.rowIndex] as TrackResult).status}</div>
-                                <div className="text-[10px] text-slate-500">{(trackingData[c.rowIndex] as TrackResult).description}</div>
-                                {(trackingData[c.rowIndex] as TrackResult).city && (
-                                  <div className="text-[10px] text-slate-400">
-                                    {(trackingData[c.rowIndex] as TrackResult).city}, {(trackingData[c.rowIndex] as TrackResult).state} · {(trackingData[c.rowIndex] as TrackResult).date}
-                                  </div>
-                                )}
-                              </div>
-                            )
+                              Track on USPS ↗
+                            </a>
                           )}
                         </td>
                       </>
