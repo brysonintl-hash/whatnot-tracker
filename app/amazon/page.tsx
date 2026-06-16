@@ -36,7 +36,9 @@ type AsinResult = {
 
 const AMAZON_FEE_PCT = 0.15;
 const AMAZON_SHIPPING_LIGHT = 10.31; // ≤ 5 lbs
-const WHATNOT_FEE_PCT = 0.08;
+const WHATNOT_COMMISSION = 0.08;
+const WHATNOT_PROCESSING = 0.029;
+const WHATNOT_TRANSACTION = 0.30;
 
 function getShipping(weightLbs: number | null): { cost: number | null; overweight: boolean } {
   if (weightLbs == null) return { cost: AMAZON_SHIPPING_LIGHT, overweight: false }; // unknown → use standard
@@ -51,7 +53,7 @@ function calcProfits(amazonPrice: number | null, yourCost: number | null, whatno
     ? amazonPrice * (1 - AMAZON_FEE_PCT) - shipCost - yourCost
     : null;
   const wnProfit = whatnotPrice != null
-    ? whatnotPrice * (1 - WHATNOT_FEE_PCT) - yourCost
+    ? whatnotPrice * (1 - WHATNOT_COMMISSION - WHATNOT_PROCESSING) - WHATNOT_TRANSACTION - yourCost
     : null;
   return { amzProfit, wnProfit, overweight, shipCost };
 }
@@ -336,8 +338,16 @@ export default function AmazonPage() {
                               <span className="font-bold text-slate-700 dark:text-slate-200">{r.whatnotPrice != null ? `$${r.whatnotPrice.toFixed(2)}` : 'Add WN price'}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Whatnot fee (8%)</span>
-                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * 0.08).toFixed(2)}` : '—'}</span>
+                              <span>Commission (8%)</span>
+                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WHATNOT_COMMISSION).toFixed(2)}` : '—'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Processing (2.9%)</span>
+                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WHATNOT_PROCESSING).toFixed(2)}` : '—'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Transaction fee</span>
+                              <span className="text-red-500">−$0.30</span>
                             </div>
                             <div className="flex justify-between text-slate-300 dark:text-slate-600">
                               <span>Shipping (buyer pays)</span>
