@@ -12,7 +12,6 @@ async function getToken(): Promise<string> {
       grant_type: 'client_credentials',
       client_id: process.env.USPS_CONSUMER_KEY!,
       client_secret: process.env.USPS_CONSUMER_SECRET!,
-      scope: 'tracking',
     }).toString(),
   });
 
@@ -41,7 +40,10 @@ export async function GET(req: NextRequest) {
     );
 
     const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: `USPS error ${res.status}: ${data?.description || data?.message || JSON.stringify(data)}` }, { status: res.status });
+    if (!res.ok) {
+      console.error('USPS tracking error:', res.status, JSON.stringify(data));
+      return NextResponse.json({ error: `USPS ${res.status}: ${data?.description || data?.message || data?.errors?.[0]?.message || JSON.stringify(data)}` }, { status: res.status });
+    }
 
     // Normalize to a simple shape
     const summary = data.trackSummary;
