@@ -119,11 +119,11 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [shipmentCount, setShipmentCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
-    // Auto-expand Shipments accordion when on /shipping
-    if (typeof window !== 'undefined' && window.location.pathname === '/shipping') return new Set(['/shipping']);
-    return new Set();
-  });
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (pathname.startsWith('/shipping')) setExpandedItems(new Set(['/shipping']));
+  }, [pathname]);
 
   function toggleExpanded(href: string) {
     setExpandedItems(prev => {

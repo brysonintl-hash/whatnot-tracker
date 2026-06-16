@@ -95,9 +95,13 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
 
   async function load() {
     setLoading(true);
-    const res = await fetch(`/api/claims?type=${type}`);
-    const data = await res.json();
-    setClaims(Array.isArray(data) ? data : []);
+    try {
+      const res = await fetch(`/api/claims?type=${type}`);
+      const data = await res.json();
+      setClaims(Array.isArray(data) ? data : []);
+    } catch {
+      setClaims([]);
+    }
     setLoading(false);
   }
 
