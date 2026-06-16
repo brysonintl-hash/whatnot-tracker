@@ -25,6 +25,7 @@ type AsinResult = {
   bullets: string[];
   url: string;
   opportunity: Opportunity;
+  weight: string | null;
   yourCost: number | null;
   whatnotPrice: number | null;
   error?: string;
@@ -84,7 +85,7 @@ export default function AmazonPage() {
       asin, title: '', brand: '', image: '', price: null, currency: 'USD',
       rating: null, reviews: null, bsr: null, bsrCategory: null, category: '',
       bullets: [], url: '', opportunity: { label: '', color: 'slate', score: 0 },
-      yourCost, whatnotPrice, loading: true,
+      weight: null, yourCost, whatnotPrice, loading: true,
     }, ...prev]);
     try {
       const res = await fetch(`/api/amazon?asin=${asin}`);
@@ -225,7 +226,15 @@ export default function AmazonPage() {
                                 className="text-sm font-bold text-slate-900 dark:text-white hover:text-orange-500 transition-colors line-clamp-2 leading-snug">
                                 {r.title}
                               </a>
-                              {r.brand && <p className="text-xs text-slate-400">{r.brand}</p>}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {r.brand && <p className="text-xs text-slate-400">{r.brand}</p>}
+                                {r.weight && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                                    {r.weight}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none flex-shrink-0">✕</button>
                           </div>

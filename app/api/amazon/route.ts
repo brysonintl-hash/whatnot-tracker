@@ -68,6 +68,22 @@ export async function GET(req: NextRequest) {
     const rating = p.rating ?? null;
     const opportunity = scoreOpportunity(bsr, price, reviews);
 
+    // Extract weight from product specifications or direct field
+    let weight: string | null = null;
+    if (p.weight) {
+      weight = String(p.weight);
+    } else if (Array.isArray(p.specifications)) {
+      const weightSpec = p.specifications.find((s: { name: string; value: string }) =>
+        /item weight|package weight|shipping weight|weight/i.test(s.name)
+      );
+      if (weightSpec) weight = weightSpec.value;
+    } else if (Array.isArray(p.attributes)) {
+      const weightAttr = p.attributes.find((a: { name: string; value: string }) =>
+        /item weight|package weight|shipping weight|weight/i.test(a.name)
+      );
+      if (weightAttr) weight = weightAttr.value;
+    }
+
     return NextResponse.json({
       asin,
       title: p.title ?? '',
@@ -83,6 +99,7 @@ export async function GET(req: NextRequest) {
       bullets: (p.feature_bullets ?? []).slice(0, 4),
       url: `https://www.amazon.com/dp/${asin}`,
       opportunity,
+      weight,
     });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
