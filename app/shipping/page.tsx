@@ -306,7 +306,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                           )}
                           {trackingData[c.rowIndex] && (
                             'error' in trackingData[c.rowIndex] ? (
-                              <div className="text-[10px] text-red-500 mt-1">{(trackingData[c.rowIndex] as { error: string }).error}</div>
+                              <div className="text-[10px] text-red-500 mt-1">{String((trackingData[c.rowIndex] as { error: unknown }).error)}</div>
                             ) : (
                               <div className="mt-1 space-y-0.5">
                                 <div className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{(trackingData[c.rowIndex] as TrackResult).status}</div>

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     );
 
     const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data }, { status: res.status });
+    if (!res.ok) return NextResponse.json({ error: `USPS error ${res.status}: ${data?.description || data?.message || JSON.stringify(data)}` }, { status: res.status });
 
     // Normalize to a simple shape
     const summary = data.trackSummary;
