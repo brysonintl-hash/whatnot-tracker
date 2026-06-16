@@ -3,24 +3,9 @@ import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+// Calibrated to match SellerAmp/Jungle Scout: BSR 21k ≈ 500/mo
 function estimateMonthlySales(bsr: number): number {
-  if (bsr <= 10) return 50000;
-  if (bsr <= 50) return 20000;
-  if (bsr <= 100) return 10000;
-  if (bsr <= 200) return 6000;
-  if (bsr <= 500) return 3000;
-  if (bsr <= 1000) return 1500;
-  if (bsr <= 2000) return 800;
-  if (bsr <= 3000) return 500;
-  if (bsr <= 5000) return 300;
-  if (bsr <= 10000) return 150;
-  if (bsr <= 20000) return 80;
-  if (bsr <= 30000) return 50;
-  if (bsr <= 50000) return 30;
-  if (bsr <= 100000) return 15;
-  if (bsr <= 200000) return 8;
-  if (bsr <= 500000) return 3;
-  return 1;
+  return Math.max(1, Math.round(116000 * Math.pow(bsr, -0.55)));
 }
 
 function scoreOpportunity(bsr: number | null, price: number | null, reviews: number | null) {
