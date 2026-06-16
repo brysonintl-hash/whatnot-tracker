@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
@@ -322,8 +322,9 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
 
 // ─── Main Shipping Page ───────────────────────────────────────────────────────
 
-export default function ShippingPage() {
+function ShippingPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   useTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [shipments, setShipments] = useState<ShipmentRow[]>([]);
@@ -333,6 +334,16 @@ export default function ShippingPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'pending' | 'in-progress' | 'resolved'>('all');
   const [activeSection, setActiveSection] = useState<SectionType>('shipments');
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
+
+  // Sync active section with ?tab= URL param whenever it changes
+  useEffect(() => {
+    const tab = searchParams.get('tab') as SectionType;
+    if (tab && ['cancellation', 'replacement', 'refund', 'usps'].includes(tab)) {
+      setActiveSection(tab);
+    } else {
+      setActiveSection('shipments');
+    }
+  }, [searchParams]);
 
   // Auto-assign state
   const [autoUser, setAutoUser] = useState('');
@@ -392,12 +403,6 @@ export default function ShippingPage() {
       setSession(s);
     });
     load();
-    // Read ?tab= from URL to navigate directly to a claim section
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab') as SectionType;
-    if (tab && ['cancellation', 'replacement', 'refund', 'usps'].includes(tab)) {
-      setActiveSection(tab);
-    }
     // Prefetch unresolved counts for badge display
     (['cancellation', 'replacement', 'refund', 'usps'] as const).forEach(t => {
       fetch(`/api/claims?type=${t}`)
@@ -923,5 +928,17 @@ export default function ShippingPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function ShippingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </div>
+    }>
+      <ShippingPageInner />
+    </Suspense>
   );
 }

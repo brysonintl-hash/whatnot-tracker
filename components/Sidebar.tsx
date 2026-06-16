@@ -277,9 +277,8 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                             key={child.href}
                             href={child.href}
                             onClick={() => setMobileOpen(false)}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+                            className="flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-200 hover:bg-slate-800"
                           >
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-600 flex-shrink-0" />
                             {child.label}
                           </Link>
                         ))}
