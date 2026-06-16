@@ -3,9 +3,10 @@ import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-// Calibrated to match SellerAmp/Jungle Scout: BSR 21k ≈ 500/mo
+// Calibrated from two real SellerAmp data points:
+// BSR 21,000 → ~500/mo, BSR 116,000 → ~50/mo
 function estimateMonthlySales(bsr: number): number {
-  return Math.max(1, Math.round(116000 * Math.pow(bsr, -0.55)));
+  return Math.max(1, Math.round(334500000 * Math.pow(bsr, -1.348)));
 }
 
 function scoreOpportunity(bsr: number | null, price: number | null, reviews: number | null) {
