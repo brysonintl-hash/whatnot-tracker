@@ -65,6 +65,8 @@ const emptyClaimForm = {
 
 // ─── Claims Section Component ─────────────────────────────────────────────────
 
+type TrackResult = { status: string; description: string; city: string; state: string; date: string; time: string };
+
 function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminOrManager: boolean }) {
   const [claims, setClaims] = useState<ClaimRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,9 +74,24 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
   const [saving, setSaving] = useState(false);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
   const [savingStatusIdx, setSavingStatusIdx] = useState<number | null>(null);
+  const [trackingData, setTrackingData] = useState<Record<number, TrackResult | { error: string }>>({});
+  const [trackingLoading, setTrackingLoading] = useState<number | null>(null);
 
   const isUsps = type === 'usps';
   const statusOptions = isUsps ? USPS_STATUSES : CLAIM_STATUSES;
+
+  async function trackShipment(c: ClaimRecord) {
+    if (!c.trackingNumber) return;
+    setTrackingLoading(c.rowIndex);
+    try {
+      const res = await fetch(`/api/usps?tracking=${encodeURIComponent(c.trackingNumber)}`);
+      const data = await res.json();
+      setTrackingData(prev => ({ ...prev, [c.rowIndex]: data }));
+    } catch {
+      setTrackingData(prev => ({ ...prev, [c.rowIndex]: { error: 'Failed to fetch' } }));
+    }
+    setTrackingLoading(null);
+  }
 
   async function load() {
     setLoading(true);
@@ -272,7 +289,33 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                         <td className="py-3 px-4 text-xs font-bold text-slate-700 dark:text-slate-200">{c.amountRequested != null ? `$${c.amountRequested.toFixed(2)}` : '—'}</td>
                         <td className="py-3 px-4 text-xs font-bold text-emerald-600 dark:text-emerald-400">{c.amountApproved != null ? `$${c.amountApproved.toFixed(2)}` : <span className="text-slate-400 font-normal">—</span>}</td>
                         <td className="py-3 px-4 text-xs text-slate-400">{c.dateSubmitted || '—'}</td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-600 dark:text-slate-300">{c.trackingNumber || '—'}</td>
+                        <td className="py-3 px-4">
+                          <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || '—'}</div>
+                          {c.trackingNumber && (
+                            <button
+                              onClick={() => trackShipment(c)}
+                              disabled={trackingLoading === c.rowIndex}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                            >
+                              {trackingLoading === c.rowIndex ? 'Tracking...' : 'Track'}
+                            </button>
+                          )}
+                          {trackingData[c.rowIndex] && (
+                            'error' in trackingData[c.rowIndex] ? (
+                              <div className="text-[10px] text-red-500 mt-1">{(trackingData[c.rowIndex] as { error: string }).error}</div>
+                            ) : (
+                              <div className="mt-1 space-y-0.5">
+                                <div className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{(trackingData[c.rowIndex] as TrackResult).status}</div>
+                                <div className="text-[10px] text-slate-500">{(trackingData[c.rowIndex] as TrackResult).description}</div>
+                                {(trackingData[c.rowIndex] as TrackResult).city && (
+                                  <div className="text-[10px] text-slate-400">
+                                    {(trackingData[c.rowIndex] as TrackResult).city}, {(trackingData[c.rowIndex] as TrackResult).state} · {(trackingData[c.rowIndex] as TrackResult).date}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          )}
+                        </td>
                       </>
                     ) : (
                       <>
