@@ -170,8 +170,8 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
 
   return (
     <div>
-      {/* Add form */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
+      {/* Add form — admin/manager only */}
+      {isAdminOrManager && <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add {SECTION_LABELS[type].slice(0, -1)}</h3>
         {isUsps ? (
           <form onSubmit={handleAdd} className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -244,7 +244,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
             </div>
           </form>
         )}
-      </div>
+      </div>}
 
       {/* Records table */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
@@ -647,7 +647,7 @@ function ShippingPageInner() {
                 ? 'border-red-500 text-red-600 dark:text-red-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
-              {SECTION_LABELS[s]}
+              {s === 'shipments' && !isAdminOrManager ? 'Assigned Shipments' : SECTION_LABELS[s]}
               {s !== 'shipments' && (sectionCounts[s] ?? 0) > 0 && (
                 <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-black rounded-full">
                   {sectionCounts[s]}

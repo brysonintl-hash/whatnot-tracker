@@ -274,7 +274,7 @@ export default function AdminPage() {
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Dashboard</h1>
-            <p className="text-xs text-slate-400">Welcome back, {session.name} — here&apos;s how Stack Bargains is performing.</p>
+            <p className="text-xs text-slate-400">Welcome back, {session.name}</p>
           </div>
           <div className="flex items-center gap-3">
             <OnlineUsers />

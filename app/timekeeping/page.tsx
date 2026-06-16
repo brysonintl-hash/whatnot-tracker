@@ -263,7 +263,7 @@ function ManagementView({ session }: { session: Session }) {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs mb-3">
+                          <div className="grid grid-cols-3 gap-x-3 gap-y-2 text-xs mb-3">
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Today</p>
                               <p className="font-bold text-slate-900 dark:text-white">{fmtHours(todayHours)}</p>
@@ -271,10 +271,6 @@ function ManagementView({ session }: { session: Session }) {
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">This Week</p>
                               <p className="font-bold text-slate-900 dark:text-white">{fmtHours(member.totalHours)}</p>
-                            </div>
-                            <div>
-                              <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">All Time</p>
-                              <p className="font-semibold text-slate-700 dark:text-slate-300">{fmtHours(totalAllTime)}</p>
                             </div>
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Earnings</p>

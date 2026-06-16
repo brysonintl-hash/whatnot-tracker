@@ -288,7 +288,7 @@ export default function AmazonPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
                         {/* Amazon FBM */}
-                        <div className={`rounded-xl border p-3.5 ${fbmOverweight ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20' : best === 'fbm' ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
+                        <div className={`rounded-xl border p-3.5 ${fbmOverweight ? 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20' : best === 'fbm' ? 'border-orange-400 dark:border-orange-600 bg-orange-100 dark:bg-orange-900/30 ring-2 ring-orange-300 dark:ring-orange-700' : 'border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10'}`}>
                           <div className="flex items-center gap-2 mb-2.5 flex-wrap">
                             <span className="text-xs font-black text-slate-700 dark:text-slate-200">Amazon FBM</span>
                             {best === 'fbm' && !fbmOverweight && <span className="text-[10px] font-black px-1.5 py-0.5 bg-orange-500 text-white rounded-full">BEST</span>}
@@ -337,7 +337,7 @@ export default function AmazonPage() {
                         </div>
 
                         {/* Amazon FBA */}
-                        <div className={`rounded-xl border p-3.5 ${best === 'fba' ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
+                        <div className={`rounded-xl border p-3.5 ${best === 'fba' ? 'border-blue-400 dark:border-blue-600 bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-700' : 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10'}`}>
                           <div className="flex items-center gap-2 mb-2.5 flex-wrap">
                             <span className="text-xs font-black text-slate-700 dark:text-slate-200">Amazon FBA</span>
                             {best === 'fba' && <span className="text-[10px] font-black px-1.5 py-0.5 bg-blue-500 text-white rounded-full">BEST</span>}
@@ -393,10 +393,10 @@ export default function AmazonPage() {
                         </div>
 
                         {/* Whatnot */}
-                        <div className={`rounded-xl border p-3.5 ${best === 'wn' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
+                        <div className={`rounded-xl border p-3.5 ${best === 'wn' ? 'border-yellow-400 dark:border-yellow-600 bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-300 dark:ring-yellow-700' : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/10'}`}>
                           <div className="flex items-center gap-2 mb-2.5">
                             <span className="text-xs font-black text-slate-700 dark:text-slate-200">Whatnot</span>
-                            {best === 'wn' && <span className="text-[10px] font-black px-1.5 py-0.5 bg-red-500 text-white rounded-full">BEST</span>}
+                            {best === 'wn' && <span className="text-[10px] font-black px-1.5 py-0.5 bg-yellow-500 text-white rounded-full">BEST</span>}
                           </div>
                           <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <div className="flex justify-between">
