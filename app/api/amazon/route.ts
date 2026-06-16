@@ -68,20 +68,21 @@ export async function GET(req: NextRequest) {
     const rating = p.rating ?? null;
     const opportunity = scoreOpportunity(bsr, price, reviews);
 
-    // Extract weight from product specifications or direct field
+    // Extract weight from product data (Amazon stores it in several places)
     let weight: string | null = null;
+    const weightRe = /item weight|package weight|shipping weight|weight/i;
     if (p.weight) {
       weight = String(p.weight);
+    } else if (p.product_details && typeof p.product_details === 'object') {
+      // product_details is a plain object: { "Item Weight": "5 pounds", ... }
+      const key = Object.keys(p.product_details).find(k => weightRe.test(k));
+      if (key) weight = String(p.product_details[key]);
     } else if (Array.isArray(p.specifications)) {
-      const weightSpec = p.specifications.find((s: { name: string; value: string }) =>
-        /item weight|package weight|shipping weight|weight/i.test(s.name)
-      );
-      if (weightSpec) weight = weightSpec.value;
+      const s = p.specifications.find((s: { name: string; value: string }) => weightRe.test(s.name));
+      if (s) weight = s.value;
     } else if (Array.isArray(p.attributes)) {
-      const weightAttr = p.attributes.find((a: { name: string; value: string }) =>
-        /item weight|package weight|shipping weight|weight/i.test(a.name)
-      );
-      if (weightAttr) weight = weightAttr.value;
+      const a = p.attributes.find((a: { name: string; value: string }) => weightRe.test(a.name));
+      if (a) weight = a.value;
     }
 
     return NextResponse.json({
