@@ -9,6 +9,28 @@ function estimateMonthlySales(bsr: number): number {
   return Math.max(1, Math.round(334500000 * Math.pow(bsr, -1.348)));
 }
 
+// 2025 Amazon FBA fulfillment fees based on weight
+// Tier is estimated from weight only — actual tier depends on dimensions too
+function calcFBAFee(weightLbs: number): { fee: number; tier: string } {
+  const oz = weightLbs * 16;
+  // Small standard (≤1 lb — assuming compact dimensions)
+  if (oz <= 4)  return { fee: 3.22, tier: 'Small Std' };
+  if (oz <= 8)  return { fee: 3.40, tier: 'Small Std' };
+  if (oz <= 12) return { fee: 3.58, tier: 'Small Std' };
+  if (oz <= 16) return { fee: 3.77, tier: 'Small Std' };
+  // Large standard (1–20 lb)
+  if (weightLbs <= 1.5) return { fee: 5.40, tier: 'Large Std' };
+  if (weightLbs <= 2)   return { fee: 5.69, tier: 'Large Std' };
+  if (weightLbs <= 2.5) return { fee: 6.10, tier: 'Large Std' };
+  if (weightLbs <= 3)   return { fee: 6.39, tier: 'Large Std' };
+  if (weightLbs <= 20) {
+    const extra = Math.ceil((weightLbs - 3) * 2); // half-lb increments
+    return { fee: Math.round((6.39 + extra * 0.16) * 100) / 100, tier: 'Large Std' };
+  }
+  // Large bulky / oversize (>20 lb)
+  return { fee: Math.round((9.73 + Math.max(0, weightLbs - 2) * 0.42) * 100) / 100, tier: 'Large Bulky' };
+}
+
 function scoreOpportunity(bsr: number | null, price: number | null, reviews: number | null) {
   if (!bsr) return { label: 'No BSR', color: 'slate', score: 0 };
 
@@ -121,6 +143,7 @@ export async function GET(req: NextRequest) {
       opportunity,
       weight,
       weightLbs,
+      fba: weightLbs != null ? calcFBAFee(weightLbs) : null,
       estimatedMonthlySales: bsr != null ? estimateMonthlySales(bsr) : null,
     });
   } catch (e) {

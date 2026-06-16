@@ -7,8 +7,8 @@ import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
 
 type Session = { username: string; role: Role; name: string };
-
 type Opportunity = { label: string; color: string; score: number };
+type FBAInfo = { fee: number; tier: string } | null;
 
 type AsinResult = {
   asin: string;
@@ -27,6 +27,7 @@ type AsinResult = {
   opportunity: Opportunity;
   weight: string | null;
   weightLbs: number | null;
+  fba: FBAInfo;
   estimatedMonthlySales: number | null;
   yourCost: number | null;
   whatnotPrice: number | null;
@@ -34,38 +35,53 @@ type AsinResult = {
   loading?: boolean;
 };
 
-const AMAZON_FEE_PCT = 0.15;
-const AMAZON_SHIPPING_LIGHT = 10.31; // ≤ 5 lbs
-const WHATNOT_COMMISSION = 0.08;
-const WHATNOT_TRANSACTION = 0.30;
+const AMAZON_FEE_PCT   = 0.15;
+const FBM_SHIP_LIGHT   = 10.31; // ≤5 lbs
+const WN_COMMISSION    = 0.08;
+const WN_TRANSACTION   = 0.30;
 
-function getShipping(weightLbs: number | null): { cost: number | null; overweight: boolean } {
-  if (weightLbs == null) return { cost: AMAZON_SHIPPING_LIGHT, overweight: false }; // unknown → use standard
-  if (weightLbs <= 5) return { cost: AMAZON_SHIPPING_LIGHT, overweight: false };
-  return { cost: null, overweight: true }; // over 5 lbs — rate unknown
-}
-
-function calcProfits(amazonPrice: number | null, yourCost: number | null, whatnotPrice: number | null, weightLbs: number | null) {
+function calcProfits(r: AsinResult) {
+  const { price, yourCost, whatnotPrice, weightLbs, fba } = r;
   if (yourCost == null) return null;
-  const { cost: shipCost, overweight } = getShipping(weightLbs);
-  const amzProfit = amazonPrice != null && shipCost != null
-    ? amazonPrice * (1 - AMAZON_FEE_PCT) - shipCost - yourCost
+
+  // FBM
+  const fbmOverweight = weightLbs != null && weightLbs > 5;
+  const fbmShip = fbmOverweight ? null : FBM_SHIP_LIGHT;
+  const fbmProfit = price != null && fbmShip != null
+    ? price * (1 - AMAZON_FEE_PCT) - fbmShip - yourCost
     : null;
+
+  // FBA
+  const fbaProfit = price != null && fba != null
+    ? price * (1 - AMAZON_FEE_PCT) - fba.fee - yourCost
+    : null;
+
+  // Whatnot
   const wnProfit = whatnotPrice != null
-    ? whatnotPrice * (1 - WHATNOT_COMMISSION) - WHATNOT_TRANSACTION - yourCost
+    ? whatnotPrice * (1 - WN_COMMISSION) - WN_TRANSACTION - yourCost
     : null;
-  return { amzProfit, wnProfit, overweight, shipCost };
+
+  // Find best option
+  const options: { key: string; profit: number }[] = [];
+  if (fbmProfit != null) options.push({ key: 'fbm', profit: fbmProfit });
+  if (fbaProfit != null) options.push({ key: 'fba', profit: fbaProfit });
+  if (wnProfit  != null) options.push({ key: 'wn',  profit: wnProfit  });
+  const best = options.length ? options.reduce((a, b) => a.profit > b.profit ? a : b).key : null;
+
+  return { fbmProfit, fbaProfit, wnProfit, fbmOverweight, fbmShip, best };
 }
 
 const OPP_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   Hot:      { bg: 'bg-emerald-50 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-700', dot: 'bg-emerald-500' },
-  Good:     { bg: 'bg-blue-50 dark:bg-blue-900/30',       text: 'text-blue-700 dark:text-blue-400',       border: 'border-blue-200 dark:border-blue-700',       dot: 'bg-blue-500' },
-  Okay:     { bg: 'bg-amber-50 dark:bg-amber-900/30',     text: 'text-amber-700 dark:text-amber-400',     border: 'border-amber-200 dark:border-amber-700',     dot: 'bg-amber-500' },
-  Risky:    { bg: 'bg-red-50 dark:bg-red-900/30',         text: 'text-red-700 dark:text-red-400',         border: 'border-red-200 dark:border-red-700',         dot: 'bg-red-500' },
-  'No BSR': { bg: 'bg-slate-50 dark:bg-slate-700',        text: 'text-slate-600 dark:text-slate-300',     border: 'border-slate-200 dark:border-slate-600',     dot: 'bg-slate-400' },
+  Good:     { bg: 'bg-blue-50 dark:bg-blue-900/30',       text: 'text-blue-700 dark:text-blue-400',       border: 'border-blue-200 dark:border-blue-700',       dot: 'bg-blue-500'   },
+  Okay:     { bg: 'bg-amber-50 dark:bg-amber-900/30',     text: 'text-amber-700 dark:text-amber-400',     border: 'border-amber-200 dark:border-amber-700',     dot: 'bg-amber-500'  },
+  Risky:    { bg: 'bg-red-50 dark:bg-red-900/30',         text: 'text-red-700 dark:text-red-400',         border: 'border-red-200 dark:border-red-700',         dot: 'bg-red-500'    },
+  'No BSR': { bg: 'bg-slate-50 dark:bg-slate-700',        text: 'text-slate-600 dark:text-slate-300',     border: 'border-slate-200 dark:border-slate-600',     dot: 'bg-slate-400'  },
 };
 
 const inputCls = 'text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400';
+
+function fmt(n: number) { return `${n >= 0 ? '+' : ''}$${Math.abs(n).toFixed(2)}`; }
 
 export default function AmazonPage() {
   const router = useRouter();
@@ -73,8 +89,8 @@ export default function AmazonPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [asinInput, setAsinInput] = useState('');
   const [costInput, setCostInput] = useState('');
-  const [wnInput, setWnInput] = useState('');
-  const [results, setResults] = useState<AsinResult[]>([]);
+  const [wnInput, setWnInput]   = useState('');
+  const [results, setResults]   = useState<AsinResult[]>([]);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   useEffect(() => {
@@ -88,17 +104,18 @@ export default function AmazonPage() {
     const asin = asinInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!asin) return;
     if (results.find(r => r.asin === asin)) return;
-    const yourCost = costInput ? parseFloat(costInput) : null;
-    const whatnotPrice = wnInput ? parseFloat(wnInput) : null;
+    const yourCost    = costInput ? parseFloat(costInput) : null;
+    const whatnotPrice = wnInput  ? parseFloat(wnInput)   : null;
     setAsinInput('');
     setResults(prev => [{
       asin, title: '', brand: '', image: '', price: null, currency: 'USD',
       rating: null, reviews: null, bsr: null, bsrCategory: null, category: '',
       bullets: [], url: '', opportunity: { label: '', color: 'slate', score: 0 },
-      weight: null, weightLbs: null, estimatedMonthlySales: null, yourCost, whatnotPrice, loading: true,
+      weight: null, weightLbs: null, fba: null, estimatedMonthlySales: null,
+      yourCost, whatnotPrice, loading: true,
     }, ...prev]);
     try {
-      const res = await fetch(`/api/amazon?asin=${asin}`);
+      const res  = await fetch(`/api/amazon?asin=${asin}`);
       const data = await res.json();
       setResults(prev => prev.map(r => r.asin === asin
         ? { ...data, yourCost, whatnotPrice, loading: false }
@@ -136,74 +153,64 @@ export default function AmazonPage() {
           {/* Search panel */}
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 mb-6 max-w-2xl">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">Amazon vs Whatnot Profit Analyzer</h2>
-            <p className="text-xs text-slate-400 mb-4">Compares Amazon FBM (15% fee + $10.31 ship) vs Whatnot (8% fee) to see which makes more money.</p>
+            <p className="text-xs text-slate-400 mb-4">Compares Amazon FBM · FBA · Whatnot to find the most profitable channel.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">ASIN *</label>
-                <input
-                  value={asinInput}
-                  onChange={e => setAsinInput(e.target.value)}
+                <input value={asinInput} onChange={e => setAsinInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') analyze(); }}
-                  placeholder="B08N5WRWNW"
-                  className={`w-full ${inputCls} font-mono`}
-                />
+                  placeholder="B08N5WRWNW" className={`w-full ${inputCls} font-mono`} />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Your Cost ($)</label>
-                <input
-                  type="number" step="0.01" min="0"
-                  value={costInput}
+                <input type="number" step="0.01" min="0" value={costInput}
                   onChange={e => setCostInput(e.target.value)}
-                  placeholder="e.g. 12.00"
-                  className={`w-full ${inputCls}`}
-                />
+                  placeholder="e.g. 12.00" className={`w-full ${inputCls}`} />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Whatnot Price ($)</label>
-                <input
-                  type="number" step="0.01" min="0"
-                  value={wnInput}
+                <input type="number" step="0.01" min="0" value={wnInput}
                   onChange={e => setWnInput(e.target.value)}
-                  placeholder="e.g. 25.00"
-                  className={`w-full ${inputCls}`}
-                />
+                  placeholder="e.g. 25.00" className={`w-full ${inputCls}`} />
               </div>
             </div>
-            <button
-              onClick={analyze}
-              disabled={!asinInput.trim()}
-              className="w-full sm:w-auto px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
-            >
+            <button onClick={analyze} disabled={!asinInput.trim()}
+              className="w-full sm:w-auto px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
               Analyze
             </button>
           </div>
 
           {/* Results */}
-          <div className="space-y-4 max-w-4xl">
+          <div className="space-y-4 max-w-5xl">
             {results.length === 0 && (
               <div className="flex flex-col items-center justify-center h-48 text-center">
                 <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No items analyzed yet</p>
-                <p className="text-slate-400 text-xs mt-1">Enter an ASIN with your cost to see Amazon vs Whatnot profit</p>
+                <p className="text-slate-400 text-xs mt-1">Enter an ASIN with your cost to compare FBM · FBA · Whatnot</p>
               </div>
             )}
 
             {results.map(r => {
               const opp = OPP_STYLE[r.opportunity?.label] ?? OPP_STYLE['No BSR'];
-              const profits = calcProfits(r.price, r.yourCost, r.whatnotPrice, r.weightLbs);
-              const amzProfit = profits?.amzProfit ?? null;
-              const wnProfit = profits?.wnProfit ?? null;
-              const overweight = profits?.overweight ?? false;
-              const shipCost = profits?.shipCost ?? null;
-              const winner = !overweight && amzProfit != null && wnProfit != null
-                ? amzProfit > wnProfit ? 'amazon' : 'whatnot'
-                : !overweight && amzProfit != null ? 'amazon'
-                : wnProfit != null ? 'whatnot'
-                : null;
-              const amzMargin = amzProfit != null && r.price ? (amzProfit / r.price) * 100 : null;
-              const wnMargin = wnProfit != null && r.whatnotPrice ? (wnProfit / r.whatnotPrice) * 100 : null;
+              const calc = calcProfits(r);
+              const fbmProfit   = calc?.fbmProfit   ?? null;
+              const fbaProfit   = calc?.fbaProfit   ?? null;
+              const wnProfit    = calc?.wnProfit    ?? null;
+              const fbmOverweight = calc?.fbmOverweight ?? false;
+              const best        = calc?.best        ?? null;
+
+              const fbmMargin = fbmProfit != null && r.price       ? (fbmProfit / r.price)        * 100 : null;
+              const fbaMargin = fbaProfit != null && r.price       ? (fbaProfit / r.price)        * 100 : null;
+              const wnMargin  = wnProfit  != null && r.whatnotPrice ? (wnProfit  / r.whatnotPrice) * 100 : null;
+
+              const verdictMap: Record<string, { icon: string; msg: string; cls: string }> = {
+                fbm: { icon: '📦', msg: `Amazon FBM wins — ship it yourself, keep more margin`, cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' },
+                fba: { icon: '🏭', msg: `Amazon FBA wins — let Amazon fulfill, Prime eligible`, cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+                wn:  { icon: '🎯', msg: `Whatnot wins — sell live, lower fees overall`,         cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
+              };
+              const verdict = best ? verdictMap[best] : null;
 
               return (
                 <div key={r.asin} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
@@ -246,11 +253,15 @@ export default function AmazonPage() {
                                     {r.weight}
                                   </span>
                                 )}
+                                {r.fba && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                    FBA {r.fba.tier} · ${r.fba.fee.toFixed(2)}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none flex-shrink-0">✕</button>
                           </div>
-                          {/* BSR + opportunity badge */}
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                             {r.bsr != null && (
                               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
@@ -273,14 +284,15 @@ export default function AmazonPage() {
                         </div>
                       </div>
 
-                      {/* ── Profit Comparison ── */}
-                      <div className="grid grid-cols-2 gap-3">
+                      {/* ── 3-column profit comparison ── */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
                         {/* Amazon FBM */}
-                        <div className={`rounded-xl border p-4 ${overweight ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20' : winner === 'amazon' ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
-                          <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <div className={`rounded-xl border p-3.5 ${fbmOverweight ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20' : best === 'fbm' ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
+                          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
                             <span className="text-xs font-black text-slate-700 dark:text-slate-200">Amazon FBM</span>
-                            {winner === 'amazon' && !overweight && <span className="text-[10px] font-black px-1.5 py-0.5 bg-orange-500 text-white rounded-full">BETTER</span>}
-                            {overweight && <span className="text-[10px] font-black px-1.5 py-0.5 bg-amber-500 text-white rounded-full">OVER 5 LBS</span>}
+                            {best === 'fbm' && !fbmOverweight && <span className="text-[10px] font-black px-1.5 py-0.5 bg-orange-500 text-white rounded-full">BEST</span>}
+                            {fbmOverweight && <span className="text-[10px] font-black px-1.5 py-0.5 bg-amber-500 text-white rounded-full">OVER 5 LBS</span>}
                           </div>
                           <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <div className="flex justify-between">
@@ -289,14 +301,13 @@ export default function AmazonPage() {
                             </div>
                             <div className="flex justify-between">
                               <span>Amazon fee (15%)</span>
-                              <span className="text-red-500">{r.price != null ? `−$${(r.price * 0.15).toFixed(2)}` : '—'}</span>
+                              <span className="text-red-500">{r.price != null ? `−$${(r.price * AMAZON_FEE_PCT).toFixed(2)}` : '—'}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span>FBM shipping {overweight ? `(${r.weightLbs!.toFixed(1)} lbs)` : shipCost != null ? '(≤5 lbs)' : ''}</span>
-                              {overweight
-                                ? <span className="text-amber-500 font-bold">Rate unknown</span>
-                                : <span className="text-red-500">−${AMAZON_SHIPPING_LIGHT.toFixed(2)}</span>
-                              }
+                              <span>FBM shipping{fbmOverweight ? ` (${r.weightLbs!.toFixed(1)} lbs)` : ' (≤5 lbs)'}</span>
+                              {fbmOverweight
+                                ? <span className="text-amber-500 font-bold">Unknown</span>
+                                : <span className="text-red-500">−${FBM_SHIP_LIGHT.toFixed(2)}</span>}
                             </div>
                             {r.yourCost != null && (
                               <div className="flex justify-between">
@@ -306,30 +317,86 @@ export default function AmazonPage() {
                             )}
                             <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
                               <span className="font-bold">Net profit</span>
-                              <span className={`font-black text-sm ${overweight ? 'text-amber-500' : amzProfit != null ? amzProfit > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
-                                {overweight ? 'Unknown' : amzProfit != null ? `${amzProfit > 0 ? '+' : ''}$${amzProfit.toFixed(2)}` : r.yourCost == null ? 'Add cost' : '—'}
+                              <span className={`font-black text-sm ${fbmOverweight ? 'text-amber-500' : fbmProfit != null ? fbmProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
+                                {fbmOverweight ? 'Unknown' : fbmProfit != null ? fmt(fbmProfit) : r.yourCost == null ? 'Add cost' : '—'}
                               </span>
                             </div>
-                            {amzMargin != null && !overweight && (
+                            {fbmMargin != null && !fbmOverweight && (
                               <div className="flex justify-between text-[10px]">
                                 <span>Margin</span>
-                                <span className={amzMargin > 0 ? 'text-emerald-500' : 'text-red-400'}>{amzMargin.toFixed(1)}%</span>
+                                <span className={fbmMargin >= 0 ? 'text-emerald-500' : 'text-red-400'}>{fbmMargin.toFixed(1)}%</span>
                               </div>
                             )}
-                            {!overweight && amzProfit != null && amzProfit > 0 && r.estimatedMonthlySales != null && (
+                            {!fbmOverweight && fbmProfit != null && fbmProfit > 0 && r.estimatedMonthlySales != null && (
                               <div className="flex justify-between text-[10px] border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
-                                <span className="font-bold text-violet-600 dark:text-violet-400">Est. monthly profit</span>
-                                <span className="font-black text-violet-600 dark:text-violet-400">~${(amzProfit * r.estimatedMonthlySales).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                <span className="font-bold text-violet-600 dark:text-violet-400">Est. mo. profit</span>
+                                <span className="font-black text-violet-600 dark:text-violet-400">~${(fbmProfit * r.estimatedMonthlySales).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                               </div>
                             )}
                           </div>
                         </div>
 
+                        {/* Amazon FBA */}
+                        <div className={`rounded-xl border p-3.5 ${best === 'fba' ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
+                          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200">Amazon FBA</span>
+                            {best === 'fba' && <span className="text-[10px] font-black px-1.5 py-0.5 bg-blue-500 text-white rounded-full">BEST</span>}
+                            {r.fba && <span className="text-[10px] text-slate-400 dark:text-slate-500">{r.fba.tier}</span>}
+                          </div>
+                          <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex justify-between">
+                              <span>Sale price</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-200">{r.price != null ? `$${r.price.toFixed(2)}` : '—'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Amazon fee (15%)</span>
+                              <span className="text-red-500">{r.price != null ? `−$${(r.price * AMAZON_FEE_PCT).toFixed(2)}` : '—'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>FBA fulfillment</span>
+                              {r.fba
+                                ? <span className="text-red-500">−${r.fba.fee.toFixed(2)}</span>
+                                : <span className="text-slate-400">No weight found</span>}
+                            </div>
+                            <div className="flex justify-between text-slate-300 dark:text-slate-600">
+                              <span>Shipping (Amazon ships)</span>
+                              <span>$0.00</span>
+                            </div>
+                            {r.yourCost != null && (
+                              <div className="flex justify-between">
+                                <span>Your cost</span>
+                                <span className="text-red-500">−${r.yourCost.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
+                              <span className="font-bold">Net profit</span>
+                              <span className={`font-black text-sm ${fbaProfit != null ? fbaProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
+                                {fbaProfit != null ? fmt(fbaProfit) : r.yourCost == null ? 'Add cost' : r.fba == null ? 'No weight' : '—'}
+                              </span>
+                            </div>
+                            {fbaMargin != null && (
+                              <div className="flex justify-between text-[10px]">
+                                <span>Margin</span>
+                                <span className={fbaMargin >= 0 ? 'text-emerald-500' : 'text-red-400'}>{fbaMargin.toFixed(1)}%</span>
+                              </div>
+                            )}
+                            {fbaProfit != null && fbaProfit > 0 && r.estimatedMonthlySales != null && (
+                              <div className="flex justify-between text-[10px] border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
+                                <span className="font-bold text-violet-600 dark:text-violet-400">Est. mo. profit</span>
+                                <span className="font-black text-violet-600 dark:text-violet-400">~${(fbaProfit * r.estimatedMonthlySales).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                              </div>
+                            )}
+                          </div>
+                          {r.fba && (
+                            <p className="text-[10px] text-slate-400 mt-2 leading-tight">⚠ Tier estimated from weight. Verify in Seller Central if dimensions are large.</p>
+                          )}
+                        </div>
+
                         {/* Whatnot */}
-                        <div className={`rounded-xl border p-4 ${winner === 'whatnot' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
-                          <div className="flex items-center gap-2 mb-3">
+                        <div className={`rounded-xl border p-3.5 ${best === 'wn' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'}`}>
+                          <div className="flex items-center gap-2 mb-2.5">
                             <span className="text-xs font-black text-slate-700 dark:text-slate-200">Whatnot</span>
-                            {winner === 'whatnot' && <span className="text-[10px] font-black px-1.5 py-0.5 bg-red-500 text-white rounded-full">BETTER</span>}
+                            {best === 'wn' && <span className="text-[10px] font-black px-1.5 py-0.5 bg-red-500 text-white rounded-full">BEST</span>}
                           </div>
                           <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <div className="flex justify-between">
@@ -338,7 +405,7 @@ export default function AmazonPage() {
                             </div>
                             <div className="flex justify-between">
                               <span>Commission (8%)</span>
-                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WHATNOT_COMMISSION).toFixed(2)}` : '—'}</span>
+                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WN_COMMISSION).toFixed(2)}` : '—'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Transaction fee</span>
@@ -356,14 +423,14 @@ export default function AmazonPage() {
                             )}
                             <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
                               <span className="font-bold">Net profit</span>
-                              <span className={`font-black text-sm ${wnProfit != null ? wnProfit > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
-                                {wnProfit != null ? `${wnProfit > 0 ? '+' : ''}$${wnProfit.toFixed(2)}` : r.yourCost == null ? 'Add cost' : 'Add WN price'}
+                              <span className={`font-black text-sm ${wnProfit != null ? wnProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
+                                {wnProfit != null ? fmt(wnProfit) : r.yourCost == null ? 'Add cost' : 'Add WN price'}
                               </span>
                             </div>
                             {wnMargin != null && (
                               <div className="flex justify-between text-[10px]">
                                 <span>Margin</span>
-                                <span className={wnMargin > 0 ? 'text-emerald-500' : 'text-red-400'}>{wnMargin.toFixed(1)}%</span>
+                                <span className={wnMargin >= 0 ? 'text-emerald-500' : 'text-red-400'}>{wnMargin.toFixed(1)}%</span>
                               </div>
                             )}
                           </div>
@@ -371,26 +438,22 @@ export default function AmazonPage() {
                       </div>
 
                       {/* Verdict */}
-                      {overweight && (
+                      {verdict && (
+                        <div className={`mt-3 rounded-lg px-4 py-2.5 text-xs font-bold flex items-center gap-2 ${verdict.cls}`}>
+                          <span>{verdict.icon}</span>
+                          {verdict.msg}
+                          {fbmProfit != null && fbaProfit != null && wnProfit != null && (() => {
+                            const profits = { fbm: fbmProfit, fba: fbaProfit, wn: wnProfit };
+                            const vals = Object.values(profits);
+                            const max = Math.max(...vals);
+                            const second = vals.sort((a,b) => b-a)[1];
+                            return ` — $${(max - second).toFixed(2)} more per unit`;
+                          })()}
+                        </div>
+                      )}
+                      {fbmOverweight && !r.fba && (
                         <div className="mt-3 rounded-lg px-4 py-2.5 text-xs font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                          <span>⚠️</span>
-                          Item weighs {r.weightLbs!.toFixed(1)} lbs — exceeds 5 lb FBM rate. Get your actual shipping quote before listing on Amazon.
-                        </div>
-                      )}
-                      {!overweight && winner && amzProfit != null && wnProfit != null && (
-                        <div className={`mt-3 rounded-lg px-4 py-2.5 text-xs font-bold flex items-center gap-2 ${winner === 'amazon' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'}`}>
-                          <span>{winner === 'amazon' ? '📦' : '🎯'}</span>
-                          {winner === 'amazon'
-                            ? `List on Amazon — earns $${(amzProfit - wnProfit).toFixed(2)} more per unit than Whatnot`
-                            : amzProfit < 0
-                              ? `Stick with Whatnot — Amazon loses $${Math.abs(amzProfit).toFixed(2)} per unit after fees + shipping`
-                              : `Stick with Whatnot — earns $${(wnProfit - amzProfit).toFixed(2)} more per unit than Amazon`
-                          }
-                        </div>
-                      )}
-                      {!overweight && amzProfit != null && amzProfit < 0 && !wnProfit && (
-                        <div className="mt-3 rounded-lg px-4 py-2.5 text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
-                          ⚠️ Amazon loses ${Math.abs(amzProfit).toFixed(2)} per unit — price too low for FBM after 15% fee + $10.31 shipping
+                          ⚠️ FBM rate unknown — item exceeds 5 lbs. FBA may be a better option since Amazon handles fulfillment.
                         </div>
                       )}
                     </div>
