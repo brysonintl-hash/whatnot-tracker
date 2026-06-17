@@ -296,14 +296,35 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                         <td className="py-3 px-4">
                           <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || '—'}</div>
                           {c.trackingNumber && (
-                            <a
-                              href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(c.trackingNumber)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
-                            >
-                              Track on USPS ↗
-                            </a>
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => trackShipment(c)}
+                                disabled={trackingLoading === c.rowIndex}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                              >
+                                {trackingLoading === c.rowIndex ? (
+                                  <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Tracking...</>
+                                ) : 'Track'}
+                              </button>
+                              {trackingData[c.rowIndex] && (() => {
+                                const d = trackingData[c.rowIndex];
+                                if ('error' in d) return (
+                                  <div className="text-[10px] text-red-500 flex flex-col gap-0.5">
+                                    <span>{d.error}</span>
+                                    <a href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(c.trackingNumber!)}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Track on USPS ↗</a>
+                                  </div>
+                                );
+                                const t = d as { status: string; description: string; city: string; state: string; date: string; time: string };
+                                return (
+                                  <div className="text-[10px] leading-tight mt-0.5 space-y-0.5">
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 block">{t.status}</span>
+                                    <span className="text-slate-500 dark:text-slate-400 block">{t.description}</span>
+                                    {(t.city || t.state) && <span className="text-slate-400 block">{[t.city, t.state].filter(Boolean).join(', ')}</span>}
+                                    {t.date && <span className="text-slate-400 block">{t.date} {t.time}</span>}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           )}
                         </td>
                       </>
