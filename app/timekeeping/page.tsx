@@ -242,9 +242,9 @@ function ManagementView({ session }: { session: Session }) {
                       const isActive = member.entries.some(e => !e.clockOut);
                       const allEntries = entries.filter(e => e.userId === member.userId);
                       const totalAllTime = allEntries.reduce((s, e) => s + hoursFromEntry(e), 0);
-                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const todayStr = new Date().toLocaleDateString('en-US');
                       const todayHours = member.entries
-                        .filter(e => e.date === todayStr)
+                        .filter(e => new Date(e.clockIn).toLocaleDateString('en-US') === todayStr)
                         .reduce((s, e) => s + hoursFromEntry(e), 0);
                       const lastEntry = member.entries[member.entries.length - 1];
                       return (
@@ -416,7 +416,7 @@ function ManagementView({ session }: { session: Session }) {
                           const isEditing = editingId === e.id;
                           return (
                             <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
-                              <td className="py-3 px-3 text-xs text-slate-400">{e.date}</td>
+                              <td className="py-3 px-3 text-xs text-slate-400">{new Date(e.clockIn).toLocaleDateString('en-US')}</td>
                               <td className="py-3 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300">{e.name}</td>
                               <td className="py-3 px-3"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 capitalize">{e.role}</span></td>
                               <td className="py-2 px-3 text-xs text-slate-700 dark:text-slate-300">
@@ -597,7 +597,7 @@ function StaffView({ session }: { session: Session }) {
                     { label: 'Hours This Week', value: fmtHours(totalHours), color: 'text-blue-600', border: 'border-l-blue-400' },
                     { label: 'Entries This Week', value: weekEntries.length.toString(), color: 'text-slate-900', border: 'border-l-slate-400' },
                     { label: 'Status', value: active ? 'Clocked In' : 'Clocked Out', color: active ? 'text-emerald-600' : 'text-slate-400', border: active ? 'border-l-emerald-400' : 'border-l-slate-300' },
-                    { label: "Today's Entries", value: entries.filter(e => e.date === new Date().toLocaleDateString('en-US')).length.toString(), color: 'text-amber-600', border: 'border-l-amber-400' },
+                    { label: "Today's Entries", value: entries.filter(e => new Date(e.clockIn).toLocaleDateString('en-US') === new Date().toLocaleDateString('en-US')).length.toString(), color: 'text-amber-600', border: 'border-l-amber-400' },
                   ].map(k => (
                     <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.border} shadow-sm p-5`}>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
@@ -629,7 +629,7 @@ function StaffView({ session }: { session: Session }) {
                       ) : (
                         [...weekEntries].reverse().map(e => (
                           <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                            <td className="py-3 px-5 text-xs text-slate-400">{e.date}</td>
+                            <td className="py-3 px-5 text-xs text-slate-400">{new Date(e.clockIn).toLocaleDateString('en-US')}</td>
                             <td className="py-3 px-5 text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
                             <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
                             <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>

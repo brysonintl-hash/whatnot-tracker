@@ -76,9 +76,56 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
   const [savingStatusIdx, setSavingStatusIdx] = useState<number | null>(null);
   const [trackingData, setTrackingData] = useState<Record<number, TrackResult | { error: string }>>({});
   const [trackingLoading, setTrackingLoading] = useState<number | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState(emptyClaimForm);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const isUsps = type === 'usps';
   const statusOptions = isUsps ? USPS_STATUSES : CLAIM_STATUSES;
+
+  function openEdit(c: ClaimRecord) {
+    setEditingIdx(c.rowIndex);
+    setEditForm({
+      orderNumber: c.orderNumber || '',
+      dateOrder: c.dateOrder || '',
+      modelNumber: c.modelNumber || '',
+      itemName: c.itemName || '',
+      username: c.username || '',
+      status: c.status || '',
+      amountRequested: c.amountRequested != null ? String(c.amountRequested) : '',
+      amountApproved: c.amountApproved != null ? String(c.amountApproved) : '',
+      dateSubmitted: c.dateSubmitted || '',
+      trackingNumber: c.trackingNumber || '',
+    });
+  }
+
+  async function saveEdit(c: ClaimRecord) {
+    setSavingEdit(true);
+    await fetch('/api/claims', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        rowIndex: c.rowIndex,
+        username: editForm.username,
+        status: editForm.status,
+        ...(isUsps ? {
+          amountRequested: parseFloat(editForm.amountRequested) || 0,
+          amountApproved: editForm.amountApproved ? parseFloat(editForm.amountApproved) : undefined,
+          dateSubmitted: editForm.dateSubmitted,
+          trackingNumber: editForm.trackingNumber,
+        } : {
+          orderNumber: editForm.orderNumber,
+          dateOrder: editForm.dateOrder,
+          modelNumber: editForm.modelNumber,
+          itemName: editForm.itemName,
+        }),
+      }),
+    });
+    setSavingEdit(false);
+    setEditingIdx(null);
+    load();
+  }
 
   async function trackShipment(c: ClaimRecord) {
     if (!c.trackingNumber) return;
@@ -279,31 +326,62 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                 </tr>
               </thead>
               <tbody>
-                {claims.map(c => (
-                  <tr key={c.rowIndex} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                {claims.map(c => {
+                  const isEditing = editingIdx === c.rowIndex;
+                  const inCls = 'text-xs px-2 py-1 border border-blue-300 dark:border-blue-600 rounded bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-full';
+                  return (
+                  <tr key={c.rowIndex} className={`border-b border-slate-50 dark:border-slate-700/50 ${isEditing ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
                     {isUsps ? (
                       <>
-                        <td className="py-3 px-4 text-xs font-bold text-blue-600 dark:text-blue-400">
-                          {c.username ? (
-                            <a href={`https://www.whatnot.com/user/${c.username}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                              {c.username}
-                            </a>
-                          ) : '—'}
+                        <td className="py-2 px-4">
+                          {isEditing ? (
+                            <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))} className={inCls} placeholder="username" />
+                          ) : (
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                              {c.username ? (
+                                <a href={`https://www.whatnot.com/user/${c.username}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.username}</a>
+                              ) : '—'}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-3 px-4 text-xs font-bold text-slate-700 dark:text-slate-200">{c.amountRequested != null ? `$${c.amountRequested.toFixed(2)}` : '—'}</td>
-                        <td className="py-3 px-4 text-xs font-bold text-emerald-600 dark:text-emerald-400">{c.amountApproved != null ? `$${c.amountApproved.toFixed(2)}` : <span className="text-slate-400 font-normal">—</span>}</td>
-                        <td className="py-3 px-4 text-xs text-slate-400">{c.dateSubmitted || '—'}</td>
-                        <td className="py-3 px-4">
-                          <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || '—'}</div>
-                          {c.trackingNumber && (
-                            <a
-                              href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(c.trackingNumber)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
-                            >
-                              Track on USPS ↗
-                            </a>
+                        <td className="py-2 px-4">
+                          {isEditing ? (
+                            <input type="number" step="0.01" min="0" value={editForm.amountRequested} onChange={e => setEditForm(f => ({ ...f, amountRequested: e.target.value }))} className={inCls} placeholder="0.00" />
+                          ) : (
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{c.amountRequested != null ? `$${c.amountRequested.toFixed(2)}` : '—'}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-4">
+                          {isEditing ? (
+                            <input type="number" step="0.01" min="0" value={editForm.amountApproved} onChange={e => setEditForm(f => ({ ...f, amountApproved: e.target.value }))} className={inCls} placeholder="0.00" />
+                          ) : (
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{c.amountApproved != null ? `$${c.amountApproved.toFixed(2)}` : <span className="text-slate-400 font-normal">—</span>}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-4">
+                          {isEditing ? (
+                            <input type="date" value={editForm.dateSubmitted} onChange={e => setEditForm(f => ({ ...f, dateSubmitted: e.target.value }))} className={inCls} />
+                          ) : (
+                            <span className="text-xs text-slate-400">{c.dateSubmitted || '—'}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-4">
+                          {isEditing ? (
+                            <input value={editForm.trackingNumber} onChange={e => setEditForm(f => ({ ...f, trackingNumber: e.target.value }))} className={inCls} placeholder="Tracking #" />
+                          ) : (
+                            <>
+                              <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || '—'}</div>
+                              {c.trackingNumber && (
+                                <a
+                                  href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(c.trackingNumber)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
+                                >
+                                  Track on USPS ↗
+                                </a>
+                              )}
+                            </>
                           )}
                         </td>
                       </>
@@ -316,8 +394,12 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                         <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || '—'}</td>
                       </>
                     )}
-                    <td className="py-3 px-4">
-                      {isAdminOrManager ? (
+                    <td className="py-2 px-4">
+                      {isEditing ? (
+                        <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))} className={`text-[10px] font-bold border rounded-full px-2 py-0.5 focus:outline-none ${statusColor(editForm.status)}`}>
+                          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      ) : isAdminOrManager ? (
                         <select
                           value={c.status}
                           onChange={e => handleStatusChange(c, e.target.value)}
@@ -331,19 +413,42 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                       )}
                     </td>
                     {isAdminOrManager && (
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => handleDelete(c)}
-                          disabled={deletingIdx === c.rowIndex}
-                          className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded disabled:opacity-40"
-                          title="Delete"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                      <td className="py-2 px-4">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => saveEdit(c)} disabled={savingEdit}
+                              className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded transition-colors disabled:opacity-50">
+                              {savingEdit ? '...' : 'Save'}
+                            </button>
+                            <button onClick={() => setEditingIdx(null)}
+                              className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 rounded transition-colors">
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            {isUsps && (
+                              <button onClick={() => openEdit(c)}
+                                className="text-slate-400 hover:text-blue-500 transition-colors p-1 rounded"
+                                title="Edit">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(c)}
+                              disabled={deletingIdx === c.rowIndex}
+                              className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded disabled:opacity-40"
+                              title="Delete"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

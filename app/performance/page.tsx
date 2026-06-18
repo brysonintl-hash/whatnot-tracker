@@ -312,7 +312,7 @@ export default function PerformancePage() {
 
                   {/* Host cards */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                    {hostStats.map(hs => {
+                    {hostStats.map((hs, idx) => {
                       const color = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
                       const revenuePerHour = hs.durationHours > 0 ? hs.totalSales / hs.durationHours : null;
                       const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
@@ -330,7 +330,7 @@ export default function PerformancePage() {
                         },
                         {
                           label: 'Show Duration',
-                          value: fmtDuration(hs.durationHours),
+                          value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—',
                           valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
                         },
                         {
@@ -371,7 +371,7 @@ export default function PerformancePage() {
                             <div>
                               <p className="font-black text-slate-900 dark:text-white text-base leading-tight">{hs.host}</p>
                               <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
-                                Livestream {hs.livestream}
+                                Livestream {idx + 1}
                               </p>
                             </div>
                           </div>

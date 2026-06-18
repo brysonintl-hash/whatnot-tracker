@@ -203,6 +203,24 @@ export async function updateClaimStatus(type: string, rowIndex: number, status: 
   });
 }
 
+export async function updateClaim(type: string, rowIndex: number, data: Omit<ClaimRecord, 'rowIndex'>): Promise<void> {
+  const auth = getAuth();
+  if (!auth) return;
+  const tab = CLAIM_TABS[type];
+  if (!tab) return;
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const values = type === 'usps'
+    ? [[data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status]]
+    : [[data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status]];
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${tab}'!A${rowIndex}:F${rowIndex}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values },
+  });
+}
+
 // ─── Write assignment back to SHIPMENT RECORDS Google Sheet ──────────────────
 
 export async function updateShipmentInSheet(tab: string, shipmentId: string, assignedName: string, status: string): Promise<void> {
