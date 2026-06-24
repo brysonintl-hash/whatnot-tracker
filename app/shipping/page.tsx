@@ -79,6 +79,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editForm, setEditForm] = useState(emptyClaimForm);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const isUsps = type === 'usps';
   const statusOptions = isUsps ? USPS_STATUSES : CLAIM_STATUSES;
@@ -158,30 +159,41 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
     e.preventDefault();
     if (isUsps ? (!form.username || !form.amountRequested || !form.status) : (!form.orderNumber || !form.status)) return;
     setSaving(true);
-    await fetch('/api/claims', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isUsps ? {
-        type,
-        username: form.username,
-        amountRequested: parseFloat(form.amountRequested) || 0,
-        amountApproved: form.amountApproved ? parseFloat(form.amountApproved) : undefined,
-        dateSubmitted: form.dateSubmitted,
-        trackingNumber: form.trackingNumber,
-        status: form.status,
-      } : {
-        type,
-        orderNumber: form.orderNumber,
-        dateOrder: form.dateOrder,
-        modelNumber: form.modelNumber,
-        itemName: form.itemName,
-        username: form.username,
-        status: form.status,
-      }),
-    });
+    setSaveError(null);
+    try {
+      const res = await fetch('/api/claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isUsps ? {
+          type,
+          username: form.username,
+          amountRequested: parseFloat(form.amountRequested) || 0,
+          amountApproved: form.amountApproved ? parseFloat(form.amountApproved) : undefined,
+          dateSubmitted: form.dateSubmitted,
+          trackingNumber: form.trackingNumber,
+          status: form.status,
+        } : {
+          type,
+          orderNumber: form.orderNumber,
+          dateOrder: form.dateOrder,
+          modelNumber: form.modelNumber,
+          itemName: form.itemName,
+          username: form.username,
+          status: form.status,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data.error || 'Failed to save. Check Railway logs.');
+        setSaving(false);
+        return;
+      }
+      setForm(emptyClaimForm);
+      load();
+    } catch {
+      setSaveError('Network error. Please try again.');
+    }
     setSaving(false);
-    setForm(emptyClaimForm);
-    load();
   }
 
   async function handleDelete(c: ClaimRecord) {
@@ -249,7 +261,12 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div className="col-span-2 md:col-span-3 flex justify-end">
+            <div className="col-span-2 md:col-span-3 flex flex-col gap-2 items-end">
+              {saveError && (
+                <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg px-3 py-2 w-full">
+                  {saveError}
+                </p>
+              )}
               <button type="submit" disabled={saving} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
                 {saving ? 'Adding...' : 'Add USPS Claim'}
               </button>
@@ -284,7 +301,12 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div className="col-span-2 md:col-span-3 flex justify-end">
+            <div className="col-span-2 md:col-span-3 flex flex-col gap-2 items-end">
+              {saveError && (
+                <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg px-3 py-2 w-full">
+                  {saveError}
+                </p>
+              )}
               <button type="submit" disabled={saving} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
                 {saving ? 'Adding...' : `Add ${SECTION_LABELS[type].slice(0, -1)}`}
               </button>

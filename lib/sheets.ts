@@ -153,20 +153,25 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
 
 export async function addClaim(type: string, data: Omit<ClaimRecord, 'rowIndex'>): Promise<void> {
   const auth = getAuth();
-  if (!auth) return;
+  if (!auth) throw new Error('Google Sheets not configured');
   const tab = CLAIM_TABS[type];
-  if (!tab) return;
-  const sheets = google.sheets({ version: 'v4', auth });
-  const spreadsheetId = process.env.SALES_SHEET_ID!;
-  const values = type === 'usps'
-    ? [[data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status]]
-    : [[data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status]];
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `'${tab}'!A:F`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values },
-  });
+  if (!tab) throw new Error(`Unknown claim type: ${type}`);
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const spreadsheetId = process.env.SALES_SHEET_ID!;
+    const values = type === 'usps'
+      ? [[data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status]]
+      : [[data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status]];
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `'${tab}'!A2:F`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+  } catch (e) {
+    console.error('addClaim error:', e);
+    throw e;
+  }
 }
 
 export async function deleteClaim(type: string, rowIndex: number): Promise<void> {

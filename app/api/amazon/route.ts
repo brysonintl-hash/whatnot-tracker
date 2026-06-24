@@ -66,6 +66,64 @@ function scoreOpportunity(bsr: number | null, price: number | null, reviews: num
   return { label: 'Risky', color: 'red', score };
 }
 
+function keepaMinsToMs(keepaMins: number): number {
+  return (keepaMins + 21564000) * 60000;
+}
+
+function parseKeepaCSV(
+  csv: number[] | null | undefined,
+  asDollars: boolean,
+  cutoffMs: number,
+): { t: string; v: number }[] {
+  if (!csv || csv.length < 2) return [];
+  const result: { t: string; v: number }[] = [];
+  for (let i = 0; i + 1 < csv.length; i += 2) {
+    const ms = keepaMinsToMs(csv[i]);
+    if (ms < cutoffMs) continue;
+    if (csv[i + 1] < 0) continue;
+    result.push({
+      t: new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      v: asDollars ? csv[i + 1] / 100 : csv[i + 1],
+    });
+  }
+  return result;
+}
+
+async function fetchKeepa(asin: string) {
+  const key = process.env.KEEPA_API_KEY;
+  if (!key) return null;
+  try {
+    const url = `https://api.keepa.com/product?key=${key}&domain=1&asin=${asin}&history=1&stats=180`;
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const json = await res.json();
+    if (!json.products?.[0]) {
+      return { note: json.error === 'ACCESS_DENIED' ? 'Keepa tokens exhausted — upgrade plan for history.' : 'Keepa: no data.', priceHistory: [], bsrHistory: [], avg30: null, avg90: null, salesRankDrops30: null, monthlySold: null };
+    }
+    const kp = json.products[0];
+    const cutoff = Date.now() - 90 * 24 * 3600000;
+    const priceHistory = parseKeepaCSV(kp.csv?.[0], true, cutoff);
+    // BSR history from salesRanks object (keyed by category name)
+    let bsrHistory: { t: string; v: number }[] = [];
+    if (kp.salesRanks && typeof kp.salesRanks === 'object') {
+      const rankArrays = Object.values(kp.salesRanks) as number[][];
+      if (rankArrays[0]) bsrHistory = parseKeepaCSV(rankArrays[0], false, cutoff);
+    }
+    const stats = kp.stats ?? {};
+    const avg30Raw = Array.isArray(stats.avg30) ? stats.avg30[0] : stats.avg30;
+    const avg90Raw = Array.isArray(stats.avg90) ? stats.avg90[0] : stats.avg90;
+    return {
+      avg30: avg30Raw > 0 ? avg30Raw / 100 : null,
+      avg90: avg90Raw > 0 ? avg90Raw / 100 : null,
+      salesRankDrops30: kp.salesRankDrops30 ?? null,
+      monthlySold: kp.monthlySold > 0 ? kp.monthlySold : null,
+      priceHistory,
+      bsrHistory,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -78,7 +136,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://api.rainforestapi.com/request?api_key=${apiKey}&type=product&asin=${encodeURIComponent(asin)}&amazon_domain=amazon.com`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const [res, keepa] = await Promise.all([
+      fetch(url, { next: { revalidate: 3600 } }),
+      fetchKeepa(asin),
+    ]);
     const data = await res.json();
 
     if (!res.ok || data.request_info?.success === false) {
@@ -145,6 +206,7 @@ export async function GET(req: NextRequest) {
       weightLbs,
       fba: weightLbs != null ? calcFBAFee(weightLbs) : null,
       estimatedMonthlySales: bsr != null ? estimateMonthlySales(bsr) : null,
+      keepa,
     });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

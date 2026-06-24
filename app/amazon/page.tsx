@@ -5,10 +5,28 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, PointElement, LineElement,
+  Tooltip, Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 type Session = { username: string; role: Role; name: string };
 type Opportunity = { label: string; color: string; score: number };
 type FBAInfo = { fee: number; tier: string } | null;
+type KeepaPoint = { t: string; v: number };
+type KeepaData = {
+  avg30: number | null;
+  avg90: number | null;
+  salesRankDrops30: number | null;
+  monthlySold: number | null;
+  priceHistory: KeepaPoint[];
+  bsrHistory: KeepaPoint[];
+  note?: string;
+};
 
 type AsinResult = {
   asin: string;
@@ -31,6 +49,7 @@ type AsinResult = {
   estimatedMonthlySales: number | null;
   yourCost: number | null;
   whatnotPrice: number | null;
+  keepa?: KeepaData | null;
   error?: string;
   loading?: boolean;
 };
@@ -82,6 +101,98 @@ const OPP_STYLE: Record<string, { bg: string; text: string; border: string; dot:
 const inputCls = 'text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400';
 
 function fmt(n: number) { return `${n >= 0 ? '+' : ''}$${Math.abs(n).toFixed(2)}`; }
+
+const CHART_OPTS = (reverse = false) => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: false as const,
+  plugins: { legend: { display: false }, tooltip: { mode: 'index' as const, intersect: false } },
+  scales: {
+    x: { ticks: { maxRotation: 0, maxTicksLimit: 5, font: { size: 9 } }, grid: { display: false } },
+    y: { reverse, ticks: { font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.15)' } },
+  },
+});
+
+function KeepaSection({ keepa }: { keepa: KeepaData }) {
+  const hasPrice = keepa.priceHistory.length > 2;
+  const hasBSR   = keepa.bsrHistory.length  > 2;
+  const hasStats = keepa.avg30 || keepa.avg90 || keepa.salesRankDrops30 != null;
+
+  if (!hasPrice && !hasBSR && !hasStats) {
+    return keepa.note ? (
+      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+        <p className="text-[11px] text-slate-400 italic">{keepa.note}</p>
+      </div>
+    ) : null;
+  }
+
+  const priceData = {
+    labels: keepa.priceHistory.map(p => p.t),
+    datasets: [{
+      data: keepa.priceHistory.map(p => p.v),
+      borderColor: '#f97316',
+      backgroundColor: 'rgba(249,115,22,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+      borderWidth: 2,
+    }],
+  };
+
+  const bsrData = {
+    labels: keepa.bsrHistory.map(b => b.t),
+    datasets: [{
+      data: keepa.bsrHistory.map(b => b.v),
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+      borderWidth: 2,
+    }],
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mb-3">
+        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Keepa · 90-Day History</span>
+        {keepa.avg30 != null && (
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">30d avg <span className="font-bold text-slate-700 dark:text-slate-200">${keepa.avg30.toFixed(2)}</span></span>
+        )}
+        {keepa.avg90 != null && (
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">90d avg <span className="font-bold text-slate-700 dark:text-slate-200">${keepa.avg90.toFixed(2)}</span></span>
+        )}
+        {keepa.salesRankDrops30 != null && (
+          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400">~{keepa.salesRankDrops30} rank drops/mo</span>
+        )}
+        {keepa.monthlySold != null && (
+          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{keepa.monthlySold} sold/mo (Keepa)</span>
+        )}
+      </div>
+      {keepa.note && <p className="text-[10px] text-slate-400 italic mb-2">{keepa.note}</p>}
+      {(hasPrice || hasBSR) && (
+        <div className={`grid gap-4 ${hasPrice && hasBSR ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+          {hasPrice && (
+            <div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Amazon Price ($)</p>
+              <div className="h-28">
+                <Line data={priceData} options={CHART_OPTS()} />
+              </div>
+            </div>
+          )}
+          {hasBSR && (
+            <div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Sales Rank (lower = better)</p>
+              <div className="h-28">
+                <Line data={bsrData} options={CHART_OPTS(true)} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AmazonPage() {
   const router = useRouter();
@@ -456,6 +567,8 @@ export default function AmazonPage() {
                           ⚠️ FBM rate unknown — item exceeds 5 lbs. FBA may be a better option since Amazon handles fulfillment.
                         </div>
                       )}
+
+                      {r.keepa && <KeepaSection keepa={r.keepa} />}
                     </div>
                   )}
                 </div>

@@ -55,6 +55,7 @@ function ManagementView({ session }: { session: Session }) {
   const [savingPay, setSavingPay] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; scope: 'week' | 'all' }>({ open: false, scope: 'week' });
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ clockIn: string; clockOut: string }>({ clockIn: '', clockOut: '' });
@@ -124,11 +125,13 @@ function ManagementView({ session }: { session: Session }) {
     });
   }
 
-  async function clearHistory(scope: 'week' | 'all') {
-    const msg = scope === 'week'
-      ? 'Clear all time entries for this week? This cannot be undone.'
-      : 'Clear ALL time history? This will delete every entry permanently.';
-    if (!confirm(msg)) return;
+  function clearHistory(scope: 'week' | 'all') {
+    setConfirmModal({ open: true, scope });
+  }
+
+  async function executeCleared() {
+    const scope = confirmModal.scope;
+    setConfirmModal(m => ({ ...m, open: false }));
     setClearing(true);
     const params = scope === 'week'
       ? `scope=week&sun=${sun.toISOString()}&sat=${sat.toISOString()}`
@@ -478,6 +481,41 @@ function ManagementView({ session }: { session: Session }) {
           )}
         </main>
       </div>
+
+      {/* Confirmation modal */}
+      {confirmModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 max-w-sm w-full">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${confirmModal.scope === 'all' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
+              <svg className={`w-6 h-6 ${confirmModal.scope === 'all' ? 'text-red-500' : 'text-amber-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.999L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16.001c-.77 1.332.192 2.999 1.732 2.999z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-black text-slate-900 dark:text-white text-center mb-1">
+              {confirmModal.scope === 'all' ? 'Clear All History?' : 'Clear This Week?'}
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+              {confirmModal.scope === 'all'
+                ? 'This will permanently delete every time entry. This action cannot be undone.'
+                : 'All time entries for the current week will be deleted. This cannot be undone.'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmModal(m => ({ ...m, open: false }))}
+                className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeCleared}
+                className={`flex-1 px-4 py-2.5 text-white text-sm font-bold rounded-xl transition-colors ${confirmModal.scope === 'all' ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}`}
+              >
+                {confirmModal.scope === 'all' ? 'Delete All' : 'Clear Week'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

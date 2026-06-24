@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/useTheme';
+import { useIdleLogout } from '@/lib/useIdleLogout';
 import type { Role } from '@/lib/types';
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; children?: NavItem[] };
@@ -49,7 +50,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
-      { href: '/tracking', label: 'Tracking', icon: I.map },
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
     ]},
     { title: 'Team', items: [
@@ -69,7 +69,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
-      { href: '/tracking', label: 'Tracking', icon: I.map },
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
     ]},
     { title: 'Team', items: [
@@ -86,7 +85,6 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
-      { href: '/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -101,7 +99,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/sales', label: 'Sales', icon: I.chart },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
-      { href: '/tracking', label: 'Tracking', icon: I.map },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -121,6 +118,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const pathname = usePathname();
   const router = useRouter();
   useTheme();
+  useIdleLogout(60);
   const sections = NAV[role] ?? [];
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
