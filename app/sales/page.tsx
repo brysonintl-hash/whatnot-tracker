@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { Bar, Line } from 'react-chartjs-2';
@@ -52,6 +52,13 @@ export default function SalesPage() {
   const [customDate, setCustomDate] = useState('');
   const [selectedHost, setSelectedHost] = useState('All');
   const [showPage, setShowPage] = useState(1);
+  const lineChartRef = useRef<any>(null);
+  const barChartRef  = useRef<any>(null);
+
+  // Load zoom plugin client-side only (references `window`)
+  useEffect(() => {
+    import('chartjs-plugin-zoom').then(m => ChartJS.register(m.default));
+  }, []);
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
@@ -76,7 +83,21 @@ export default function SalesPage() {
 
   const chartOpts = useMemo(() => ({
     responsive: true,
-    plugins: { legend: { labels: { color: chartText } } },
+    plugins: {
+      legend: { labels: { color: chartText } },
+      zoom: {
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: 'x' as const,
+        },
+        pan: {
+          enabled: true,
+          mode: 'x' as const,
+        },
+        limits: { x: { min: 'original' as const, max: 'original' as const } },
+      },
+    },
     scales: {
       x: { ticks: { color: chartTick }, grid: { color: chartGrid } },
       y: { ticks: { color: chartTick }, grid: { color: chartGrid } },
@@ -194,8 +215,19 @@ export default function SalesPage() {
 
               {/* Sales trend */}
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 mb-4">
-                <h2 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Sales & Profit by Show</h2>
-                <Line data={{
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-bold text-slate-900 dark:text-white text-sm">Sales & Profit by Show</h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Scroll to zoom · Drag to pan</p>
+                  </div>
+                  <button
+                    onClick={() => lineChartRef.current?.resetZoom()}
+                    className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    Reset Zoom
+                  </button>
+                </div>
+                <Line ref={lineChartRef} data={{
                   labels: byTab.map(([tab]) => tab),
                   datasets: [
                     { label: 'Sales ($)', data: byTab.map(([, v]) => v.sales), borderColor: '#F59E0B', backgroundColor: isDark ? 'rgba(245,158,11,0.1)' : '#FEF3C7', tension: 0.3, fill: true },

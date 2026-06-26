@@ -189,14 +189,223 @@ function computeHostStats(orders: Order[]): HostStat[] {
     .sort((a, b) => a.host.localeCompare(b.host) || a.livestream - b.livestream);
 }
 
+// ─── Timekeeping types for Team Calendar ────────────────────────────────────
+
+type TKEntry = {
+  id: string; userId: string; username: string; name: string;
+  role: string; clockIn: string; clockOut: string | null; note: string;
+};
+
+const ROLE_CLR: Record<string, string> = {
+  admin: '#DC2626', manager: '#3B82F6', host: '#F59E0B',
+  shipper: '#8B5CF6', employee: '#10B981',
+};
+
+function fmtTimeLocal(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtWorked(clockIn: string, clockOut: string | null): string {
+  if (!clockOut) return 'In progress';
+  const h = (new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 3600000;
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${hh}h ${String(mm).padStart(2, '0')}m`;
+}
+
+function TeamCalendar({ entries }: { entries: TKEntry[] }) {
+  const [calMonth, setCalMonth] = useState(() => {
+    const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1);
+  });
+  const [hovered, setHovered] = useState<{ dateKey: string; x: number; y: number } | null>(null);
+
+  const byDate = useMemo(() => {
+    const map: Record<string, TKEntry[]> = {};
+    entries.forEach(e => {
+      const d = new Date(e.clockIn);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
+    });
+    return map;
+  }, [entries]);
+
+  const year = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  const cells: (string | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) =>
+      `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`
+    ),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const hoveredEntries = hovered ? (byDate[hovered.dateKey] ?? []) : [];
+  const totalDays = Object.keys(byDate).filter(k => k.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length;
+
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={() => setCalMonth(new Date(year, month - 1, 1))}
+          className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+          <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <div className="text-center">
+          <h2 className="text-base font-black text-slate-900 dark:text-white">
+            {calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          {totalDays > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{totalDays} days with activity</p>}
+        </div>
+        <button onClick={() => setCalMonth(new Date(year, month + 1, 1))}
+          className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+          <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 mb-2">
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+          <div key={d} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1.5">
+        {cells.map((dateKey, i) => {
+          if (!dateKey) return <div key={i} className="rounded-xl bg-slate-50 dark:bg-slate-700/20" style={{ minHeight: '80px' }} />;
+
+          const dayNum = parseInt(dateKey.split('-')[2]);
+          const dayEntries = byDate[dateKey] ?? [];
+          const isToday = dateKey === todayKey;
+          const hasStaff = dayEntries.length > 0;
+          const uniqueStaff = Array.from(new Map(dayEntries.map(e => [e.userId, e])).values());
+
+          return (
+            <div
+              key={dateKey}
+              className={`rounded-xl p-2 border transition-all ${
+                isToday
+                  ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
+                  : hasStaff
+                  ? 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-400 hover:shadow-md cursor-pointer'
+                  : 'border-slate-100 dark:border-slate-700/40 bg-slate-50/50 dark:bg-slate-800/40'
+              }`}
+              style={{ minHeight: '80px' }}
+              onMouseEnter={hasStaff ? (e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = rect.right + 10 > window.innerWidth - 280 ? rect.left - 280 : rect.right + 10;
+                setHovered({ dateKey, x, y: Math.min(rect.top, window.innerHeight - 320) });
+              } : undefined}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <div className={`text-xs font-black mb-1.5 ${isToday ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                {isToday ? (
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-white text-[10px]">{dayNum}</span>
+                ) : dayNum}
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {uniqueStaff.slice(0, 4).map(e => (
+                  <div key={e.userId}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-black ring-1 ring-white dark:ring-slate-700"
+                    style={{ backgroundColor: ROLE_CLR[e.role] ?? '#6B7280' }}>
+                    {(e.name[0] ?? '?').toUpperCase()}
+                  </div>
+                ))}
+                {uniqueStaff.length > 4 && (
+                  <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-600 dark:text-slate-300">
+                    +{uniqueStaff.length - 4}
+                  </div>
+                )}
+              </div>
+              {hasStaff && (
+                <div className="mt-1.5 text-[9px] text-slate-400">
+                  {dayEntries.length} session{dayEntries.length !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+        {Object.entries(ROLE_CLR).map(([role, color]) => (
+          <div key={role} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+            <span className="text-[10px] text-slate-500 capitalize">{role}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Hover tooltip */}
+      {hovered && hoveredEntries.length > 0 && (
+        <div
+          className="fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-4 w-72 pointer-events-none"
+          style={{ left: hovered.x, top: hovered.y }}
+        >
+          <p className="text-xs font-black text-slate-900 dark:text-white mb-3 border-b border-slate-100 dark:border-slate-700 pb-2">
+            {new Date(hovered.dateKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          </p>
+          <div className="space-y-3">
+            {hoveredEntries.map(e => (
+              <div key={e.id} className="flex items-start gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-black flex-shrink-0 ring-2 ring-white dark:ring-slate-700"
+                  style={{ backgroundColor: ROLE_CLR[e.role] ?? '#6B7280' }}>
+                  {(e.name[0] ?? '?').toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{e.name}</p>
+                  <p className="text-[10px] text-slate-400 capitalize mb-1">{e.role}</p>
+                  <div className="text-[10px] space-y-0.5">
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-400">In:</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">{fmtTimeLocal(e.clockIn)}</span>
+                    </div>
+                    {e.clockOut ? (
+                      <>
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">Out:</span>
+                          <span className="font-bold text-red-500">{fmtTimeLocal(e.clockOut)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">Total:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{fmtWorked(e.clockIn, e.clockOut)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="font-bold text-amber-500">Currently clocked in</p>
+                    )}
+                    {e.note && <p className="text-slate-400 italic truncate">"{e.note}"</p>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
 export default function PerformancePage() {
   const router = useRouter();
   useTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [tkEntries, setTkEntries] = useState<TKEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
+  const [view, setView] = useState<'stats' | 'calendar'>('stats');
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -206,14 +415,15 @@ export default function PerformancePage() {
       if (s.role !== 'admin' && s.role !== 'manager') { router.push('/login'); return; }
       setSession(s);
     });
-    fetch('/api/sales', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(data => {
-        if (data?.error) setError(data.error);
-        else setOrders(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(e => { setError(e.message); setLoading(false); });
+    Promise.all([
+      fetch('/api/sales', { cache: 'no-store' }).then(r => r.json()),
+      fetch('/api/timekeeping').then(r => r.json()),
+    ]).then(([salesData, tkData]) => {
+      if (salesData?.error) setError(salesData.error);
+      else setOrders(Array.isArray(salesData) ? salesData : []);
+      setTkEntries(Array.isArray(tkData) ? tkData : []);
+      setLoading(false);
+    }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
   // All available show dates sorted newest → oldest
@@ -262,7 +472,24 @@ export default function PerformancePage() {
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Performance</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
-          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() => setView('stats')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${view === 'stats' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+              >
+                Show Stats
+              </button>
+              <button
+                onClick={() => setView('calendar')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'calendar' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                Team Calendar
+              </button>
+            </div>
+            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -273,6 +500,8 @@ export default function PerformancePage() {
               <p className="font-bold text-red-600 mb-1">Error loading data</p>
               <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">{error}</p>
             </div>
+          ) : view === 'calendar' ? (
+            <TeamCalendar entries={tkEntries} />
           ) : (
             <>
               {/* Date picker bar */}
