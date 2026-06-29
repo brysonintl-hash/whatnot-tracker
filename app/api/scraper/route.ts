@@ -171,8 +171,9 @@ function extractListingsFromHtml(html: string): Listing[] {
   const products: Listing[] = [];
   const seenIds = new Set<string>();
 
-  // Whatnot listing URLs: /listing/XXXX or full URL
-  const linkRe = /href="((?:https:\/\/www\.whatnot\.com)?\/listing\/([a-zA-Z0-9_-]+))"/gi;
+  // Match Whatnot listing URLs in any attribute (href, data-href, etc.)
+  // Handles: /listing/abc123  or  https://www.whatnot.com/listing/abc123
+  const linkRe = /(?:href|data-href)=["']?((?:https:\/\/(?:www\.)?whatnot\.com)?\/listing\/([a-zA-Z0-9_-]{6,}))["']?/gi;
   let m: RegExpExecArray | null;
 
   while ((m = linkRe.exec(html)) !== null) {
@@ -180,37 +181,42 @@ function extractListingsFromHtml(html: string): Listing[] {
     if (seenIds.has(id)) continue;
     seenIds.add(id);
 
-    // Grab surrounding context (look back 2000 chars for image/title, forward 200 for price)
-    const ctxStart = Math.max(0, m.index - 2000);
-    const ctxEnd   = Math.min(html.length, m.index + 500);
+    // Context: 3000 chars before (for title/image) + 300 after (for price/qty)
+    const ctxStart = Math.max(0, m.index - 3000);
+    const ctxEnd   = Math.min(html.length, m.index + 300);
     const ctx = html.slice(ctxStart, ctxEnd);
 
-    // Find price: $20 or $10.00 — pick the one closest to the link
-    const priceMatches = Array.from(ctx.matchAll(/\$(\d+(?:\.\d{2})?)/g));
-    const price = priceMatches.length > 0
-      ? parseFloat(priceMatches[priceMatches.length - 1][1])
-      : null;
+    // Price: last $XX or $XX.XX in context (closest to the link)
+    const priceMatches: RegExpExecArray[] = [];
+    const priceRe2 = /\$(\d+(?:\.\d{1,2})?)/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = priceRe2.exec(ctx)) !== null) priceMatches.push(pm);
+    const price = priceMatches.length > 0 ? parseFloat(priceMatches[priceMatches.length - 1][1]) : null;
 
-    // Find image — prefer CDN images (whatnot CDN is hwcdn.net or images.whatnot.com or cloudfront)
-    const imgRe = /src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)(?:\?[^"]*)?)"/gi;
+    // Image: any CDN image in context — prefer whatnot/hwcdn/cloudfront domains
+    const imgRe2 = /src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/gi;
     let imgM: RegExpExecArray | null;
     let image = '';
-    while ((imgM = imgRe.exec(ctx)) !== null) {
+    while ((imgM = imgRe2.exec(ctx)) !== null) {
       const src = imgM[1];
-      if (src.includes('whatnot') || src.includes('hwcdn') || src.includes('cloudfront')) {
-        image = src;
-        break;
+      if (src.includes('whatnot') || src.includes('hwcdn') || src.includes('cloudfront') || src.includes('imgix')) {
+        image = src; break;
       }
     }
+    // Fallback: any image
+    if (!image) {
+      const anyImg = ctx.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/i);
+      if (anyImg) image = anyImg[1];
+    }
 
-    // Find title: strip HTML from context, look for meaningful text (10-200 chars)
-    const plainCtx = stripHtml(ctx);
-    // Find a sentence-like phrase that isn't just numbers/symbols
-    const titleM = plainCtx.match(/([A-Z][A-Za-z0-9/'()\-&., ]{9,180})/);
+    // Title: strip tags from context, find longest plausible product name
+    const plain = stripHtml(ctx);
+    // Product names on Whatnot are typically 10–200 chars, start with a capital or digit
+    const titleM = plain.match(/([A-Z0-9][A-Za-z0-9/'()\-&.,% ]{9,200})/);
     const title = titleM ? titleM[1].replace(/\s+/g, ' ').trim() : `Listing ${id}`;
 
-    // Find quantity: "Qty 6" or "6 left" or "Quantity: 6"
-    const qtyM = ctx.match(/(?:Qty|qty|QTY|Quantity|quantity)[:\s]+(\d+)|(\d+)\s*(?:left|remaining|available)/i);
+    // Qty: "Qty. 6", "Qty 6", "6 left", "Quantity: 6"
+    const qtyM = ctx.match(/(?:Qty\.?|Quantity)[:\s]+(\d+)|(\d+)\s*(?:left|remaining|available)/i);
     const qty  = qtyM ? parseInt(qtyM[1] ?? qtyM[2]) : null;
 
     products.push({ id, title, price, image, category: '', condition: '', qty, url: `https://www.whatnot.com/listing/${id}` });
@@ -245,10 +251,20 @@ function extractAvatar(html: string): string {
 }
 
 async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number }> {
-  // render=true: executes JS; wait=8000: wait 8s for React to finish rendering
-  const url = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&render=true&wait_for_selector=body&country_code=us`;
+  // render=true  → executes JavaScript
+  // wait=15000   → wait 15s after page load for async product API calls to finish
+  // country_code=us → use US residential IP (Whatnot serves US content)
+  const params = new URLSearchParams({
+    api_key: key,
+    url: targetUrl,
+    render: 'true',
+    wait: '15000',
+    country_code: 'us',
+    premium: 'true',      // residential proxy — better success rate on Whatnot
+  });
+  const url = `https://api.scraperapi.com/?${params.toString()}`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(90000) });
     return { html: await res.text(), status: res.status };
   } catch {
     return { html: '', status: 0 };
