@@ -22,36 +22,18 @@ function fmtPrice(p: number | null): string {
 }
 
 function downloadCSV(result: ScraperResult) {
-  const profileRows = [
-    ['=== SELLER PROFILE ==='],
-    ['Username', result.username],
-    ['Display Name', result.displayName],
-    ['Bio', result.bio || ''],
-    ['Followers', result.followers != null ? String(result.followers) : ''],
-    ['Following', result.following != null ? String(result.following) : ''],
-    ['Reviews', result.reviewCount != null ? String(result.reviewCount) : ''],
-    ['Rating', result.reviewScore != null ? String(result.reviewScore) : ''],
-    ['Total Sold', result.totalSold != null ? String(result.totalSold) : ''],
-    ['Verified', result.verified ? 'Yes' : 'No'],
-    ['Profile URL', `https://www.whatnot.com/user/${result.username}`],
-    [''],
-    ['=== LISTINGS ==='],
-    ['Title', 'Price', 'Category', 'Condition', 'Qty', 'Listing URL'],
-  ];
-
-  const listingRows: string[][] = result.listings.map(l => [
-    l.title,
-    l.price != null ? String(l.price) : '',
-    l.category,
-    l.condition,
+  const headers = ['Title', 'Price', 'Category', 'Qty', 'URL'];
+  const rows = result.listings.map(l => [
+    String(l.title ?? '').replace(/"/g, '""'),
+    l.price != null ? `$${l.price.toFixed(2)}` : '',
+    String(l.category ?? '').replace(/"/g, '""'),
     l.qty != null ? String(l.qty) : '',
-    l.url,
+    l.url ?? '',
   ]);
 
-  const allRows = [...profileRows, ...listingRows];
-  const csv = allRows.map(row =>
-    row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')
-  ).join('\r\n');
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${cell}"`).join(','))
+    .join('\r\n');
 
   const bom = '﻿'; // UTF-8 BOM for Excel compatibility
   const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
@@ -269,7 +251,9 @@ export default function ScraperPage() {
                     <div>
                       <p className="text-sm font-black text-slate-900 dark:text-white">
                         Shop Listings
-                        <span className="ml-2 text-[10px] font-bold text-slate-400">({result.listings.length} found)</span>
+                        <span className="ml-2 text-[10px] font-bold text-slate-400">
+                          ({result.listings.length} scraped{result.totalDetected && result.totalDetected > result.listings.length ? ` of ${result.totalDetected} total` : ''})
+                        </span>
                       </p>
                       {categoryFilter && <p className="text-[10px] text-slate-400 mt-0.5">Filtered: &quot;{categoryFilter}&quot;</p>}
                     </div>

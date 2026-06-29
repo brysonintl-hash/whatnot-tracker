@@ -27,6 +27,7 @@ export type ScraperResult = {
   avatar: string;
   listings: Listing[];
   categories: string[];
+  totalDetected: number | null;
   note?: string;
 };
 
@@ -46,7 +47,6 @@ function numOrNull(v: unknown): number | null {
   return isNaN(n) ? null : n;
 }
 
-// Parse "25.8K", "1.2M", "18400" → raw number
 function parseCompact(s: string): number | null {
   const clean = s.replace(/,/g, '').trim();
   const m = clean.match(/^([\d.]+)([KkMm]?)$/);
@@ -58,165 +58,132 @@ function parseCompact(s: string): number | null {
   return Math.round(val);
 }
 
-// Find NUMBER before a label — handles "25.8K Followers", "18.4K Sold", etc.
 function regexStat(html: string, label: string): number | null {
-  // Try with compact suffix first (e.g. 25.8K Followers)
   const re = new RegExp('([\\d.,]+[KkMm]?)\\s*' + label, 'i');
   const m = html.match(re);
   return m ? parseCompact(m[1]) : null;
 }
 
-// Handle Whatnot's format: "4.9 (2.4K Reviews)" — rating before parens, count inside
 function regexReviews(html: string): { score: number | null; count: number | null } {
-  // Format: 4.9 (2.4K Reviews)
   const m = html.match(/([\d.]+)\s*\(\s*([\d.,]+[KkMm]?)\s*Reviews?\s*\)/i);
   if (m) return { score: parseFloat(m[1]), count: parseCompact(m[2]) };
-  // Format: (2.4K Reviews) without leading score
   const m2 = html.match(/\(\s*([\d.,]+[KkMm]?)\s*Reviews?\s*\)/i);
   if (m2) return { score: null, count: parseCompact(m2[1]) };
-  // Format: 2.4K Reviews
-  const m3 = html.match(/([\d.,]+[KkMm]?)\s*Reviews?/i);
-  if (m3) return { score: null, count: parseCompact(m3[1]) };
   return { score: null, count: null };
 }
 
-// Strip all HTML tags, decode basic entities, collapse whitespace
 function stripHtml(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/\s+/g, ' ').trim();
 }
 
-// Extract all JSON-like blobs from script tags
-function extractJsonBlobs(html: string): unknown[] {
-  const results: unknown[] = [];
-  // __NEXT_DATA__
-  const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-  if (nd) { try { results.push(JSON.parse(nd[1])); } catch {} }
-  // Any <script> that starts with { or [
-  const re = /<script[^>]*>\s*(\{[\s\S]{50,}?\}|\[[\s\S]{50,}?\])\s*<\/script>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    try { results.push(JSON.parse(m[1])); } catch {}
-  }
-  // window.__X__ = {...} assignments
-  const assignRe = /(?:window\.[A-Z_]+|self\.__next\w*)\s*=\s*(\{[\s\S]*?\})\s*;/g;
-  let am: RegExpExecArray | null;
-  while ((am = assignRe.exec(html)) !== null) {
-    try { results.push(JSON.parse(am[1])); } catch {}
-  }
-  return results;
+// Remove attributes that pollute title extraction (srcset has image filenames like "0-abc.jpeg 96w")
+function cleanHtmlAttrs(html: string): string {
+  return html
+    .replace(/\ssrcset="[^"]*"/gi, '')
+    .replace(/\ssizes="[^"]*"/gi, '')
+    .replace(/\sdata-src="[^"]*"/gi, '')
+    .replace(/\sstyle="[^"]*"/gi, '');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findUserInBlob(obj: any, depth: number): any {
-  if (depth > 10 || obj == null) return null;
-  if (typeof obj === 'object' && !Array.isArray(obj)) {
-    const keys = Object.keys(obj);
-    const score = ['displayName', 'followersCount', 'reviewScore', 'profilePhoto', 'soldCount', 'sellerRating'].filter(k => keys.includes(k)).length;
-    if (score >= 2) return obj;
-    for (const val of Object.values(obj)) {
-      const found = findUserInBlob(val, depth + 1);
-      if (found) return found;
-    }
+function extractDisplayName(html: string, username: string): string {
+  const ogM = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)
+           ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i);
+  if (ogM) {
+    const name = ogM[1].replace(/\s*[|\-–—].*$/, '').replace(/\s*on\s*Whatnot.*/i, '').trim();
+    if (name && name.toLowerCase() !== 'whatnot') return name;
   }
-  return null;
+  const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleM) {
+    const name = titleM[1].replace(/\s*[|\-–—].*$/, '').replace(/\s*on\s*Whatnot.*/i, '').trim();
+    if (name && name.toLowerCase() !== 'whatnot') return name;
+  }
+  return username;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findListingsInBlob(obj: any, depth = 0): any[] {
-  if (depth > 10 || obj == null) return [];
-  if (Array.isArray(obj) && obj.length > 0 && typeof obj[0] === 'object') {
-    const first = obj[0];
-    const score = ['title', 'name', 'price', 'image', 'listingId', 'productId'].filter(k => k in first).length;
-    if (score >= 2) return obj;
-  }
-  if (typeof obj === 'object' && !Array.isArray(obj)) {
-    for (const [key, val] of Object.entries(obj)) {
-      if (['listings', 'products', 'items', 'inventory', 'shopItems', 'forSale', 'sellerListings'].includes(key)) {
-        const found = findListingsInBlob(val, depth + 1);
-        if (found.length > 0) return found;
-      }
-    }
-    for (const val of Object.values(obj)) {
-      const found = findListingsInBlob(val, depth + 1);
-      if (found.length > 0) return found;
-    }
-  }
-  return [];
+function extractAvatar(html: string): string {
+  const m = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+         ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  return m ? m[1] : '';
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseListingsFromBlobs(raw: any[]): Listing[] {
-  return raw.map(item => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dig = (...keys: string[]): any => { for (const k of keys) if (item[k] != null) return item[k]; return undefined; };
-    const id       = safe(() => String(dig('id', 'listingId', 'productId', 'sku') ?? ''), '');
-    const title    = safe(() => String(dig('title', 'name', 'productTitle', 'itemName') ?? 'Untitled'), 'Untitled');
-    const price    = safe(() => parsePrice(dig('price', 'startingPrice', 'buyItNowPrice', 'amount')), null);
-    const image    = safe(() => String(dig('image', 'imageUrl', 'photo', 'thumbnailUrl', 'coverPhoto') ?? item.photos?.[0]?.url ?? ''), '');
-    const category = safe(() => String(item.category?.name ?? item.categoryName ?? dig('category') ?? ''), '');
-    const condition = safe(() => String(dig('condition', 'itemCondition') ?? ''), '');
-    const qty      = safe(() => numOrNull(dig('quantity', 'qty', 'stock', 'inventoryCount')), null);
-    return { id, title, price, image, category, condition, qty, url: id ? `https://www.whatnot.com/listing/${id}` : '' };
-  });
+// Detect total product count from "Products (76)" in the page
+function detectTotalCount(html: string): number | null {
+  const m = html.match(/Products?\s*\((\d+)\)/i);
+  return m ? parseInt(m[1]) : null;
 }
 
-// Extract product listings directly from rendered DOM HTML by finding listing URLs
+// ── Extract listings from rendered HTML ──────────────────────────────────────
+// Primary title source: alt attribute of the product image (most reliable)
+// Secondary: text near the listing link (after removing noisy attributes)
 function extractListingsFromHtml(html: string): Listing[] {
   const products: Listing[] = [];
   const seenIds = new Set<string>();
 
-  // Match Whatnot listing URLs in any attribute (href, data-href, etc.)
-  // Handles: /listing/abc123  or  https://www.whatnot.com/listing/abc123
-  const linkRe = /(?:href|data-href)=["']?((?:https:\/\/(?:www\.)?whatnot\.com)?\/listing\/([a-zA-Z0-9_-]{6,}))["']?/gi;
+  // Pre-clean: strip srcset and other attributes that pollute text
+  const cleanHtml = cleanHtmlAttrs(html);
+
+  const linkRe = /href=["']?((?:https:\/\/(?:www\.)?whatnot\.com)?\/listing\/([a-zA-Z0-9_=-]{6,}))["']?/gi;
   let m: RegExpExecArray | null;
 
-  while ((m = linkRe.exec(html)) !== null) {
+  while ((m = linkRe.exec(cleanHtml)) !== null) {
     const id = m[2];
     if (seenIds.has(id)) continue;
     seenIds.add(id);
 
-    // Context: 3000 chars before (for title/image) + 300 after (for price/qty)
     const ctxStart = Math.max(0, m.index - 3000);
-    const ctxEnd   = Math.min(html.length, m.index + 300);
-    const ctx = html.slice(ctxStart, ctxEnd);
+    const ctxEnd   = Math.min(cleanHtml.length, m.index + 400);
+    const ctx = cleanHtml.slice(ctxStart, ctxEnd);
 
-    // Price: last $XX or $XX.XX in context (closest to the link)
+    // ── Title: use alt attribute first (it IS the product name on Whatnot) ──
+    // Look for alt text closest to the listing link (search backwards from link position)
+    const altMatches: string[] = [];
+    const altRe = /alt="([^"]{10,250})"/gi;
+    let am: RegExpExecArray | null;
+    while ((am = altRe.exec(ctx)) !== null) {
+      const t = am[1].trim();
+      // Skip generic alts like "product image", "thumbnail", seller name
+      if (t.length >= 10 && !/^(product|image|thumbnail|photo|item|listing|shop)$/i.test(t)) {
+        altMatches.push(t);
+      }
+    }
+    // Use last alt match (closest to the link)
+    let title = altMatches.length > 0 ? altMatches[altMatches.length - 1] : '';
+
+    // ── Fallback: strip tags and find product-like text ──────────────────────
+    if (!title) {
+      const plain = stripHtml(ctx);
+      // Product titles on Whatnot often start with "Retail", brand name, or description
+      const titleM = plain.match(/\b((?:Retail\s+[\d$]+\s+)?[A-Z][A-Za-z0-9/'()\-&.,% ]{9,200})/);
+      title = titleM ? titleM[1].replace(/\s+/g, ' ').trim() : `Listing ${id}`;
+    }
+
+    // ── Price ──────────────────────────────────────────────────────────────
     const priceMatches: RegExpExecArray[] = [];
-    const priceRe2 = /\$(\d+(?:\.\d{1,2})?)/g;
+    const priceRe = /\$(\d+(?:\.\d{1,2})?)/g;
     let pm: RegExpExecArray | null;
-    while ((pm = priceRe2.exec(ctx)) !== null) priceMatches.push(pm);
-    const price = priceMatches.length > 0 ? parseFloat(priceMatches[priceMatches.length - 1][1]) : null;
+    while ((pm = priceRe.exec(ctx)) !== null) priceMatches.push(pm);
+    const price = priceMatches.length > 0
+      ? parseFloat(priceMatches[priceMatches.length - 1][1])
+      : null;
 
-    // Image: any CDN image in context — prefer whatnot/hwcdn/cloudfront domains
-    const imgRe2 = /src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/gi;
+    // ── Image ────────────────────────────────────────────────────────────────
+    const imgRe = /src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/gi;
     let imgM: RegExpExecArray | null;
     let image = '';
-    while ((imgM = imgRe2.exec(ctx)) !== null) {
+    while ((imgM = imgRe.exec(ctx)) !== null) {
       const src = imgM[1];
       if (src.includes('whatnot') || src.includes('hwcdn') || src.includes('cloudfront') || src.includes('imgix')) {
         image = src; break;
       }
     }
-    // Fallback: any image
-    if (!image) {
-      const anyImg = ctx.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/i);
-      if (anyImg) image = anyImg[1];
-    }
 
-    // Title: strip tags from context, find longest plausible product name
-    const plain = stripHtml(ctx);
-    // Product names on Whatnot are typically 10–200 chars, start with a capital or digit
-    const titleM = plain.match(/([A-Z0-9][A-Za-z0-9/'()\-&.,% ]{9,200})/);
-    const title = titleM ? titleM[1].replace(/\s+/g, ' ').trim() : `Listing ${id}`;
-
-    // Qty: "Qty. 6", "Qty 6", "6 left", "Quantity: 6"
-    const qtyM = ctx.match(/(?:Qty\.?|Quantity)[:\s]+(\d+)|(\d+)\s*(?:left|remaining|available)/i);
+    // ── Qty ──────────────────────────────────────────────────────────────────
+    const qtyM = ctx.match(/(?:Qty\.?|Quantity)[:\s]+(\d+)|(\d+)\s+Available/i);
     const qty  = qtyM ? parseInt(qtyM[1] ?? qtyM[2]) : null;
 
     products.push({ id, title, price, image, category: '', condition: '', qty, url: `https://www.whatnot.com/listing/${id}` });
@@ -225,46 +192,127 @@ function extractListingsFromHtml(html: string): Listing[] {
   return products;
 }
 
-// Extract display name from rendered HTML — look for heading or meta tags
-function extractDisplayName(html: string, username: string): string {
-  // og:title meta
-  const ogM = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)
-           ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i);
-  if (ogM) {
-    const name = ogM[1].replace(/\s*[|\-–—].*$/, '').trim();
-    if (name && name.toLowerCase() !== 'whatnot') return name;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findGQLEdges(obj: any, depth = 0): any[] {
+  if (depth > 8 || !obj) return [];
+  if (Array.isArray(obj) && obj.length > 0 && obj[0]?.node) return obj.map((e: any) => e.node);
+  if (Array.isArray(obj) && obj.length > 0 && obj[0]?.id) return obj;
+  if (typeof obj === 'object') {
+    for (const val of Object.values(obj)) {
+      const found = findGQLEdges(val, depth + 1);
+      if (found.length > 0) return found;
+    }
   }
-  // <title> tag
-  const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (titleM) {
-    const name = titleM[1].replace(/\s*[|\-–—].*$/, '').replace(/\s*on\s*Whatnot.*$/i, '').trim();
-    if (name && name.toLowerCase() !== 'whatnot' && name.length > 0) return name;
-  }
-  return username;
+  return [];
 }
 
-// Extract avatar from og:image or first matching profile image
-function extractAvatar(html: string): string {
-  const m = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
-         ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-  return m ? m[1] : '';
+// ── Try Whatnot's internal API directly (no Cloudflare on API endpoints) ────
+// Whatnot uses Relay GraphQL. The base64 listing IDs decode to "ListingNode:XXXX"
+async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Origin': 'https://www.whatnot.com',
+    'Referer': `https://www.whatnot.com/user/${username}/shop`,
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  };
+
+  // GraphQL queries to try (Whatnot uses Relay, so field names may vary)
+  const queries = [
+    // Pattern 1: user → listings
+    { query: `query GetShop($u:String!){user(username:$u){listings(first:200){edges{node{id title price quantity photos{url} category{name} condition}}}}}`, variables: { u: username } },
+    // Pattern 2: seller → products
+    { query: `query GetShop($u:String!){seller(username:$u){products(first:200){edges{node{id title price qty imageUrl category condition}}}}}`, variables: { u: username } },
+    // Pattern 3: profile → listings
+    { query: `query GetShop($u:String!){profile(username:$u){listings(first:200){nodes{id title price quantity photos{url}}}}}`, variables: { u: username } },
+  ];
+
+  // GraphQL endpoint candidates
+  const endpoints = [
+    'https://www.whatnot.com/api/graphql',
+    'https://www.whatnot.com/graphql',
+    'https://api.whatnot.com/graphql',
+  ];
+
+  for (const endpoint of endpoints) {
+    for (const body of queries) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST', headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) continue;
+        const ct = res.headers.get('content-type') ?? '';
+        if (!ct.includes('json')) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await res.json();
+        if (data.errors && !data.data) continue;
+
+        // Try to find listings array anywhere in the response
+        const nodes = findGQLEdges(data);
+        if (nodes.length > 0) {
+          return nodes.map((node: any) => ({
+            id: String(node.id ?? ''),
+            title: String(node.title ?? node.name ?? 'Untitled'),
+            price: parsePrice(node.price ?? node.amount ?? node.startingPrice),
+            image: String(node.photos?.[0]?.url ?? node.imageUrl ?? node.image ?? ''),
+            category: String(node.category?.name ?? node.categoryName ?? node.category ?? ''),
+            condition: String(node.condition ?? ''),
+            qty: numOrNull(node.quantity ?? node.qty ?? node.stock),
+            url: node.id ? `https://www.whatnot.com/listing/${node.id}` : '',
+          }));
+        }
+      } catch { /* try next */ }
+    }
+  }
+
+  // REST fallback patterns
+  const restEndpoints = [
+    `https://www.whatnot.com/api/users/${username}/listings?per_page=200`,
+    `https://www.whatnot.com/api/sellers/${username}/listings?limit=200`,
+    `https://www.whatnot.com/api/v1/users/${username}/products?per_page=200`,
+  ];
+  for (const url of restEndpoints) {
+    try {
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.includes('json')) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+      const arr = Array.isArray(data) ? data : (data.listings ?? data.results ?? data.products ?? data.items ?? []);
+      if (arr.length > 0) {
+        return arr.map((item: any) => ({
+          id: String(item.id ?? item.listingId ?? ''),
+          title: String(item.title ?? item.name ?? 'Untitled'),
+          price: parsePrice(item.price ?? item.startingPrice),
+          image: String(item.image ?? item.imageUrl ?? item.photo ?? ''),
+          category: String(item.category?.name ?? item.categoryName ?? item.category ?? ''),
+          condition: String(item.condition ?? ''),
+          qty: numOrNull(item.quantity ?? item.qty),
+          url: `https://www.whatnot.com/listing/${item.id ?? ''}`,
+        }));
+      }
+    } catch { /* try next */ }
+  }
+
+  return [];
 }
 
 async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number }> {
-  // render=true  → executes JavaScript
-  // wait=15000   → wait 15s after page load for async product API calls to finish
-  // country_code=us → use US residential IP (Whatnot serves US content)
   const params = new URLSearchParams({
     api_key: key,
     url: targetUrl,
     render: 'true',
     wait: '15000',
     country_code: 'us',
-    premium: 'true',      // residential proxy — better success rate on Whatnot
+    premium: 'true',
   });
-  const url = `https://api.scraperapi.com/?${params.toString()}`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(90000) });
+    const res = await fetch(`https://api.scraperapi.com/?${params.toString()}`, {
+      signal: AbortSignal.timeout(90000),
+    });
     return { html: await res.text(), status: res.status };
   } catch {
     return { html: '', status: 0 };
@@ -283,91 +331,71 @@ export async function GET(req: NextRequest) {
   if (!scraperKey) {
     return NextResponse.json({
       error: 'SETUP_REQUIRED',
-      message: 'Whatnot is protected by Cloudflare and blocks direct server requests. To enable scraping, add a free ScraperAPI key:\n\n1. Go to https://www.scraperapi.com and sign up (free — no credit card, 1,000 requests/month)\n2. Copy your API key from the dashboard\n3. In Railway → your service → Variables add: SCRAPER_API_KEY = your_key\n4. Redeploy and try again',
+      message: 'Whatnot is protected by Cloudflare and blocks direct server requests. Add a free ScraperAPI key:\n\n1. Sign up at https://www.scraperapi.com (free, no credit card, 1,000 requests/month)\n2. Copy your API key\n3. In Railway → Variables add: SCRAPER_API_KEY = your_key\n4. Redeploy and try again',
     }, { status: 503 });
   }
 
   try {
-    // Fetch the shop page (has products) — one request to save API credits
-    const { html, status } = await fetchViaScraperAPI(
-      `https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`,
-      scraperKey,
-    );
+    // Run ScraperAPI (for profile/HTML) and direct API (for all listings) in parallel
+    const [{ html, status }, apiListings] = await Promise.all([
+      fetchViaScraperAPI(`https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`, scraperKey),
+      fetchWhatnotAPIListings(username),
+    ]);
 
-    if (status === 404 || html.includes('Page not found') || html.includes('404') && html.length < 3000) {
+    if (status === 404 || (html.includes('Page not found') && html.length < 5000)) {
       return NextResponse.json({ error: `Seller "@${username}" was not found on Whatnot.` }, { status: 404 });
     }
-
     if (!html || html.length < 500) {
-      return NextResponse.json({ error: 'ScraperAPI returned an empty response. Please try again in a moment.' }, { status: 503 });
+      return NextResponse.json({ error: 'ScraperAPI returned an empty response. Please try again.' }, { status: 503 });
     }
 
-    // ── 1. Try JSON blobs (React hydration / __NEXT_DATA__) ──────────────────
-    const blobs = extractJsonBlobs(html);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let userObj: Record<string, any> = {};
-    for (const blob of blobs) {
-      const u = findUserInBlob(blob, 0);
-      if (u) { userObj = u; break; }
-    }
-    let rawListings: unknown[] = [];
-    for (const blob of blobs) {
-      const found = findListingsInBlob(blob);
-      if (found.length > rawListings.length) rawListings = found;
-    }
-    let listings = parseListingsFromBlobs(rawListings as Record<string, unknown>[]);
+    // ── Profile stats from HTML ──────────────────────────────────────────────
+    const reviews    = regexReviews(html);
+    const displayName = extractDisplayName(html, username);
+    const avatar      = extractAvatar(html);
+    const followers   = regexStat(html, 'Followers?');
+    const following   = regexStat(html, 'Following') ?? 0;
+    const reviewCount = reviews.count;
+    const reviewScore = reviews.score;
+    const totalSold   = regexStat(html, 'Sold');
+    const totalDetected = detectTotalCount(html);
 
-    // ── 2. Fall back to DOM extraction if JSON gave us nothing ────────────────
-    if (listings.length === 0) {
+    // ── Listings: prefer direct API (all items), fall back to HTML DOM ───────
+    let listings: Listing[];
+    let note: string | undefined;
+
+    if (apiListings.length > 0) {
+      listings = apiListings;
+      if (totalDetected && listings.length < totalDetected) {
+        note = `Direct API returned ${listings.length} listings (page may show ${totalDetected} total — some may be paginated).`;
+      }
+    } else {
       listings = extractListingsFromHtml(html);
+      if (totalDetected && listings.length < totalDetected) {
+        note = `Only ${listings.length} of ${totalDetected} products captured from the first page. Whatnot loads the rest via infinite scroll which server-side scraping cannot trigger.`;
+      } else if (listings.length === 0) {
+        note = 'No listings found. Profile data is included in the CSV.';
+      }
     }
-
-    // ── 3. Profile stats: JSON → meta tags → regex on plain text ─────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dig = (...keys: string[]): any => { for (const k of keys) if ((userObj as any)[k] != null) return (userObj as any)[k]; return undefined; };
-    const reviews  = regexReviews(html);
-    const plainHtml = stripHtml(html);
-
-    const displayName = String(dig('displayName', 'name', 'fullName', 'sellerName') ?? '')
-      || extractDisplayName(html, username);
-
-    const bio = String(dig('bio', 'description', 'about') ?? '');
-
-    const followers = numOrNull(dig('followersCount', 'followers', 'followerCount'))
-      ?? regexStat(html, 'Followers?')
-      ?? regexStat(plainHtml, 'Followers?');
-
-    const following = numOrNull(dig('followingCount', 'following'))
-      ?? regexStat(html, 'Following')
-      ?? regexStat(plainHtml, 'Following');
-
-    const reviewCount = numOrNull(dig('reviewCount', 'numReviews', 'reviewsCount', 'totalReviews'))
-      ?? reviews.count;
-
-    const reviewScore = numOrNull(dig('reviewScore', 'rating', 'averageRating', 'avgRating'))
-      ?? reviews.score;
-
-    const totalSold = numOrNull(dig('soldCount', 'totalSold', 'itemsSold', 'totalItemsSold'))
-      ?? regexStat(html, 'Sold')
-      ?? regexStat(plainHtml, 'Sold');
-
-    const verified = !!dig('verified', 'isVerified', 'verifiedSeller');
-
-    const avatar = String(dig('profilePhoto', 'avatar', 'profileImage', 'photo', 'photoUrl') ?? '')
-      || extractAvatar(html);
 
     const catSet = new Set(listings.map(l => l.category).filter(Boolean));
     const categories = Array.from(catSet);
 
-    let note: string | undefined;
-    if (listings.length === 0) {
-      note = 'Profile info was captured but shop listings could not be found in the rendered page. Whatnot may load products via a separate API call after page render. All captured profile data is included in the CSV.';
-    }
-
     const result: ScraperResult = {
-      username, displayName, bio,
-      followers, following, reviewCount, reviewScore, totalSold,
-      verified, avatar, listings, categories, note,
+      username,
+      displayName: safe(() => displayName, username),
+      bio: '',
+      followers: safe(() => followers, null),
+      following: safe(() => following, null),
+      reviewCount: safe(() => reviewCount, null),
+      reviewScore: safe(() => reviewScore, null),
+      totalSold: safe(() => totalSold, null),
+      verified: false,
+      avatar: safe(() => avatar, ''),
+      listings,
+      categories,
+      totalDetected,
+      note,
     };
 
     return NextResponse.json(result);
