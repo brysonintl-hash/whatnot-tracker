@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { getIngest } from '@/lib/ingestCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -444,6 +445,29 @@ export async function GET(req: NextRequest) {
   const scraperKey = process.env.SCRAPER_API_KEY;
 
   try {
+    // Step 0: Check if bookmarklet already sent us the listings
+    const ingestedListings = getIngest(username);
+    if (ingestedListings && ingestedListings.length > 0) {
+      const profile = await fetchWhatnotProfile(username);
+      const catSet = new Set(ingestedListings.map(l => l.category).filter(Boolean));
+      return NextResponse.json({
+        username,
+        displayName: profile?.displayName ?? username,
+        bio: profile?.bio ?? '',
+        followers: profile?.followers ?? null,
+        following: profile?.following ?? null,
+        reviewCount: profile?.reviewCount ?? null,
+        reviewScore: profile?.reviewScore ?? null,
+        totalSold: profile?.totalSold ?? null,
+        verified: profile?.verified ?? false,
+        avatar: profile?.avatar ?? '',
+        listings: ingestedListings,
+        categories: Array.from(catSet),
+        totalDetected: ingestedListings.length,
+        note: `${ingestedListings.length} listings captured directly from your browser via the bookmarklet.`,
+      } as ScraperResult);
+    }
+
     // Step 1: Try direct Whatnot API for everything (no ScraperAPI credits used)
     const [directListings, directProfile] = await Promise.all([
       fetchWhatnotAPIListings(username),
