@@ -317,33 +317,45 @@ async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
   return [];
 }
 
-async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number; scraperError?: string }> {
-  const params = new URLSearchParams({
-    api_key: key,
-    url: targetUrl,
-    render: 'true',
-    wait: '8000',
-    country_code: 'us',
-    premium: 'true',
-  });
+async function tryScraperAPI(targetUrl: string, key: string, extra: Record<string, string>): Promise<{ html: string; status: number; error?: string }> {
+  const params = new URLSearchParams({ api_key: key, url: targetUrl, ...extra });
   try {
     const res = await fetch(`https://api.scraperapi.com/?${params.toString()}`, {
       signal: AbortSignal.timeout(90000),
     });
     const text = await res.text();
-    // ScraperAPI returns JSON error objects on failure (not HTML)
-    if (res.status !== 200 || text.trim().startsWith('{')) {
-      let msg = `ScraperAPI status ${res.status}`;
+    const isHtml = text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<body');
+    if (!isHtml) {
+      let msg = `status ${res.status}`;
       try { const j = JSON.parse(text); msg = j.message ?? j.error ?? msg; } catch { /* not JSON */ }
-      // If it's an actual HTML response that happens to start with { ignore the json check
-      if (!text.includes('<!DOCTYPE') && !text.includes('<html')) {
-        return { html: '', status: res.status, scraperError: msg };
-      }
+      return { html: '', status: res.status, error: msg };
     }
     return { html: text, status: res.status };
   } catch (e) {
-    return { html: '', status: 0, scraperError: String(e) };
+    return { html: '', status: 0, error: String(e) };
   }
+}
+
+async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number; scraperError?: string }> {
+  // Try multiple param combinations — Whatnot blocks many render strategies
+  const attempts: Record<string, string>[] = [
+    // 1. JS render, no premium (cheapest, most compatible)
+    { render: 'true', wait: '5000', country_code: 'us' },
+    // 2. JS render + premium proxies
+    { render: 'true', wait: '5000', country_code: 'us', premium: 'true' },
+    // 3. JS render + ultra premium
+    { render: 'true', wait: '5000', country_code: 'us', ultra_premium: 'true' },
+    // 4. Plain HTML (no render) — gets SSR shell but faster/cheaper
+    { country_code: 'us', premium: 'true' },
+  ];
+
+  let lastError = '';
+  for (const params of attempts) {
+    const result = await tryScraperAPI(targetUrl, key, params);
+    if (result.html && result.html.length > 500) return { html: result.html, status: result.status };
+    lastError = result.error ?? `status ${result.status}`;
+  }
+  return { html: '', status: 0, scraperError: lastError };
 }
 
 export async function GET(req: NextRequest) {
