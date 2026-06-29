@@ -31,9 +31,7 @@ export type ScraperResult = {
   note?: string;
 };
 
-function safe<T>(fn: () => T, fallback: T): T {
-  try { return fn(); } catch { return fallback; }
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function parsePrice(v: unknown): number | null {
   if (v == null) return null;
@@ -58,16 +56,16 @@ function parseCompact(s: string): number | null {
   return Math.round(val);
 }
 
-function regexStat(html: string, label: string): number | null {
+function regexStat(text: string, label: string): number | null {
   const re = new RegExp('([\\d.,]+[KkMm]?)\\s*' + label, 'i');
-  const m = html.match(re);
+  const m = text.match(re);
   return m ? parseCompact(m[1]) : null;
 }
 
-function regexReviews(html: string): { score: number | null; count: number | null } {
-  const m = html.match(/([\d.]+)\s*\(\s*([\d.,]+[KkMm]?)\s*Reviews?\s*\)/i);
+function regexReviews(text: string): { score: number | null; count: number | null } {
+  const m = text.match(/([\d.]+)\s*\(\s*([\d.,]+[KkMm]?)\s*Reviews?\s*\)/i);
   if (m) return { score: parseFloat(m[1]), count: parseCompact(m[2]) };
-  const m2 = html.match(/\(\s*([\d.,]+[KkMm]?)\s*Reviews?\s*\)/i);
+  const m2 = text.match(/\(\s*([\d.,]+[KkMm]?)\s*Reviews?\s*\)/i);
   if (m2) return { score: null, count: parseCompact(m2[1]) };
   return { score: null, count: null };
 }
@@ -81,7 +79,6 @@ function stripHtml(html: string): string {
     .replace(/\s+/g, ' ').trim();
 }
 
-// Remove attributes that pollute title extraction (srcset has image filenames like "0-abc.jpeg 96w")
 function cleanHtmlAttrs(html: string): string {
   return html
     .replace(/\ssrcset="[^"]*"/gi, '')
@@ -111,20 +108,15 @@ function extractAvatar(html: string): string {
   return m ? m[1] : '';
 }
 
-// Detect total product count from "Products (76)" in the page
 function detectTotalCount(html: string): number | null {
   const m = html.match(/Products?\s*\((\d+)\)/i);
   return m ? parseInt(m[1]) : null;
 }
 
 // ── Extract listings from rendered HTML ──────────────────────────────────────
-// Primary title source: alt attribute of the product image (most reliable)
-// Secondary: text near the listing link (after removing noisy attributes)
 function extractListingsFromHtml(html: string): Listing[] {
   const products: Listing[] = [];
   const seenIds = new Set<string>();
-
-  // Pre-clean: strip srcset and other attributes that pollute text
   const cleanHtml = cleanHtmlAttrs(html);
 
   const linkRe = /href=["']?((?:https:\/\/(?:www\.)?whatnot\.com)?\/listing\/([a-zA-Z0-9_=-]{6,}))["']?/gi;
@@ -139,31 +131,24 @@ function extractListingsFromHtml(html: string): Listing[] {
     const ctxEnd   = Math.min(cleanHtml.length, m.index + 400);
     const ctx = cleanHtml.slice(ctxStart, ctxEnd);
 
-    // ── Title: priority order ────────────────────────────────────────────────
-    // 1. data-testid="listing-title" (Whatnot's own DOM attribute — most accurate)
-    // 2. data-testid containing "title" (card variants)
-    // 3. alt attribute on images
-    // 4. plain text fallback
+    // 1. data-testid="listing-title"
     let title = '';
-
-    // 1. Exact testid match — text immediately after the closing >
     const testIdM = ctx.match(/data-testid="listing-title"[^>]*>([^<]{5,250})</i);
     if (testIdM) title = testIdM[1].trim();
 
-    // 2. Any testid containing "title"
+    // 2. any testid containing "title"
     if (!title) {
       const anyTestId = ctx.match(/data-testid="[^"]*title[^"]*"[^>]*>([^<]{5,250})</i);
       if (anyTestId) title = anyTestId[1].trim();
     }
 
-    // 3. alt attribute — pick the one closest to the link (last match in context)
+    // 3. alt attribute
     if (!title) {
       const altRe2 = /alt="([^"]{10,250})"/gi;
       let am: RegExpExecArray | null;
       let lastAlt = '';
       while ((am = altRe2.exec(ctx)) !== null) {
         const t = am[1].trim();
-        // Skip generic / noise alts
         if (!/^(product|image|thumbnail|photo|item|listing|shop|avatar|profile|logo)$/i.test(t)
             && !/^\d{1,3}w$/.test(t)) {
           lastAlt = t;
@@ -172,23 +157,19 @@ function extractListingsFromHtml(html: string): Listing[] {
       if (lastAlt) title = lastAlt;
     }
 
-    // 4. Plain text from stripped HTML
+    // 4. plain text fallback
     if (!title) {
       const plain = stripHtml(ctx);
       const titleM = plain.match(/\b((?:Retail\s+[\d$]+\s+)?[A-Z][A-Za-z0-9/'()\-&.,% ]{9,200})/);
       title = titleM ? titleM[1].replace(/\s+/g, ' ').trim() : `Listing ${id}`;
     }
 
-    // ── Price ──────────────────────────────────────────────────────────────
     const priceMatches: RegExpExecArray[] = [];
     const priceRe = /\$(\d+(?:\.\d{1,2})?)/g;
     let pm: RegExpExecArray | null;
     while ((pm = priceRe.exec(ctx)) !== null) priceMatches.push(pm);
-    const price = priceMatches.length > 0
-      ? parseFloat(priceMatches[priceMatches.length - 1][1])
-      : null;
+    const price = priceMatches.length > 0 ? parseFloat(priceMatches[priceMatches.length - 1][1]) : null;
 
-    // ── Image ────────────────────────────────────────────────────────────────
     const imgRe = /src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/gi;
     let imgM: RegExpExecArray | null;
     let image = '';
@@ -199,14 +180,131 @@ function extractListingsFromHtml(html: string): Listing[] {
       }
     }
 
-    // ── Qty ──────────────────────────────────────────────────────────────────
     const qtyM = ctx.match(/(?:Qty\.?|Quantity)[:\s]+(\d+)|(\d+)\s+Available/i);
-    const qty  = qtyM ? parseInt(qtyM[1] ?? qtyM[2]) : null;
+    const qty = qtyM ? parseInt(qtyM[1] ?? qtyM[2]) : null;
 
     products.push({ id, title, price, image, category: '', condition: '', qty, url: `https://www.whatnot.com/listing/${id}` });
   }
 
   return products;
+}
+
+// ── Shared headers (mimics mobile Whatnot app) ────────────────────────────────
+const WN_HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'Origin': 'https://www.whatnot.com',
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+};
+
+// ── Try Whatnot's profile via direct API calls ────────────────────────────────
+interface ProfileData {
+  displayName: string;
+  bio: string;
+  followers: number | null;
+  following: number | null;
+  reviewCount: number | null;
+  reviewScore: number | null;
+  totalSold: number | null;
+  verified: boolean;
+  avatar: string;
+}
+
+async function fetchWhatnotProfile(username: string): Promise<ProfileData | null> {
+  const blank: ProfileData = {
+    displayName: username, bio: '', followers: null, following: null,
+    reviewCount: null, reviewScore: null, totalSold: null, verified: false, avatar: '',
+  };
+
+  // REST endpoints — Whatnot's internal API
+  const restUrls = [
+    `https://www.whatnot.com/api/users/${username}`,
+    `https://www.whatnot.com/api/v1/users/${username}`,
+    `https://www.whatnot.com/api/sellers/${username}`,
+    `https://www.whatnot.com/api/v1/sellers/${username}`,
+    `https://api.whatnot.com/users/${username}`,
+  ];
+
+  for (const url of restUrls) {
+    try {
+      const res = await fetch(url, { headers: WN_HEADERS, signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.includes('json')) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d: any = await res.json();
+      // Try to find the user object at various paths
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const u = d.user ?? d.seller ?? d.profile ?? d.data?.user ?? d;
+      if (!u || typeof u !== 'object' || !u.username) continue;
+      return {
+        displayName: u.displayName ?? u.display_name ?? u.name ?? username,
+        bio: u.bio ?? u.description ?? '',
+        followers: numOrNull(u.followersCount ?? u.followers_count ?? u.followers),
+        following: numOrNull(u.followingCount ?? u.following_count ?? u.following),
+        reviewCount: numOrNull(u.reviewCount ?? u.review_count ?? u.reviews),
+        reviewScore: numOrNull(u.reviewScore ?? u.review_score ?? u.rating ?? u.sellerRating),
+        totalSold: numOrNull(u.totalSold ?? u.total_sold ?? u.soldCount ?? u.sold_count),
+        verified: !!(u.verified ?? u.isVerified ?? u.is_verified),
+        avatar: u.profilePhoto ?? u.profile_photo ?? u.avatar ?? u.avatarUrl ?? '',
+      };
+    } catch { /* try next */ }
+  }
+
+  // GraphQL
+  const gqlEndpoints = [
+    'https://www.whatnot.com/api/graphql',
+    'https://www.whatnot.com/graphql',
+    'https://api.whatnot.com/graphql',
+  ];
+  const gqlQueries = [
+    `query{user(username:"${username}"){displayName bio followersCount followingCount reviewCount reviewScore totalSold verified profilePhoto}}`,
+    `query{seller(username:"${username}"){displayName bio followersCount followingCount sellerRating reviewCount totalItemsSold isVerified avatar}}`,
+    `query{profile(username:"${username}"){displayName bio followers{totalCount} following{totalCount} reviews{count averageScore} soldCount verified avatar}}`,
+  ];
+
+  for (const endpoint of gqlEndpoints) {
+    for (const query of gqlQueries) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST', headers: WN_HEADERS,
+          body: JSON.stringify({ query }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d: any = await res.json();
+        if (d.errors && !d.data) continue;
+        const u = findGQLUser(d);
+        if (!u) continue;
+        return {
+          displayName: u.displayName ?? username,
+          bio: u.bio ?? '',
+          followers: numOrNull(u.followersCount ?? u.followers?.totalCount),
+          following: numOrNull(u.followingCount ?? u.following?.totalCount),
+          reviewCount: numOrNull(u.reviewCount ?? u.reviews?.count),
+          reviewScore: numOrNull(u.reviewScore ?? u.sellerRating ?? u.reviews?.averageScore),
+          totalSold: numOrNull(u.totalSold ?? u.soldCount ?? u.totalItemsSold),
+          verified: !!(u.verified ?? u.isVerified),
+          avatar: u.profilePhoto ?? u.avatar ?? '',
+        };
+      } catch { /* try next */ }
+    }
+  }
+
+  return blank;
+}
+
+// ── GraphQL helpers ───────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findGQLUser(o: any, depth = 0): any {
+  if (depth > 6 || !o || typeof o !== 'object') return null;
+  if (o.displayName || o.followersCount || o.followingCount) return o;
+  for (const v of Object.values(o)) {
+    const found = findGQLUser(v, depth + 1);
+    if (found) return found;
+  }
+  return null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -223,39 +321,23 @@ function findGQLEdges(obj: any, depth = 0): any[] {
   return [];
 }
 
-// ── Try Whatnot's internal API directly (no Cloudflare on API endpoints) ────
-// Whatnot uses Relay GraphQL. The base64 listing IDs decode to "ListingNode:XXXX"
 async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Origin': 'https://www.whatnot.com',
-    'Referer': `https://www.whatnot.com/user/${username}/shop`,
-    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-  };
-
-  // GraphQL queries to try (Whatnot uses Relay, so field names may vary)
-  const queries = [
-    // Pattern 1: user → listings
-    { query: `query GetShop($u:String!){user(username:$u){listings(first:200){edges{node{id title price quantity photos{url} category{name} condition}}}}}`, variables: { u: username } },
-    // Pattern 2: seller → products
-    { query: `query GetShop($u:String!){seller(username:$u){products(first:200){edges{node{id title price qty imageUrl category condition}}}}}`, variables: { u: username } },
-    // Pattern 3: profile → listings
-    { query: `query GetShop($u:String!){profile(username:$u){listings(first:200){nodes{id title price quantity photos{url}}}}}`, variables: { u: username } },
-  ];
-
-  // GraphQL endpoint candidates
-  const endpoints = [
+  const gqlEndpoints = [
     'https://www.whatnot.com/api/graphql',
     'https://www.whatnot.com/graphql',
     'https://api.whatnot.com/graphql',
   ];
+  const gqlQueries = [
+    { query: `query GetShop($u:String!){user(username:$u){listings(first:200){edges{node{id title price quantity photos{url} category{name} condition}}}}}`, variables: { u: username } },
+    { query: `query GetShop($u:String!){seller(username:$u){products(first:200){edges{node{id title price qty imageUrl category condition}}}}}`, variables: { u: username } },
+    { query: `query GetShop($u:String!){profile(username:$u){listings(first:200){nodes{id title price quantity photos{url}}}}}`, variables: { u: username } },
+  ];
 
-  for (const endpoint of endpoints) {
-    for (const body of queries) {
+  for (const endpoint of gqlEndpoints) {
+    for (const body of gqlQueries) {
       try {
         const res = await fetch(endpoint, {
-          method: 'POST', headers,
+          method: 'POST', headers: WN_HEADERS,
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(10000),
         });
@@ -265,8 +347,6 @@ async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = await res.json();
         if (data.errors && !data.data) continue;
-
-        // Try to find listings array anywhere in the response
         const nodes = findGQLEdges(data);
         if (nodes.length > 0) {
           return nodes.map((node: any) => ({
@@ -284,7 +364,6 @@ async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
     }
   }
 
-  // REST fallback patterns
   const restEndpoints = [
     `https://www.whatnot.com/api/users/${username}/listings?per_page=200`,
     `https://www.whatnot.com/api/sellers/${username}/listings?limit=200`,
@@ -292,7 +371,7 @@ async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
   ];
   for (const url of restEndpoints) {
     try {
-      const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+      const res = await fetch(url, { headers: WN_HEADERS, signal: AbortSignal.timeout(8000) });
       if (!res.ok) continue;
       const ct = res.headers.get('content-type') ?? '';
       if (!ct.includes('json')) continue;
@@ -317,6 +396,7 @@ async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
   return [];
 }
 
+// ── ScraperAPI — optional, used as last resort ────────────────────────────────
 async function tryScraperAPI(targetUrl: string, key: string, extra: Record<string, string>): Promise<{ html: string; status: number; error?: string }> {
   const params = new URLSearchParams({ api_key: key, url: targetUrl, ...extra });
   try {
@@ -337,18 +417,12 @@ async function tryScraperAPI(targetUrl: string, key: string, extra: Record<strin
 }
 
 async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number; scraperError?: string }> {
-  // Try multiple param combinations — Whatnot blocks many render strategies
   const attempts: Record<string, string>[] = [
-    // 1. JS render, no premium (cheapest, most compatible)
-    { render: 'true', wait: '5000', country_code: 'us' },
-    // 2. JS render + premium proxies
-    { render: 'true', wait: '5000', country_code: 'us', premium: 'true' },
-    // 3. JS render + ultra premium
-    { render: 'true', wait: '5000', country_code: 'us', ultra_premium: 'true' },
-    // 4. Plain HTML (no render) — gets SSR shell but faster/cheaper
+    { render: 'true', country_code: 'us' },
+    { render: 'true', country_code: 'us', premium: 'true' },
     { country_code: 'us', premium: 'true' },
+    { render: 'true', country_code: 'us', wait: '5000' },
   ];
-
   let lastError = '';
   for (const params of attempts) {
     const result = await tryScraperAPI(targetUrl, key, params);
@@ -358,6 +432,7 @@ async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ htm
   return { html: '', status: 0, scraperError: lastError };
 }
 
+// ── Main route ────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session || (session.role !== 'admin' && session.role !== 'manager'))
@@ -367,78 +442,135 @@ export async function GET(req: NextRequest) {
   if (!username) return NextResponse.json({ error: 'Missing username' }, { status: 400 });
 
   const scraperKey = process.env.SCRAPER_API_KEY;
-  if (!scraperKey) {
-    return NextResponse.json({
-      error: 'SETUP_REQUIRED',
-      message: 'Whatnot is protected by Cloudflare and blocks direct server requests. Add a free ScraperAPI key:\n\n1. Sign up at https://www.scraperapi.com (free, no credit card, 1,000 requests/month)\n2. Copy your API key\n3. In Railway → Variables add: SCRAPER_API_KEY = your_key\n4. Redeploy and try again',
-    }, { status: 503 });
-  }
 
   try {
-    // Run ScraperAPI (for profile/HTML) and direct API (for all listings) in parallel
-    const [{ html, status, scraperError }, apiListings] = await Promise.all([
-      fetchViaScraperAPI(`https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`, scraperKey),
+    // Step 1: Try direct Whatnot API for everything (no ScraperAPI credits used)
+    const [directListings, directProfile] = await Promise.all([
       fetchWhatnotAPIListings(username),
+      fetchWhatnotProfile(username),
     ]);
 
-    if (status === 404 || (html.includes('Page not found') && html.length < 5000)) {
+    // Step 2: If direct API gave us what we need, return it immediately
+    if (directListings.length > 0 && directProfile && directProfile.displayName !== username) {
+      const catSet = new Set(directListings.map(l => l.category).filter(Boolean));
+      return NextResponse.json({
+        username,
+        displayName: directProfile.displayName,
+        bio: directProfile.bio,
+        followers: directProfile.followers,
+        following: directProfile.following,
+        reviewCount: directProfile.reviewCount,
+        reviewScore: directProfile.reviewScore,
+        totalSold: directProfile.totalSold,
+        verified: directProfile.verified,
+        avatar: directProfile.avatar,
+        listings: directListings,
+        categories: Array.from(catSet),
+        totalDetected: directListings.length,
+      } as ScraperResult);
+    }
+
+    // Step 3: Fall back to ScraperAPI for the HTML (renders the page)
+    if (!scraperKey) {
+      // Return whatever direct API gave us, even if incomplete
+      if (directListings.length > 0 || (directProfile && directProfile.followers != null)) {
+        const catSet = new Set(directListings.map(l => l.category).filter(Boolean));
+        return NextResponse.json({
+          username,
+          displayName: directProfile?.displayName ?? username,
+          bio: directProfile?.bio ?? '',
+          followers: directProfile?.followers ?? null,
+          following: directProfile?.following ?? null,
+          reviewCount: directProfile?.reviewCount ?? null,
+          reviewScore: directProfile?.reviewScore ?? null,
+          totalSold: directProfile?.totalSold ?? null,
+          verified: directProfile?.verified ?? false,
+          avatar: directProfile?.avatar ?? '',
+          listings: directListings,
+          categories: Array.from(catSet),
+          totalDetected: directListings.length,
+          note: directListings.length === 0 ? 'Add SCRAPER_API_KEY in Railway to scrape listings from the rendered page.' : undefined,
+        } as ScraperResult);
+      }
+      return NextResponse.json({
+        error: 'SETUP_REQUIRED',
+        message: 'Whatnot blocks direct server requests. Add a ScraperAPI key to bypass Cloudflare:\n\n1. Sign up at https://www.scraperapi.com (free — 5,000 credits/month on trial)\n2. Copy your API key\n3. In Railway → Variables add: SCRAPER_API_KEY = your_key\n4. Redeploy and try again',
+      }, { status: 503 });
+    }
+
+    // Step 4: Use ScraperAPI for HTML
+    const { html, scraperError } = await fetchViaScraperAPI(
+      `https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`, scraperKey
+    );
+
+    if (!html || html.length < 500) {
+      // ScraperAPI failed — but return whatever direct API gave us
+      if (directListings.length > 0) {
+        const catSet = new Set(directListings.map(l => l.category).filter(Boolean));
+        return NextResponse.json({
+          username,
+          displayName: directProfile?.displayName ?? username,
+          bio: directProfile?.bio ?? '',
+          followers: directProfile?.followers ?? null,
+          following: directProfile?.following ?? null,
+          reviewCount: directProfile?.reviewCount ?? null,
+          reviewScore: directProfile?.reviewScore ?? null,
+          totalSold: directProfile?.totalSold ?? null,
+          verified: directProfile?.verified ?? false,
+          avatar: directProfile?.avatar ?? '',
+          listings: directListings,
+          categories: Array.from(catSet),
+          totalDetected: directListings.length,
+          note: `ScraperAPI couldn't render the page (${scraperError ?? 'unknown error'}) but direct API returned ${directListings.length} listings.`,
+        } as ScraperResult);
+      }
+      return NextResponse.json({
+        error: `Could not reach Whatnot. ScraperAPI error: ${scraperError ?? 'empty response'}. Please try again.`,
+      }, { status: 503 });
+    }
+
+    // Step 5: Got HTML — extract profile + listings from it
+    if (html.includes('Page not found') && html.length < 5000) {
       return NextResponse.json({ error: `Seller "@${username}" was not found on Whatnot.` }, { status: 404 });
     }
-    if (!html || html.length < 500) {
-      const detail = scraperError ? ` (${scraperError})` : '';
-      return NextResponse.json({ error: `ScraperAPI did not return a page${detail}. Check that your SCRAPER_API_KEY is valid and has remaining credits, then try again.` }, { status: 503 });
-    }
 
-    // ── Profile stats from HTML ──────────────────────────────────────────────
-    const reviews    = regexReviews(html);
-    const displayName = extractDisplayName(html, username);
-    const avatar      = extractAvatar(html);
-    const followers   = regexStat(html, 'Followers?');
-    const following   = regexStat(html, 'Following') ?? 0;
-    const reviewCount = reviews.count;
-    const reviewScore = reviews.score;
-    const totalSold   = regexStat(html, 'Sold');
+    const reviews      = regexReviews(html);
+    const displayName  = directProfile?.displayName !== username ? directProfile!.displayName : extractDisplayName(html, username);
+    const avatar       = directProfile?.avatar || extractAvatar(html);
+    const followers    = directProfile?.followers ?? regexStat(html, 'Followers?');
+    const following    = directProfile?.following ?? regexStat(html, 'Following') ?? 0;
+    const reviewCount  = directProfile?.reviewCount ?? reviews.count;
+    const reviewScore  = directProfile?.reviewScore ?? reviews.score;
+    const totalSold    = directProfile?.totalSold ?? regexStat(html, 'Sold');
     const totalDetected = detectTotalCount(html);
 
-    // ── Listings: prefer direct API (all items), fall back to HTML DOM ───────
-    let listings: Listing[];
-    let note: string | undefined;
+    const htmlListings = extractListingsFromHtml(html);
+    const listings = directListings.length > 0 ? directListings : htmlListings;
 
-    if (apiListings.length > 0) {
-      listings = apiListings;
-      if (totalDetected && listings.length < totalDetected) {
-        note = `Direct API returned ${listings.length} listings (page may show ${totalDetected} total — some may be paginated).`;
-      }
-    } else {
-      listings = extractListingsFromHtml(html);
-      if (totalDetected && listings.length < totalDetected) {
-        note = `Only ${listings.length} of ${totalDetected} products captured from the first page. Whatnot loads the rest via infinite scroll which server-side scraping cannot trigger.`;
-      } else if (listings.length === 0) {
-        note = 'No listings found. Profile data is included in the CSV.';
-      }
+    let note: string | undefined;
+    if (totalDetected && listings.length < totalDetected) {
+      note = `${listings.length} of ${totalDetected} products captured. Whatnot loads the rest via infinite scroll.`;
     }
 
     const catSet = new Set(listings.map(l => l.category).filter(Boolean));
-    const categories = Array.from(catSet);
 
-    const result: ScraperResult = {
+    return NextResponse.json({
       username,
-      displayName: safe(() => displayName, username),
-      bio: '',
-      followers: safe(() => followers, null),
-      following: safe(() => following, null),
-      reviewCount: safe(() => reviewCount, null),
-      reviewScore: safe(() => reviewScore, null),
-      totalSold: safe(() => totalSold, null),
-      verified: false,
-      avatar: safe(() => avatar, ''),
+      displayName,
+      bio: directProfile?.bio ?? '',
+      followers,
+      following,
+      reviewCount,
+      reviewScore,
+      totalSold,
+      verified: directProfile?.verified ?? false,
+      avatar,
       listings,
-      categories,
+      categories: Array.from(catSet),
       totalDetected,
       note,
-    };
+    } as ScraperResult);
 
-    return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ error: `Scrape failed: ${String(e)}` }, { status: 500 });
   }
