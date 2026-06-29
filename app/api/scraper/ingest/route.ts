@@ -4,7 +4,7 @@ import type { Listing } from '@/app/api/scraper/route';
 
 export const dynamic = 'force-dynamic';
 
-// Allow cross-origin POST from whatnot.com (bookmarklet runs there)
+// text/plain requests don't trigger CORS preflight — only need Allow-Origin on the response
 const CORS = {
   'Access-Control-Allow-Origin': 'https://www.whatnot.com',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -17,7 +17,9 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { username: string; listings: Listing[] };
+    // Accept both application/json and text/plain (text/plain skips CORS preflight)
+    const text = await req.text();
+    const body = JSON.parse(text) as { username: string; listings: Listing[] };
     const { username, listings } = body;
     if (!username || !Array.isArray(listings) || listings.length === 0) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400, headers: CORS });

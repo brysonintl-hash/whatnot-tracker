@@ -60,8 +60,8 @@ function StatCard({ label, value, sub }: { label: string; value: string | null; 
 }
 
 function BookmarkletSection({ appUrl }: { appUrl: string }) {
-  // No cross-origin fetch — encode listings in the URL itself and open the page directly
-  const bm = `javascript:(function(){var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);if(!m){alert('Go to a Whatnot seller shop page first (e.g. whatnot.com/user/toolsforlifee/shop)');return;}var username=m[1].toLowerCase();var seen=new Set();var listings=[];document.querySelectorAll('a[href*="/listing/"]').forEach(function(a){var hm=(a.href||'').match(/\\/listing\\/([a-zA-Z0-9_=+\\-]{6,})/);if(!hm||seen.has(hm[1]))return;seen.add(hm[1]);var id=hm[1];var card=a;for(var i=0;i<8;i++){if(card.parentElement)card=card.parentElement;else break;}var titleEl=card.querySelector('[data-testid*="title"],[data-testid*="name"]');var title=titleEl?titleEl.textContent.trim():'';if(!title){var img=a.querySelector('img');title=img?img.alt.trim():'';}if(!title||title.length<4)return;var priceM=(card.textContent||'').match(/\\$(\\d+(?:\\.\\d{1,2})?)/);var price=priceM?parseFloat(priceM[1]):null;var qtyM=(card.textContent||'').match(/Qty[.:\\s]+(\\d+)|(\\d+)\\s+Available/i);var qty=qtyM?parseInt(qtyM[1]||qtyM[2]):null;listings.push({id:id,title:title,price:price,image:'',category:'',condition:'',qty:qty,url:'https://www.whatnot.com/listing/'+id});});if(!listings.length){alert('No listings found. Make sure you are on the Shop tab and scroll down to load all products first.');return;}var json=JSON.stringify(listings);var encoded=btoa(unescape(encodeURIComponent(json)));window.open('${appUrl}/scraper?u='+encodeURIComponent(username)+'&d='+encodeURIComponent(encoded),'_blank');})();`;
+  // text/plain avoids CORS preflight (no OPTIONS request needed) — browser just checks response header
+  const bm = `javascript:(function(){var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);if(!m){alert('Go to a Whatnot seller shop page first (e.g. whatnot.com/user/toolsforlifee/shop)');return;}var username=m[1].toLowerCase();var seen=new Set();var listings=[];document.querySelectorAll('a[href*="/listing/"]').forEach(function(a){var hm=(a.href||'').match(/\\/listing\\/([a-zA-Z0-9_=+\\-]{6,})/);if(!hm||seen.has(hm[1]))return;seen.add(hm[1]);var id=hm[1];var card=a;for(var i=0;i<8;i++){if(card.parentElement)card=card.parentElement;else break;}var titleEl=card.querySelector('[data-testid*="title"],[data-testid*="name"]');var title=titleEl?titleEl.textContent.trim():'';if(!title){var img=a.querySelector('img');title=img?img.alt.trim():'';}if(!title||title.length<4)return;var priceM=(card.textContent||'').match(/\\$(\\d+(?:\\.\\d{1,2})?)/);var price=priceM?parseFloat(priceM[1]):null;var qtyM=(card.textContent||'').match(/Qty[.:\\s]+(\\d+)|(\\d+)\\s+Available/i);var qty=qtyM?parseInt(qtyM[1]||qtyM[2]):null;listings.push({id:id,title:title,price:price,qty:qty,url:'https://www.whatnot.com/listing/'+id});});if(!listings.length){alert('No listings found. Make sure you are on the Shop tab and scroll down to load all products first.');return;}var APP='${appUrl}';fetch(APP+'/api/scraper/ingest',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({username:username,listings:listings}),mode:'cors'}).then(function(r){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');}).catch(function(e){alert('Could not reach the app. Make sure you are logged in at '+APP);});})();`;
 
   return (
     <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-5 mb-6">
@@ -149,30 +149,7 @@ function ScraperPageInner() {
       if (!s || (s.role !== 'admin' && s.role !== 'manager')) { router.push('/login'); return; }
       setSession(s);
       const u = searchParams.get('u')?.trim().replace(/^@/, '');
-      const d = searchParams.get('d');
-      if (u && d) {
-        // Bookmarklet passed listings encoded in URL — decode and show directly
-        try {
-          const listings = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(d))))) as Listing[];
-          setUsername(u);
-          setResult({
-            username: u, displayName: u, bio: '',
-            followers: null, following: null, reviewCount: null, reviewScore: null,
-            totalSold: null, verified: false, avatar: '',
-            listings, categories: [], totalDetected: listings.length,
-            note: `${listings.length} products captured directly from your browser.`,
-          });
-          // Also fetch profile in background
-          fetch(`/api/scraper?username=${encodeURIComponent(u)}`).then(r => r.json()).then(data => {
-            if (!data.error) setResult(prev => prev ? { ...prev, displayName: data.displayName, avatar: data.avatar, reviewCount: data.reviewCount, reviewScore: data.reviewScore, totalSold: data.totalSold, verified: data.verified } : prev);
-          }).catch(() => {});
-        } catch {
-          setUsername(u);
-          runSearch(u);
-        }
-      } else if (u) {
-        runSearch(u);
-      }
+      if (u) runSearch(u);
     });
   }, [router, searchParams, runSearch]);
 
