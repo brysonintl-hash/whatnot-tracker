@@ -317,12 +317,12 @@ async function fetchWhatnotAPIListings(username: string): Promise<Listing[]> {
   return [];
 }
 
-async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number }> {
+async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ html: string; status: number; scraperError?: string }> {
   const params = new URLSearchParams({
     api_key: key,
     url: targetUrl,
     render: 'true',
-    wait: '15000',
+    wait: '8000',
     country_code: 'us',
     premium: 'true',
   });
@@ -330,9 +330,19 @@ async function fetchViaScraperAPI(targetUrl: string, key: string): Promise<{ htm
     const res = await fetch(`https://api.scraperapi.com/?${params.toString()}`, {
       signal: AbortSignal.timeout(90000),
     });
-    return { html: await res.text(), status: res.status };
-  } catch {
-    return { html: '', status: 0 };
+    const text = await res.text();
+    // ScraperAPI returns JSON error objects on failure (not HTML)
+    if (res.status !== 200 || text.trim().startsWith('{')) {
+      let msg = `ScraperAPI status ${res.status}`;
+      try { const j = JSON.parse(text); msg = j.message ?? j.error ?? msg; } catch { /* not JSON */ }
+      // If it's an actual HTML response that happens to start with { ignore the json check
+      if (!text.includes('<!DOCTYPE') && !text.includes('<html')) {
+        return { html: '', status: res.status, scraperError: msg };
+      }
+    }
+    return { html: text, status: res.status };
+  } catch (e) {
+    return { html: '', status: 0, scraperError: String(e) };
   }
 }
 
@@ -354,7 +364,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Run ScraperAPI (for profile/HTML) and direct API (for all listings) in parallel
-    const [{ html, status }, apiListings] = await Promise.all([
+    const [{ html, status, scraperError }, apiListings] = await Promise.all([
       fetchViaScraperAPI(`https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`, scraperKey),
       fetchWhatnotAPIListings(username),
     ]);
@@ -363,7 +373,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `Seller "@${username}" was not found on Whatnot.` }, { status: 404 });
     }
     if (!html || html.length < 500) {
-      return NextResponse.json({ error: 'ScraperAPI returned an empty response. Please try again.' }, { status: 503 });
+      const detail = scraperError ? ` (${scraperError})` : '';
+      return NextResponse.json({ error: `ScraperAPI did not return a page${detail}. Check that your SCRAPER_API_KEY is valid and has remaining credits, then try again.` }, { status: 503 });
     }
 
     // ── Profile stats from HTML ──────────────────────────────────────────────

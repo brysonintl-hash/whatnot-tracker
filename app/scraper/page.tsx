@@ -132,7 +132,7 @@ export default function ScraperPage() {
                   type="text"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                  placeholder="Whatnot username (e.g. toolsforlifee)"
+                  placeholder="Whatnot username"
                   className="w-full pl-10 pr-4 py-3 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
