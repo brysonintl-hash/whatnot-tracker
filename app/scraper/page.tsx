@@ -22,11 +22,10 @@ function fmtPrice(p: number | null): string {
 }
 
 function downloadCSV(result: ScraperResult) {
-  const headers = ['Title', 'Price', 'Category', 'Qty', 'URL'];
+  const headers = ['Title', 'Price', 'Qty', 'URL'];
   const rows = result.listings.map(l => [
     String(l.title ?? '').replace(/"/g, '""'),
     l.price != null ? `$${l.price.toFixed(2)}` : '',
-    String(l.category ?? '').replace(/"/g, '""'),
     l.qty != null ? String(l.qty) : '',
     l.url ?? '',
   ]);
@@ -257,22 +256,7 @@ export default function ScraperPage() {
                       </p>
                       {categoryFilter && <p className="text-[10px] text-slate-400 mt-0.5">Filtered: &quot;{categoryFilter}&quot;</p>}
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {result.categories.length > 0 && (
-                        <>
-                          <button onClick={() => setCategoryFilter('')}
-                            className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-colors ${!categoryFilter ? 'bg-violet-600 text-white border-violet-600' : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-violet-400'}`}>
-                            All
-                          </button>
-                          {result.categories.map(cat => (
-                            <button key={cat} onClick={() => setCategoryFilter(cat)}
-                              className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-colors ${categoryFilter === cat ? 'bg-violet-600 text-white border-violet-600' : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-violet-400'}`}>
-                              {cat}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
+                    <div />
                   </div>
 
                   {filteredListings.length === 0 ? (
@@ -295,7 +279,7 @@ export default function ScraperPage() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-slate-100 dark:border-slate-700">
-                            {['Item', 'Category', 'Condition', 'Qty', 'Price', ''].map(h => (
+                            {['Item', 'Qty', 'Price', ''].map(h => (
                               <th key={h} className={`text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4 ${h === 'Price' || h === 'Qty' ? 'text-right' : h === '' ? 'text-right' : 'text-left'}`}>{h}</th>
                             ))}
                           </tr>
@@ -316,12 +300,6 @@ export default function ScraperPage() {
                                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 line-clamp-2 max-w-[200px]">{l.title}</span>
                                 </div>
                               </td>
-                              <td className="py-3 px-4">
-                                {l.category ? (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 whitespace-nowrap">{l.category}</span>
-                                ) : <span className="text-xs text-slate-400">—</span>}
-                              </td>
-                              <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400">{l.condition || '—'}</td>
                               <td className="py-3 px-4 text-right text-xs text-slate-500 dark:text-slate-400">{l.qty != null ? l.qty : '—'}</td>
                               <td className="py-3 px-4 text-right">
                                 <span className="text-xs font-black text-slate-900 dark:text-white">{fmtPrice(l.price)}</span>

@@ -139,25 +139,42 @@ function extractListingsFromHtml(html: string): Listing[] {
     const ctxEnd   = Math.min(cleanHtml.length, m.index + 400);
     const ctx = cleanHtml.slice(ctxStart, ctxEnd);
 
-    // ── Title: use alt attribute first (it IS the product name on Whatnot) ──
-    // Look for alt text closest to the listing link (search backwards from link position)
-    const altMatches: string[] = [];
-    const altRe = /alt="([^"]{10,250})"/gi;
-    let am: RegExpExecArray | null;
-    while ((am = altRe.exec(ctx)) !== null) {
-      const t = am[1].trim();
-      // Skip generic alts like "product image", "thumbnail", seller name
-      if (t.length >= 10 && !/^(product|image|thumbnail|photo|item|listing|shop)$/i.test(t)) {
-        altMatches.push(t);
-      }
-    }
-    // Use last alt match (closest to the link)
-    let title = altMatches.length > 0 ? altMatches[altMatches.length - 1] : '';
+    // ── Title: priority order ────────────────────────────────────────────────
+    // 1. data-testid="listing-title" (Whatnot's own DOM attribute — most accurate)
+    // 2. data-testid containing "title" (card variants)
+    // 3. alt attribute on images
+    // 4. plain text fallback
+    let title = '';
 
-    // ── Fallback: strip tags and find product-like text ──────────────────────
+    // 1. Exact testid match — text immediately after the closing >
+    const testIdM = ctx.match(/data-testid="listing-title"[^>]*>([^<]{5,250})</i);
+    if (testIdM) title = testIdM[1].trim();
+
+    // 2. Any testid containing "title"
+    if (!title) {
+      const anyTestId = ctx.match(/data-testid="[^"]*title[^"]*"[^>]*>([^<]{5,250})</i);
+      if (anyTestId) title = anyTestId[1].trim();
+    }
+
+    // 3. alt attribute — pick the one closest to the link (last match in context)
+    if (!title) {
+      const altRe2 = /alt="([^"]{10,250})"/gi;
+      let am: RegExpExecArray | null;
+      let lastAlt = '';
+      while ((am = altRe2.exec(ctx)) !== null) {
+        const t = am[1].trim();
+        // Skip generic / noise alts
+        if (!/^(product|image|thumbnail|photo|item|listing|shop|avatar|profile|logo)$/i.test(t)
+            && !/^\d{1,3}w$/.test(t)) {
+          lastAlt = t;
+        }
+      }
+      if (lastAlt) title = lastAlt;
+    }
+
+    // 4. Plain text from stripped HTML
     if (!title) {
       const plain = stripHtml(ctx);
-      // Product titles on Whatnot often start with "Retail", brand name, or description
       const titleM = plain.match(/\b((?:Retail\s+[\d$]+\s+)?[A-Z][A-Za-z0-9/'()\-&.,% ]{9,200})/);
       title = titleM ? titleM[1].replace(/\s+/g, ' ').trim() : `Listing ${id}`;
     }
