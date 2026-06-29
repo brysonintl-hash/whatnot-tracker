@@ -203,7 +203,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
   const enriched = orders.map(o => {
     const margin        = o.sold > 0 ? (o.profit / o.sold) * 100 : 0;
     const costBack      = o.sold - o.profit; // total non-profit portion (fees + item cost)
-    const suggestedPrice = costBack > 0 ? costBack / (1 - MARGIN_TARGET / 100) : o.sold;
+    const suggestedPrice = costBack > 0 ? Math.ceil(costBack / (1 - MARGIN_TARGET / 100)) : Math.ceil(o.sold);
     const priceGap      = suggestedPrice - o.sold;
     const profitGap     = o.sold > 0 ? o.sold * (MARGIN_TARGET / 100) - o.profit : 0;
     return { ...o, margin, costBack, suggestedPrice, priceGap, profitGap };
@@ -234,7 +234,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
       totalProfitGap:   items.reduce((s, i) => s + Math.max(0, i.profitGap), 0),
       count:            items.length,
       avgSold:          items.reduce((s, i) => s + i.sold, 0) / items.length,
-      avgSuggested:     items.reduce((s, i) => s + i.suggestedPrice, 0) / items.length,
+      avgSuggested:     Math.ceil(items.reduce((s, i) => s + i.suggestedPrice, 0) / items.length),
     }))
     .sort((a, b) => b.totalProfitGap - a.totalProfitGap)
     .slice(0, 3);
@@ -869,8 +869,10 @@ export default function PerformancePage() {
                     })}
                   </div>
 
-                  {/* Margin Analyzer */}
-                  <MarginAnalyzer orders={dayOrders} />
+                  {/* Margin Analyzer — admin / manager / host only */}
+                  {(session?.role === 'admin' || session?.role === 'manager' || session?.role === 'host') && (
+                    <MarginAnalyzer orders={dayOrders} />
+                  )}
                 </>
               )}
             </>

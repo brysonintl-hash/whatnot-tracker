@@ -26,6 +26,14 @@ export function updatePresence(userId: string, username: string, name: string, r
   writeFileSync(FILE, JSON.stringify(data, null, 2));
 }
 
+export function getAllPresence(): Record<string, PresenceRecord> {
+  try {
+    if (!existsSync(FILE)) return {};
+    return JSON.parse(readFileSync(FILE, 'utf8'));
+  } catch {}
+  return {};
+}
+
 export function getOnlineUsers(withinMs = 30 * 1000): PresenceRecord[] {
   try {
     if (!existsSync(FILE)) return [];

@@ -6,7 +6,21 @@ import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 
 type Session = { username: string; role: Role; name: string };
-type User = { id: string; username: string; name: string; role: Role; status: 'active' | 'pending'; createdAt: string };
+type User = { id: string; username: string; name: string; role: Role; status: 'active' | 'pending'; createdAt: string; lastSeen: string | null };
+
+function fmtLastSeen(iso: string | null): { label: string; online: boolean } {
+  if (!iso) return { label: 'Never', online: false };
+  const diff = Date.now() - new Date(iso).getTime();
+  const online = diff < 30_000;
+  if (online) return { label: 'Online now', online: true };
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return { label: `${mins}m ago`, online: false };
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return { label: `${hrs}h ago`, online: false };
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return { label: `${days}d ago`, online: false };
+  return { label: new Date(iso).toLocaleDateString(), online: false };
+}
 
 const ROLES: Role[] = ['admin', 'manager', 'shipper', 'host'];
 
@@ -107,7 +121,7 @@ export default function UsersPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-700">
-                      {['Name', 'Username', 'Current Role', 'Change Role', 'Joined', ''].map(h => (
+                      {['Name', 'Username', 'Current Role', 'Change Role', 'Last Online', 'Joined', ''].map(h => (
                         <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">{h}</th>
                       ))}
                     </tr>
@@ -148,6 +162,14 @@ export default function UsersPage() {
                               {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">↑ Activate</span>}
                             </div>
                           )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {(() => { const ls = fmtLastSeen(u.lastSeen); return (
+                            <span className={`flex items-center gap-1.5 text-xs font-medium ${ls.online ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ls.online ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                              {ls.label}
+                            </span>
+                          ); })()}
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</td>
                         <td className="py-3 px-5">
