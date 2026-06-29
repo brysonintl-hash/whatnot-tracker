@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
@@ -105,7 +107,7 @@ function BookmarkletSection({ appUrl }: { appUrl: string }) {
   );
 }
 
-export default function ScraperPage() {
+function ScraperPageInner() {
   useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -380,5 +382,17 @@ export default function ScraperPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function ScraperPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </div>
+    }>
+      <ScraperPageInner />
+    </Suspense>
   );
 }
