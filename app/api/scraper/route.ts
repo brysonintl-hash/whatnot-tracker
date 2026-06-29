@@ -197,18 +197,30 @@ async function tryWhatnotAPI(username: string): Promise<{ user: unknown; listing
   return { user: {}, listings: [] };
 }
 
-const BROWSER_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Connection': 'keep-alive',
-  'Upgrade-Insecure-Requests': '1',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Cache-Control': 'max-age=0',
-};
+// Route a URL through ScraperAPI (bypasses Cloudflare) if the key is configured,
+// otherwise fall back to a direct fetch which will likely be blocked by CF.
+async function fetchHtml(targetUrl: string): Promise<{ html: string; status: number }> {
+  const key = process.env.SCRAPER_API_KEY;
+  let fetchUrl = targetUrl;
+  const headers: Record<string, string> = {};
+
+  if (key) {
+    // ScraperAPI handles Cloudflare bypass + JS rendering automatically
+    fetchUrl = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&render=true`;
+  } else {
+    // Direct fetch — will be blocked by Cloudflare on Railway
+    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+    headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+    headers['Accept-Language'] = 'en-US,en;q=0.9';
+  }
+
+  try {
+    const res = await fetch(fetchUrl, { headers, signal: AbortSignal.timeout(30000) });
+    return { html: await res.text(), status: res.status };
+  } catch {
+    return { html: '', status: 0 };
+  }
+}
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -218,53 +230,45 @@ export async function GET(req: NextRequest) {
   const username = req.nextUrl.searchParams.get('username')?.trim().toLowerCase().replace(/^@/, '');
   if (!username) return NextResponse.json({ error: 'Missing username' }, { status: 400 });
 
+  // Tell the user how to fix it if no key is configured
+  if (!process.env.SCRAPER_API_KEY) {
+    return NextResponse.json({
+      error: 'SETUP_REQUIRED',
+      message: 'Whatnot is protected by Cloudflare and blocks direct server requests. To enable scraping, add a free ScraperAPI key:\n\n1. Go to https://www.scraperapi.com and sign up (free — no credit card, 1,000 requests/month)\n2. Copy your API key from the dashboard\n3. Add it to Railway → your service → Variables: SCRAPER_API_KEY = your_key\n4. Redeploy and try again',
+    }, { status: 503 });
+  }
+
   try {
-    // Run all requests in parallel: HTML pages + API probes
-    const [shopRes, profileRes, apiData] = await Promise.all([
-      fetch(`https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`, { headers: BROWSER_HEADERS })
-        .then(r => ({ ok: r.ok, status: r.status, text: r.text() })).catch(() => null),
-      fetch(`https://www.whatnot.com/user/${encodeURIComponent(username)}`, { headers: BROWSER_HEADERS })
-        .then(r => ({ ok: r.ok, status: r.status, text: r.text() })).catch(() => null),
-      tryWhatnotAPI(username),
+    // Fetch both pages in parallel through ScraperAPI
+    const [shopResult, profileResult] = await Promise.all([
+      fetchHtml(`https://www.whatnot.com/user/${encodeURIComponent(username)}/shop`),
+      fetchHtml(`https://www.whatnot.com/user/${encodeURIComponent(username)}`),
     ]);
 
-    const shopHtml  = shopRes  ? await shopRes.text  : '';
-    const profileHtml = profileRes ? await profileRes.text : '';
+    const shopHtml    = shopResult.html;
+    const profileHtml = profileResult.html;
     const combinedHtml = shopHtml + profileHtml;
 
-    // Check for blocking / not found
-    if (shopRes?.status === 404 && profileRes?.status === 404) {
+    if (shopResult.status === 404 && profileResult.status === 404) {
       return NextResponse.json({ error: `Seller "@${username}" was not found on Whatnot.` }, { status: 404 });
     }
-    const isBlocked = combinedHtml.includes('cf-browser-verification') || combinedHtml.includes('Just a moment') || combinedHtml.includes('Enable JavaScript and cookies');
-    if (isBlocked) {
-      return NextResponse.json({ error: 'Whatnot is blocking automated access with a Cloudflare challenge. Profile data cannot be scraped server-side.' }, { status: 422 });
-    }
 
-    // Extract JSON blobs from HTML
+    // Extract JSON blobs from HTML (ScraperAPI returns fully rendered HTML with JS executed)
     const htmlBlobs = [...extractJsonBlobs(shopHtml), ...extractJsonBlobs(profileHtml)];
 
-    // Try to find user profile object from HTML blobs, then fall back to API
+    // Try to find user profile object from HTML blobs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let userObj: Record<string, any> = {};
     for (const blob of htmlBlobs) {
       const u = findUserInBlob(blob, username, 0);
       if (u) { userObj = u; break; }
     }
-    // Fall back to API user data
-    if (!userObj.displayName && !userObj.followersCount) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      userObj = (apiData.user as Record<string, any>) ?? {};
-    }
 
-    // Find listings: HTML blobs first, then API
+    // Find listings from HTML blobs
     let rawListings: unknown[] = [];
     for (const blob of htmlBlobs) {
       const found = findListingsInBlob(blob);
       if (found.length > rawListings.length) rawListings = found;
-    }
-    if (rawListings.length === 0 && apiData.listings.length > 0) {
-      rawListings = apiData.listings;
     }
 
     const listings = parseListings(rawListings as Record<string, unknown>[]);
