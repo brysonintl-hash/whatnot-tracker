@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/useTheme';
 import { useIdleLogout } from '@/lib/useIdleLogout';
 import type { Role } from '@/lib/types';
+import Chat from '@/components/Chat';
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; children?: NavItem[] };
 type Section = { title: string; items: NavItem[] };
@@ -350,6 +351,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         </button>
       </div>
     </aside>
+    <Chat />
     </>
   );
 }
