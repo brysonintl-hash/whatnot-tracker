@@ -45,7 +45,7 @@ function downloadCSV(result: ScraperResult) {
 }
 
 function BookmarkletSection({ appUrl }: { appUrl: string }) {
-  const bm = `javascript:(function(){var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);if(!m){alert('Go to a Whatnot seller shop page first');return;}var username=m[1].toLowerCase();var APP='${appUrl}';var lastH=0,stalls=0;function bestTitle(card,a){var testId=card.querySelector('[data-testid*="title"],[data-testid*="name"]');if(testId){var t=testId.textContent.trim();if(t.length>5)return t;}var best='',bestLen=0;card.querySelectorAll('p,span,h2,h3,strong').forEach(function(el){if(el.children.length>0)return;var t=el.textContent.trim();var skip=/^(\\$[\\d.]+|Qty|Filter|Search|Sort|Shop|Browse|Home|Sign)/i.test(t);if(!skip&&t.length>bestLen&&t.length>8){bestLen=t.length;best=t;}});if(best)return best;var img=a.querySelector('img');return(img&&img.alt&&img.alt.length>8&&!/^[0-9a-f\\-]{20,}$/i.test(img.alt))?img.alt.trim():'';}function extract(){var seen=new Set(),listings=[];document.querySelectorAll('a[href*=\\"/listing/\\"]').forEach(function(a){var hm=(a.href||'').match(/\\/listing\\/([a-zA-Z0-9_=+\\-]{6,})/);if(!hm||seen.has(hm[1]))return;seen.add(hm[1]);var id=hm[1];var card=a;for(var i=0;i<8;i++){if(card.parentElement)card=card.parentElement;else break;}var title=bestTitle(card,a);if(!title||title.length<4)return;var priceM=(card.textContent||'').match(/\\$([\\d]+(?:\\.[\\d]{1,2})?)/);var price=priceM?parseFloat(priceM[1]):null;var qtyM=(card.textContent||'').match(/Qty[.:\\s]+(\\d+)|(\\d+)\\s+Available/i);var qty=qtyM?parseInt(qtyM[1]||qtyM[2]):null;listings.push({id:id,title:title,price:price,qty:qty,url:'https://www.whatnot.com/listing/'+id});});return listings;}var t=setInterval(function(){window.scrollTo(0,document.body.scrollHeight);var h=document.body.scrollHeight;if(h===lastH){stalls++;if(stalls>=4){clearInterval(t);var listings=extract();if(!listings.length){alert('No listings found.');return;}fetch(APP+'/api/scraper/ingest',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({username:username,listings:listings}),mode:'no-cors'}).then(function(){setTimeout(function(){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');},500);}).catch(function(){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');});}}else{stalls=0;lastH=h;}},2000);})();`;
+  const bm = `javascript:(function(){var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);if(!m){alert('Go to a Whatnot seller shop page first');return;}var username=m[1].toLowerCase();var APP='${appUrl}';var lastH=0,stalls=0;function bestTitle(card,a){var testId=card.querySelector('[data-testid*="title"],[data-testid*="name"]');if(testId){var t=testId.textContent.trim();if(t.length>5)return t;}var best='',bestLen=0;card.querySelectorAll('p,h2,h3,h4,strong,label').forEach(function(el){var t=el.textContent.trim();var bad=/^(\\$[\\d.]+|Qty|Filter|Search|Sort|Shop|Browse|Home|Sign|\\d+\\s*(item|product|result))/i.test(t)||/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(t);if(!bad&&t.length>bestLen&&t.length>8&&t.length<400){bestLen=t.length;best=t;}});if(best)return best;var img=a.querySelector('img');return(img&&img.alt&&img.alt.length>8&&!/^[0-9a-f\\-]{20,}$/i.test(img.alt))?img.alt.trim():'';}function extract(){var seen=new Set(),listings=[];document.querySelectorAll('a[href*=\\"/listing/\\"]').forEach(function(a){var hm=(a.href||'').match(/\\/listing\\/([a-zA-Z0-9_=+\\-]{6,})/);if(!hm||seen.has(hm[1]))return;seen.add(hm[1]);var id=hm[1];var card=a;for(var i=0;i<10;i++){if(card.parentElement)card=card.parentElement;else break;}var title=bestTitle(card,a);if(!title||title.length<4)return;var priceM=(card.textContent||'').match(/\\$([\\d]+(?:\\.[\\d]{1,2})?)/);var price=priceM?parseFloat(priceM[1]):null;var qtyM=(card.textContent||'').match(/Qty[.:\\s]+(\\d+)|(\\d+)\\s+Available/i);var qty=qtyM?parseInt(qtyM[1]||qtyM[2]):null;listings.push({id:id,title:title,price:price,qty:qty,url:'https://www.whatnot.com/listing/'+id});});return listings;}var t=setInterval(function(){window.scrollTo(0,document.body.scrollHeight);var h=document.body.scrollHeight;if(h===lastH){stalls++;if(stalls>=4){clearInterval(t);var listings=extract();if(!listings.length){alert('No listings found on this page. Make sure you are on the Shop tab.');return;}alert('Sending '+listings.length+' products...');fetch(APP+'/api/scraper/ingest',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({username:username,listings:listings}),mode:'no-cors'}).then(function(){setTimeout(function(){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');},600);}).catch(function(){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');});}}else{stalls=0;lastH=h;}},2000);})();`;
 
   return (
     <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-5 mb-6">
@@ -232,25 +232,31 @@ function ScraperPageInner() {
                 </div>
 
                 {/* Download block */}
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">
-                      {productCount} product{productCount !== 1 ? 's' : ''} ready
-                    </p>
-                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                      {result.totalDetected && result.totalDetected > productCount
-                        ? `${result.totalDetected - productCount} more available — use the bookmarklet to get all`
-                        : 'CSV includes Title, Price, Qty, URL'}
+                {productCount > 0 ? (
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">
+                        {productCount} product{productCount !== 1 ? 's' : ''} ready
+                      </p>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">CSV includes Title, Price, Qty, URL</p>
+                    </div>
+                    <button onClick={() => downloadCSV(result)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      Download CSV
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
+                    <p className="text-sm font-black text-amber-800 dark:text-amber-300 mb-1">No products captured via search</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Whatnot loads products via JavaScript — the server can&apos;t render them.
+                      Use the <span className="font-bold">bookmarklet above</span> while the seller&apos;s shop is open in your browser to capture all products.
                     </p>
                   </div>
-                  <button onClick={() => downloadCSV(result)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors flex-shrink-0">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    Download CSV
-                  </button>
-                </div>
+                )}
 
-                {result.totalDetected && result.totalDetected > productCount && (
+                {productCount > 0 && result.totalDetected && result.totalDetected > productCount && (
                   <p className="text-[10px] text-slate-400 text-center mt-3">
                     For all {result.totalDetected} products, use the <span className="text-violet-500 font-bold">bookmarklet</span> above while the shop is open in your browser.
                   </p>
