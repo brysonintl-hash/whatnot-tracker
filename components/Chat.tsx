@@ -22,6 +22,8 @@ interface Toast {
   id: string;
   name: string;
   role: string;
+  type: 'online' | 'message';
+  text?: string;
 }
 
 const ROLE_DOT: Record<string, string> = {
@@ -56,11 +58,12 @@ export default function Chat() {
   const prevOnlineIds = useRef<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(false);
+  const myUsernameRef = useRef('');
   openRef.current = open;
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
-      if (s?.username) setMyUsername(s.username);
+      if (s?.username) { setMyUsername(s.username); myUsernameRef.current = s.username; }
     });
   }, []);
 
@@ -73,7 +76,16 @@ export default function Chat() {
       if (msgs.length === 0) return;
       sinceRef.current = msgs[msgs.length - 1].at;
       setMessages(prev => [...prev, ...msgs].slice(-100));
-      if (!openRef.current) setUnread(u => u + msgs.length);
+      if (!openRef.current) {
+        setUnread(u => u + msgs.length);
+        // Show toast for each new incoming message (not my own)
+        msgs.forEach(msg => {
+          if (msg.username === myUsernameRef.current) return;
+          const tid = Math.random().toString(36).slice(2);
+          setToasts(prev => [...prev, { id: tid, name: msg.name, role: msg.role, type: 'message', text: msg.text }]);
+          setTimeout(() => setToasts(prev => prev.filter(t => t.id !== tid)), 5000);
+        });
+      }
     } catch {}
   }, []);
 
@@ -89,7 +101,7 @@ export default function Chat() {
       users.forEach(u => {
         if (!prevOnlineIds.current.has(u.id)) {
           const tid = Math.random().toString(36).slice(2);
-          setToasts(prev => [...prev, { id: tid, name: u.name, role: u.role }]);
+          setToasts(prev => [...prev, { id: tid, name: u.name, role: u.role, type: 'online' }]);
           setTimeout(() => setToasts(prev => prev.filter(t => t.id !== tid)), 4500);
         }
       });
@@ -141,18 +153,35 @@ export default function Chat() {
 
   return (
     <>
-      {/* Online toasts — stack above the chat button */}
-      <div className="fixed bottom-20 right-4 z-[9999] flex flex-col-reverse gap-2 pointer-events-none" style={{ maxWidth: 260 }}>
+      {/* Toasts — online + new message notifications */}
+      <div className="fixed bottom-20 right-4 z-[9999] flex flex-col-reverse gap-2" style={{ maxWidth: 280 }}>
         {toasts.map(t => (
-          <div key={t.id}
-            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl px-4 py-3 flex items-center gap-3"
-            style={{ animation: 'slideInRight 0.3s ease' }}>
-            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 animate-pulse ${ROLE_DOT[t.role] ?? 'bg-slate-400'}`} />
-            <div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{t.name} is online</p>
-              <p className="text-[10px] text-slate-400 capitalize mt-0.5">{t.role}</p>
+          t.type === 'message' ? (
+            <button key={t.id} onClick={() => { setOpen(true); setToasts(prev => prev.filter(x => x.id !== t.id)); }}
+              className="bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-700 rounded-xl shadow-xl px-4 py-3 flex items-start gap-3 text-left w-full"
+              style={{ animation: 'slideInRight 0.3s ease' }}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 mt-0.5 ${ROLE_DOT[t.role] ?? 'bg-slate-400'}`}>
+                {t.name[0]?.toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <p className="text-xs font-black text-slate-900 dark:text-white leading-tight truncate">{t.name}</p>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full capitalize flex-shrink-0 ${ROLE_BADGE[t.role] ?? ''}`}>{t.role}</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug line-clamp-2">{t.text}</p>
+              </div>
+            </button>
+          ) : (
+            <div key={t.id}
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl px-4 py-3 flex items-center gap-3 pointer-events-none"
+              style={{ animation: 'slideInRight 0.3s ease' }}>
+              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 animate-pulse ${ROLE_DOT[t.role] ?? 'bg-slate-400'}`} />
+              <div>
+                <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{t.name} is online</p>
+                <p className="text-[10px] text-slate-400 capitalize mt-0.5">{t.role}</p>
+              </div>
             </div>
-          </div>
+          )
         ))}
       </div>
 
