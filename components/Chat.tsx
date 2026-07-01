@@ -18,6 +18,13 @@ interface OnlineUser {
   role: string;
 }
 
+interface Reader {
+  username: string;
+  name: string;
+  role: string;
+  lastReadAt: number;
+}
+
 interface Toast {
   id: string;
   name: string;
@@ -51,6 +58,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [readers, setReaders] = useState<Reader[]>([]);
   const [input, setInput] = useState('');
   const [unread, setUnread] = useState(0);
   const [myUsername, setMyUsername] = useState('');
@@ -73,6 +81,7 @@ export default function Chat() {
       if (!r.ok) return;
       const data = await r.json();
       const msgs: ChatMessage[] = data.messages ?? [];
+      if (data.readers) setReaders(data.readers);
       if (msgs.length === 0) return;
       sinceRef.current = msgs[msgs.length - 1].at;
       setMessages(prev => [...prev, ...msgs].slice(-100));
@@ -125,6 +134,17 @@ export default function Chat() {
     const onlineTimer = setInterval(fetchOnline, 10000);
     return () => { clearInterval(msgTimer); clearInterval(onlineTimer); };
   }, [myUsername, fetchMessages, fetchOnline]);
+
+  // Post read receipt whenever chat is open and messages update
+  useEffect(() => {
+    if (!open || !messages.length) return;
+    const lastAt = messages[messages.length - 1].at;
+    fetch('/api/chat/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lastReadAt: lastAt }),
+    }).catch(() => {});
+  }, [open, messages]);
 
   useEffect(() => {
     if (open) {
@@ -219,8 +239,16 @@ export default function Chat() {
                 <p className="text-xs text-slate-400 text-center">No messages yet.<br />Say hi to the team! 👋</p>
               </div>
             )}
-            {messages.map(msg => {
+            {messages.map((msg, idx) => {
               const isMe = msg.username === myUsername;
+              const isLast = idx === messages.length - 1;
+
+              // Who has seen up to this message but NOT the next one
+              const nextAt = messages[idx + 1]?.at ?? Infinity;
+              const seenHere = readers.filter(
+                r => r.username !== myUsername && r.lastReadAt >= msg.at && r.lastReadAt < nextAt
+              );
+
               return (
                 <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                   {!isMe && (
@@ -239,7 +267,25 @@ export default function Chat() {
                   }`}>
                     {msg.text}
                   </div>
-                  <span className="text-[9px] text-slate-400 mt-0.5">{fmt(msg.at)}</span>
+                  <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <span className="text-[9px] text-slate-400">{fmt(msg.at)}</span>
+                    {seenHere.length > 0 && (
+                      <div className="flex items-center gap-0.5 ml-1" title={`Seen by ${seenHere.map(r => r.name).join(', ')}`}>
+                        {seenHere.slice(0, 4).map(r => (
+                          <div key={r.username}
+                            className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[7px] font-black ${ROLE_DOT[r.role] ?? 'bg-slate-400'}`}>
+                            {r.name[0]?.toUpperCase()}
+                          </div>
+                        ))}
+                        {seenHere.length > 4 && (
+                          <span className="text-[8px] text-slate-400">+{seenHere.length - 4}</span>
+                        )}
+                      </div>
+                    )}
+                    {isMe && isLast && seenHere.length === 0 && (
+                      <span className="text-[9px] text-slate-500 ml-1">Sent</span>
+                    )}
+                  </div>
                 </div>
               );
             })}

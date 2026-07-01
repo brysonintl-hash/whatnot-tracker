@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { addMessage, getMessages } from '@/lib/chatStore';
+import { getReaders } from '@/lib/readStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const since = parseInt(req.nextUrl.searchParams.get('since') ?? '0');
-  return NextResponse.json({ messages: getMessages(since) });
+  return NextResponse.json({ messages: getMessages(since), readers: getReaders() });
 }
 
 export async function POST(req: NextRequest) {
