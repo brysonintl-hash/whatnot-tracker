@@ -215,12 +215,17 @@ function ScraperPageInner() {
       setResult({
         username: payload.u,
         displayName: payload.u,
-        listings,
-        totalDetected: listings.length,
+        bio: '',
+        followers: null,
+        following: null,
         reviewScore: null,
         reviewCount: null,
         totalSold: null,
+        verified: false,
         avatar: '',
+        listings,
+        categories: [],
+        totalDetected: listings.length,
       });
       // Remove hash from URL bar without reloading
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
