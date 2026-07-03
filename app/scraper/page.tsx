@@ -45,11 +45,103 @@ function downloadCSV(result: ScraperResult) {
 }
 
 function BookmarkletSection({ appUrl }: { appUrl: string }) {
-  // DIAGNOSTIC bookmarklet — shows link patterns on the page so we can debug
-  const diag = `javascript:(function(){var anchors=Array.from(document.querySelectorAll('a[href]'));var wn=anchors.filter(function(a){return a.href.includes('whatnot.com');});var patterns={};wn.forEach(function(a){var p=a.href.replace(/\\/[0-9a-f\\-]{8,}/gi,'/ID').replace(window.location.origin,'');patterns[p]=(patterns[p]||0)+1;});var top=Object.entries(patterns).sort(function(a,b){return b[1]-a[1];}).slice(0,10);var totalA=anchors.length;alert('Total <a> tags: '+totalA+'\\nWhatnot links ('+wn.length+'):\\n'+top.map(function(e){return e[1]+'x '+e[0];}).join('\\n')+'\\n\\nAlso: data-testid values on page:\\n'+Array.from(document.querySelectorAll('[data-testid]')).slice(0,8).map(function(e){return e.getAttribute('data-testid');}).join(', '));})();`;
+  // Bookmarklet: auto-scrolls page, extracts ALL products, encodes directly in URL hash
+  // No server POST needed — data travels in the URL itself, bypassing all caching/routing issues
+  const bm = `javascript:(function(){
+var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);
+if(!m){alert('Open a Whatnot seller shop page first (e.g. whatnot.com/user/USERNAME/shop)');return;}
+var username=m[1].toLowerCase();
+var APP='${appUrl}';
+var lastH=0,stalls=0;
 
-  // MAIN scraper bookmarklet — tries /listing/, /item/, and any UUID-like path
-  const bm = `javascript:(function(){var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);if(!m){alert('Go to a Whatnot seller shop page first');return;}var username=m[1].toLowerCase();var APP='${appUrl}';var lastH=0,stalls=0;function findLinks(){var all=Array.from(document.querySelectorAll('a[href]'));var r=all.filter(function(a){return/\\/(listing|item|product)\\/[a-zA-Z0-9\\-_]{6,}/.test(a.href);});if(!r.length){r=all.filter(function(a){return/whatnot\\.com\\/[^/]+\\/[0-9a-f\\-]{20,}/.test(a.href)||/whatnot\\.com\\/listing\\//.test(a.href);});}return r;}function bestTitle(card){var best='',bestLen=0;card.querySelectorAll('p,h2,h3,h4,span,strong,div').forEach(function(el){if(el.children.length>2)return;var t=el.textContent.trim();var bad=/^(\\$[\\d]+|Qty|Filter|Search|Sort|Shop|Browse|Home|Sign|Products|Reviews|Shows|Clips|Following|Follower|\\d+\\.?\\d*[KM]?\\s*(Review|Sold|Sale))/i.test(t)||/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(t)||t.length<9||t.length>500;if(!bad&&t.length>bestLen){bestLen=t.length;best=t;}});return best;}function extract(){var links=findLinks();if(!links.length){var s='No listing links found.\\nTotal <a> tags: '+document.querySelectorAll('a').length+'\\nSample hrefs: '+Array.from(document.querySelectorAll('a[href]')).slice(0,5).map(function(a){return a.href;}).join('\\n');alert(s);return[];}var seen=new Set(),listings=[];links.forEach(function(a){var hm=(a.href||'').match(/\\/(listing|item|product)\\/([a-zA-Z0-9\\-_]{6,})/);if(!hm)return;var id=hm[2];if(seen.has(id))return;seen.add(id);var card=a;for(var i=0;i<12;i++){if(card.parentElement)card=card.parentElement;else break;}var title=bestTitle(card);if(!title)title=(a.querySelector('img')||{}).alt||'';if(!title||title.length<4||/^[0-9a-f\\-]{20,}$/.test(title))return;var priceM=(card.textContent||'').match(/\\$([\\d]+(?:\\.[\\d]{1,2})?)/);var price=priceM?parseFloat(priceM[1]):null;var qtyM=(card.textContent||'').match(/Qty[.:\\s]+(\\d+)|(\\d+)\\s+Available/i);var qty=qtyM?parseInt(qtyM[1]||qtyM[2]):null;listings.push({id:id,title:title,price:price,qty:qty,url:'https://www.whatnot.com/listing/'+id});});return listings;}var t=setInterval(function(){window.scrollTo(0,document.body.scrollHeight);var h=document.body.scrollHeight;if(h===lastH){stalls++;if(stalls>=4){clearInterval(t);var listings=extract();if(!listings||!listings.length)return;alert('Found '+listings.length+' products. Opening app...');fetch(APP+'/api/scraper/ingest',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({username:username,listings:listings}),mode:'no-cors'}).then(function(){setTimeout(function(){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');},700);}).catch(function(){window.open(APP+'/scraper?u='+encodeURIComponent(username),'_blank');});}}else{stalls=0;lastH=h;}},2000);})();`;
+function getCard(a){
+  // Walk up from the <a> link — stop when parent contains multiple listing links (= we've left the card)
+  var el=a,prev=a;
+  for(var i=0;i<10;i++){
+    if(!el.parentElement)break;
+    var siblings=el.parentElement.querySelectorAll('a[href*=\\"/listing/\\"]');
+    if(siblings.length>1)return prev; // prev is the card-level element
+    prev=el;el=el.parentElement;
+  }
+  return el;
+}
+
+function getTitle(card){
+  var texts=[];
+  var walk=function(node){
+    if(node.nodeType===3){var t=node.textContent.trim();if(t)texts.push(t);}
+    else if(node.nodeType===1&&node.tagName!=='SCRIPT'&&node.tagName!=='STYLE'){
+      for(var i=0;i<node.childNodes.length;i++)walk(node.childNodes[i]);
+    }
+  };
+  walk(card);
+  // Priority 1: text starting with [$XX] — Whatnot MSRP format
+  for(var i=0;i<texts.length;i++){
+    if(/^\\[\\$[\\d,.]/.test(texts[i])&&texts[i].length>8)return texts[i];
+  }
+  // Priority 2: longest text that isn't price/qty/nav
+  var best='';
+  for(var i=0;i<texts.length;i++){
+    var t=texts[i];
+    var skip=/^(\\$[\\d]+|Qty\\.?\\s*\\d|Filter|Search|Sort|Shop|Browse|Sign|Home|Products|Reviews|Shows|Clips|Following|Followers|\\d+[KM]?\\s*(sold|review|follow))/i.test(t)
+          ||/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(t)
+          ||t.length<8||t.length>400;
+    if(!skip&&t.length>best.length)best=t;
+  }
+  return best;
+}
+
+function extract(){
+  var links=Array.from(document.querySelectorAll('a[href]')).filter(function(a){
+    return/\\/listing\\/[A-Za-z0-9\\-_+=]{6,}/.test(a.href);
+  });
+  if(!links.length){
+    alert('No listing links found on this page.\\nMake sure you are on the Shop tab.\\nTotal <a> tags: '+document.querySelectorAll('a').length);
+    return null;
+  }
+  var seen=new Set(),out=[];
+  links.forEach(function(a){
+    var hm=a.href.match(/\\/listing\\/([A-Za-z0-9\\-_+=]{6,})/);
+    if(!hm||seen.has(hm[1]))return;
+    seen.add(hm[1]);
+    var id=hm[1];
+    var card=getCard(a);
+    var title=getTitle(card);
+    if(!title||title.length<4)return;
+    var ct=card.textContent||'';
+    // Price: first standalone $XX NOT inside brackets (avoid MSRP)
+    var priceM=ct.replace(/\\[\\$[\\d,.]+\\]/g,'').match(/\\$([\\d]+(?:\\.[\\d]{1,2})?)/);
+    var price=priceM?parseFloat(priceM[1]):null;
+    var qtyM=ct.match(/Qty\\.?\\s*(\\d+)/i);
+    var qty=qtyM?parseInt(qtyM[1]):null;
+    out.push([id,title,price,qty]);
+  });
+  return out;
+}
+
+var t=setInterval(function(){
+  window.scrollTo(0,document.body.scrollHeight);
+  var h=document.body.scrollHeight;
+  if(h===lastH){
+    stalls++;
+    if(stalls>=5){
+      clearInterval(t);
+      var data=extract();
+      if(!data)return;
+      if(!data.length){alert('Products found but titles could not be extracted.\\nTry clicking Debug DOM bookmark and share the result.');return;}
+      // Encode all data into URL hash — no server POST needed, 100% reliable
+      try{
+        var payload=JSON.stringify({u:username,l:data});
+        var b64=btoa(unescape(encodeURIComponent(payload)));
+        var safe=b64.replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=/g,'');
+        var url=APP+'/scraper?u='+encodeURIComponent(username)+'#wn='+safe;
+        alert('Found '+data.length+' products! Opening app...');
+        window.open(url,'_blank');
+      }catch(e){alert('Error encoding data: '+e);}
+    }
+  }else{stalls=0;lastH=h;}
+},2000);
+})();`.replace(/\n/g, '');
 
   return (
     <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-5 mb-6">
@@ -78,20 +170,14 @@ function BookmarkletSection({ appUrl }: { appUrl: string }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-3 flex-wrap">
-        <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this to your bookmarks bar — don't click it here!"); }} draggable
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl cursor-grab active:cursor-grabbing select-none">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
-          Scrape Whatnot Shop
-        </a>
-        <a href={diag} onClick={e => { e.preventDefault(); alert("Drag this to your bookmarks bar first!"); }} draggable
-          className="inline-flex items-center gap-2 px-3 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl cursor-grab active:cursor-grabbing select-none border border-slate-200 dark:border-slate-600">
-          🔍 Debug DOM
-        </a>
-      </div>
-      <p className="text-[10px] text-violet-500 dark:text-violet-400 mt-2">Drag both to bookmarks bar. If scraper finds nothing, click <strong>Debug DOM</strong> on the Whatnot page and share the popup text.</p>
+      <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this to your bookmarks bar — don't click it here!"); }} draggable
+        className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl cursor-grab active:cursor-grabbing select-none">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+        </svg>
+        Scrape Whatnot Shop
+      </a>
+      <p className="text-[10px] text-violet-500 dark:text-violet-400 mt-2">Drag to bookmarks bar — do not click here</p>
     </div>
   );
 }
@@ -109,6 +195,37 @@ function ScraperPageInner() {
   const [appUrl, setAppUrl] = useState('');
 
   useEffect(() => { setAppUrl(window.location.origin); }, []);
+
+  // Decode bookmarklet data from URL hash (#wn=BASE64) — no server needed
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith('#wn=')) return;
+    try {
+      const safe = hash.slice(4);
+      const b64 = safe.replace(/-/g, '+').replace(/_/g, '/');
+      const json = decodeURIComponent(escape(atob(b64)));
+      const payload = JSON.parse(json) as { u: string; l: [string, string, number | null, number | null][] };
+      if (!payload.u || !Array.isArray(payload.l)) return;
+      const listings: Listing[] = payload.l.map(([id, title, price, qty]) => ({
+        id, title: title ?? '', price, qty,
+        image: '', category: '', condition: '',
+        url: `https://www.whatnot.com/listing/${id}`,
+      }));
+      setUsername(payload.u);
+      setResult({
+        username: payload.u,
+        displayName: payload.u,
+        listings,
+        totalDetected: listings.length,
+        reviewScore: null,
+        reviewCount: null,
+        totalSold: null,
+        avatar: '',
+      });
+      // Remove hash from URL bar without reloading
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    } catch { /* malformed hash — ignore */ }
+  }, []);
 
   const runSearch = useCallback(async (q: string) => {
     if (!q) return;
