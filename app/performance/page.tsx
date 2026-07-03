@@ -191,36 +191,31 @@ function computeHostStats(orders: Order[]): HostStat[] {
 
 // ─── Margin Analyzer ─────────────────────────────────────────────────────────
 
-const MARGIN_LOW    = 20; // critical threshold %
-const MARGIN_TARGET = 30; // goal %
+const MARGIN_LOW    = 20;
+const MARGIN_TARGET = 30;
 
 function MarginAnalyzer({ orders }: { orders: Order[] }) {
-  const [showAll, setShowAll] = useState(false);
+  const [showTable, setShowTable] = useState(false);
 
   if (orders.length === 0) return null;
 
-  // Enrich each order with computed margin + suggestions
   const enriched = orders.map(o => {
-    const margin        = o.sold > 0 ? (o.profit / o.sold) * 100 : 0;
-    const costBack      = o.sold - o.profit; // total non-profit portion (fees + item cost)
+    const margin         = o.sold > 0 ? (o.profit / o.sold) * 100 : 0;
+    const costBack       = o.sold - o.profit;
     const suggestedPrice = costBack > 0 ? Math.ceil(costBack / (1 - MARGIN_TARGET / 100)) : Math.ceil(o.sold);
-    const priceGap      = suggestedPrice - o.sold;
-    const profitGap     = o.sold > 0 ? o.sold * (MARGIN_TARGET / 100) - o.profit : 0;
+    const priceGap       = suggestedPrice - o.sold;
+    const profitGap      = o.sold > 0 ? o.sold * (MARGIN_TARGET / 100) - o.profit : 0;
     return { ...o, margin, costBack, suggestedPrice, priceGap, profitGap };
   });
 
   const totalRevenue   = enriched.reduce((s, o) => s + o.sold, 0);
   const totalProfit    = enriched.reduce((s, o) => s + o.profit, 0);
   const overallMargin  = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
   const belowTarget    = enriched.filter(o => o.margin < MARGIN_TARGET).sort((a, b) => a.margin - b.margin);
-  const critical       = belowTarget.filter(o => o.margin < MARGIN_LOW);
   const totalProfitGap = belowTarget.reduce((s, o) => s + Math.max(0, o.profitGap), 0);
+  const losingMoney    = belowTarget.filter(o => o.profit < 0);
 
-  const isHealthy = overallMargin >= MARGIN_TARGET;
-  const isLow     = overallMargin < MARGIN_LOW;
-
-  // Group problem items by product name to find top drags
+  // Group by product for top drags
   const productGroups: Record<string, typeof enriched> = {};
   belowTarget.forEach(o => {
     const key = o.productName || o.modelNum || 'Unknown Item';
@@ -229,129 +224,112 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
   });
   const topDrags = Object.entries(productGroups)
     .map(([name, items]) => ({
-      name: name.length > 45 ? name.slice(0, 45) + '…' : name,
-      avgMargin:        items.reduce((s, i) => s + i.margin, 0) / items.length,
-      totalProfitGap:   items.reduce((s, i) => s + Math.max(0, i.profitGap), 0),
-      count:            items.length,
-      avgSold:          items.reduce((s, i) => s + i.sold, 0) / items.length,
-      avgSuggested:     Math.ceil(items.reduce((s, i) => s + i.suggestedPrice, 0) / items.length),
+      name,
+      shortName: name.length > 50 ? name.slice(0, 50) + '…' : name,
+      avgMargin:      items.reduce((s, i) => s + i.margin, 0) / items.length,
+      totalProfitGap: items.reduce((s, i) => s + Math.max(0, i.profitGap), 0),
+      count:          items.length,
+      avgSold:        items.reduce((s, i) => s + i.sold, 0) / items.length,
+      avgSuggested:   Math.ceil(items.reduce((s, i) => s + i.suggestedPrice, 0) / items.length),
+      losing:         items.some(i => i.profit < 0),
     }))
     .sort((a, b) => b.totalProfitGap - a.totalProfitGap)
     .slice(0, 3);
 
-  const displayItems = showAll ? belowTarget : belowTarget.slice(0, 10);
-
-  // All good!
-  if (isHealthy && belowTarget.length === 0) return (
-    <div className="mt-6 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-5 flex items-center gap-4">
-      <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center flex-shrink-0">
-        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-      </div>
+  // All good
+  if (overallMargin >= MARGIN_TARGET && belowTarget.length === 0) return (
+    <div className="mt-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-700 p-6 flex items-center gap-5">
+      <div className="text-5xl">🎉</div>
       <div>
-        <p className="font-black text-emerald-700 dark:text-emerald-400 text-sm">Margin is On Target — {overallMargin.toFixed(1)}%</p>
-        <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">All orders are at or above the 30% target. Great work!</p>
+        <p className="text-xl font-black text-emerald-700 dark:text-emerald-400">You&apos;re doing great today!</p>
+        <p className="text-sm text-emerald-600 dark:text-emerald-500 mt-1">
+          All {orders.length} orders are making good profit. Keep it up!
+        </p>
       </div>
     </div>
   );
 
+  const statusEmoji = losingMoney.length > 10 ? '🚨' : losingMoney.length > 0 ? '⚠️' : '📊';
+  const statusColor = losingMoney.length > 10 ? 'red' : losingMoney.length > 0 ? 'amber' : 'amber';
+
   return (
-    <div className="mt-6">
-      {/* Section header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isLow ? 'bg-red-100 dark:bg-red-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
-          <svg className={`w-4 h-4 ${isLow ? 'text-red-500' : 'text-amber-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-        </div>
-        <h2 className="font-black text-slate-900 dark:text-white text-sm">Margin Analyzer</h2>
-        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isLow ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-          {isLow ? 'Critical' : 'Below Target'}
-        </span>
-      </div>
+    <div className="mt-6 space-y-4">
 
-      {/* Health banner + progress bar */}
-      <div className={`rounded-xl border p-5 mb-4 ${isLow ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className={`text-3xl font-black ${isLow ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {overallMargin.toFixed(1)}%
+      {/* ── Plain-English Summary ── */}
+      <div className={`rounded-2xl border-2 p-6 ${
+        statusColor === 'red'
+          ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+          : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+      }`}>
+        <div className="flex items-start gap-4">
+          <span className="text-4xl flex-shrink-0">{statusEmoji}</span>
+          <div className="flex-1">
+            <p className={`text-lg font-black leading-snug mb-1 ${statusColor === 'red' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+              {losingMoney.length > 0
+                ? `You lost money on ${losingMoney.length} sale${losingMoney.length > 1 ? 's' : ''} today`
+                : `${belowTarget.length} sales were below your profit goal`}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Overall Margin · Target: <span className="font-bold text-emerald-600">{MARGIN_TARGET}%</span> · Minimum: <span className="font-bold text-orange-500">{MARGIN_LOW}%</span>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              Out of <strong>{orders.length} total sales</strong>, {belowTarget.length} were sold without making enough profit.
+              {totalProfitGap > 0 && (
+                <> If you raise prices on those items, you could earn an extra <strong className="text-emerald-600">${fmtMoney(totalProfitGap)}</strong>.</>
+              )}
             </p>
-          </div>
-          <div className="text-right">
-            <p className={`text-lg font-black ${isLow ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              −${fmtMoney(totalProfitGap)}
-            </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">profit gap vs 30% target</p>
           </div>
         </div>
-        {/* Progress bar */}
-        <div className="relative">
-          <div className="w-full h-4 bg-slate-200 dark:bg-slate-700 rounded-full overflow-visible relative">
-            <div
-              className={`h-full rounded-full transition-all ${isLow ? 'bg-red-500' : 'bg-amber-500'}`}
-              style={{ width: `${Math.min(100, Math.max(2, (overallMargin / 40) * 100))}%` }}
-            />
-            {/* Critical marker at 20% */}
-            <div className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: `${(MARGIN_LOW / 40) * 100}%` }}>
-              <div className="w-0.5 h-full bg-orange-400" />
-            </div>
-            {/* Target marker at 30% */}
-            <div className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: `${(MARGIN_TARGET / 40) * 100}%` }}>
-              <div className="w-0.5 h-full bg-emerald-500" />
-            </div>
+
+        {/* Simple progress bar */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-slate-500">Your profit margin today</span>
+            <span className={`text-sm font-black ${overallMargin >= MARGIN_TARGET ? 'text-emerald-600' : overallMargin >= MARGIN_LOW ? 'text-amber-600' : 'text-red-600'}`}>
+              {overallMargin.toFixed(0)}% <span className="text-xs font-normal text-slate-400">(goal: 30%)</span>
+            </span>
           </div>
-          <div className="flex justify-between mt-1.5 relative">
-            <span className="text-[9px] text-slate-400 font-bold">0%</span>
-            <span className="text-[9px] font-black text-orange-500 absolute" style={{ left: `calc(${(MARGIN_LOW / 40) * 100}% - 16px)` }}>20% min</span>
-            <span className="text-[9px] font-black text-emerald-600 absolute" style={{ left: `calc(${(MARGIN_TARGET / 40) * 100}% - 20px)` }}>30% target</span>
-            <span className="text-[9px] text-slate-400 font-bold">40%+</span>
+          <div className="relative w-full h-5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${overallMargin >= MARGIN_TARGET ? 'bg-emerald-500' : overallMargin >= MARGIN_LOW ? 'bg-amber-500' : 'bg-red-500'}`}
+              style={{ width: `${Math.min(100, Math.max(3, (overallMargin / 40) * 100))}%` }} />
+            {/* Goal line */}
+            <div className="absolute inset-y-0 w-0.5 bg-white/80" style={{ left: `${(MARGIN_TARGET / 40) * 100}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>0%</span>
+            <span className="text-emerald-600 font-bold">← Goal is 30%</span>
+            <span>40%+</span>
           </div>
         </div>
       </div>
 
-      {/* 3 quick stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-          <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold mb-1.5">Critical Items</p>
-          <p className="text-2xl font-black text-red-500">{critical.length}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">below {MARGIN_LOW}% margin</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-          <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold mb-1.5">Below Target</p>
-          <p className="text-2xl font-black text-amber-500">{belowTarget.length}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">of {orders.length} orders</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-          <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold mb-1.5">Profit Gap</p>
-          <p className="text-xl font-black text-red-500">−${fmtMoney(totalProfitGap)}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">lost vs 30% target</p>
-        </div>
-      </div>
-
-      {/* What's causing the problem */}
+      {/* ── Fix These Items ── */}
       {topDrags.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 mb-4">
-          <p className="text-xs font-black text-slate-900 dark:text-white mb-1">What's Hurting Your Margin</p>
-          <p className="text-[10px] text-slate-400 mb-3">Top items dragging profitability — raise their starting bid on Whatnot</p>
-          <div className="space-y-2.5">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+          <p className="text-base font-black text-slate-900 dark:text-white mb-1">Raise these prices on Whatnot</p>
+          <p className="text-xs text-slate-400 mb-4">These {topDrags.length} items are costing you the most money. Fix them first.</p>
+          <div className="space-y-3">
             {topDrags.map((d, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 mt-0.5 ${d.avgMargin < MARGIN_LOW ? 'bg-red-500' : 'bg-amber-500'}`}>
-                  {i + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{d.name}</p>
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px]">
-                    <span className="text-slate-400">{d.count} order{d.count > 1 ? 's' : ''}</span>
-                    <span className="text-slate-500">Avg sold: <span className="font-bold text-slate-700 dark:text-slate-300">${fmtMoney(d.avgSold)}</span></span>
-                    <span className="text-slate-500">Avg margin: <span className={`font-bold ${d.avgMargin < MARGIN_LOW ? 'text-red-500' : 'text-amber-500'}`}>{d.avgMargin.toFixed(1)}%</span></span>
+              <div key={i} className={`rounded-xl border-2 p-4 ${d.losing ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${d.losing ? 'bg-red-500' : 'bg-amber-500'}`}>
+                    {i + 1}
                   </div>
-                  <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
-                    <span className="text-slate-400">💡 Set starting bid to at least</span>
-                    <span className="font-black text-emerald-600 dark:text-emerald-400">${fmtMoney(d.avgSuggested)}</span>
-                    <span className="text-slate-400">→ recovers</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">+${fmtMoney(d.totalProfitGap)}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-slate-900 dark:text-white leading-snug">{d.shortName}</p>
+                    {d.count > 1 && <p className="text-[11px] text-slate-400 mt-0.5">Sold {d.count} times</p>}
+                    {/* Simple 3-column action row */}
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-white dark:bg-slate-700 rounded-lg p-2.5 border border-slate-100 dark:border-slate-600">
+                        <p className="text-[10px] text-slate-400 mb-0.5">Sold for</p>
+                        <p className="text-sm font-black text-slate-700 dark:text-slate-200">${fmtMoney(d.avgSold)}</p>
+                      </div>
+                      <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-2.5 border border-emerald-200 dark:border-emerald-700">
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mb-0.5 font-bold">Charge at least</p>
+                        <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">${fmtMoney(d.avgSuggested)}</p>
+                      </div>
+                      <div className="bg-white dark:bg-slate-700 rounded-lg p-2.5 border border-slate-100 dark:border-slate-600">
+                        <p className="text-[10px] text-slate-400 mb-0.5">You&apos;ll gain</p>
+                        <p className="text-sm font-black text-emerald-600">+${fmtMoney(d.totalProfitGap)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -360,59 +338,58 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
         </div>
       )}
 
-      {/* Full orders table */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-          <p className="text-xs font-black text-slate-900 dark:text-white">All Orders Below 30% Margin</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">{belowTarget.length} orders · Worst margin first · Green = suggested Whatnot starting bid</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-700">
-                {['Product', 'Model #', 'Sold Price', 'Margin', 'Profit', 'Suggested Bid', '+Price Needed'].map(h => (
-                  <th key={h} className={`text-[10px] text-slate-400 font-bold uppercase tracking-wide py-2.5 px-3 whitespace-nowrap ${h === 'Product' ? 'text-left' : 'text-right'}`}>{h}</th>
+      {/* ── See All Bad Orders (collapsed) ── */}
+      {belowTarget.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <button
+            onClick={() => setShowTable(s => !s)}
+            className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+            <div>
+              <p className="text-sm font-black text-slate-900 dark:text-white">
+                See all {belowTarget.length} orders that need attention
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Tap to {showTable ? 'hide' : 'show'} the full list — sorted worst first</p>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${showTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showTable && (
+            <div className="border-t border-slate-100 dark:border-slate-700">
+              {/* Mobile-friendly card list instead of dense table */}
+              <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                {belowTarget.map((o, i) => (
+                  <div key={i} className={`px-5 py-3.5 ${o.profit < 0 ? 'bg-red-50/60 dark:bg-red-900/10' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug truncate">{o.productName || '—'}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{o.buyer} {o.modelNum ? `· ${o.modelNum}` : ''}</p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                        <div>
+                          <p className="text-[9px] text-slate-400">Sold</p>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">${fmtMoney(o.sold)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-slate-400">Profit</p>
+                          <p className={`text-xs font-black ${o.profit < 0 ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>
+                            {o.profit < 0 ? '−' : '+'}${fmtMoney(Math.abs(o.profit))}
+                          </p>
+                        </div>
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-2.5 py-1.5 border border-emerald-100 dark:border-emerald-800">
+                          <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">Set to</p>
+                          <p className="text-xs font-black text-emerald-700 dark:text-emerald-300">${fmtMoney(o.suggestedPrice)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayItems.map((o, i) => (
-                <tr key={i} className={`border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${o.margin < MARGIN_LOW ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
-                  <td className="py-2.5 px-3 max-w-[180px]">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{o.productName || '—'}</p>
-                    <p className="text-[9px] text-slate-400 truncate">{o.buyer}</p>
-                  </td>
-                  <td className="py-2.5 px-3 text-right text-[11px] text-slate-500 font-mono">{o.modelNum || '—'}</td>
-                  <td className="py-2.5 px-3 text-right text-xs font-bold text-slate-900 dark:text-white">${fmtMoney(o.sold)}</td>
-                  <td className="py-2.5 px-3 text-right">
-                    <span className={`text-xs font-black ${o.margin < MARGIN_LOW ? 'text-red-500' : 'text-amber-500'}`}>{o.margin.toFixed(1)}%</span>
-                    {o.margin < MARGIN_LOW && (
-                      <span className="ml-1 text-[8px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 font-black px-1 py-0.5 rounded">LOW</span>
-                    )}
-                  </td>
-                  <td className={`py-2.5 px-3 text-right text-xs font-bold ${o.profit >= 0 ? 'text-slate-700 dark:text-slate-300' : 'text-red-500'}`}>
-                    ${fmtMoney(o.profit)}
-                  </td>
-                  <td className="py-2.5 px-3 text-right">
-                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">${fmtMoney(o.suggestedPrice)}</span>
-                  </td>
-                  <td className="py-2.5 px-3 text-right">
-                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">+${fmtMoney(o.priceGap)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </div>
+            </div>
+          )}
         </div>
-        {belowTarget.length > 10 && (
-          <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-700 text-center">
-            <button onClick={() => setShowAll(s => !s)}
-              className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors">
-              {showAll ? '▲ Show less' : `▼ Show all ${belowTarget.length} problem orders`}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
