@@ -143,41 +143,108 @@ var t=setInterval(function(){
 },2000);
 })();`.replace(/\n/g, '');
 
+  const consoleScript = `(async function(){
+  var u=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);
+  var seller=u?u[1]:'shop';
+  console.log('Scrolling to load all products...');
+  var last=0,stalls=0;
+  while(stalls<5){
+    window.scrollTo(0,document.body.scrollHeight);
+    await new Promise(function(r){setTimeout(r,2000);});
+    var h=document.body.scrollHeight;
+    if(h===last)stalls++;else{stalls=0;last=h;}
+    console.log('Height: '+h+' Stalls: '+stalls);
+  }
+  console.log('Extracting products...');
+  var seen=new Set(),rows=[['Title','Price','Qty','URL']];
+  document.querySelectorAll('a[href]').forEach(function(a){
+    var m=a.href.match(/\\/listing\\/([A-Za-z0-9\\-_+=]{6,})/);
+    if(!m||seen.has(m[1]))return;
+    seen.add(m[1]);
+    var id=m[1];
+    var card=a;
+    for(var i=0;i<10;i++){
+      if(!card.parentElement)break;
+      if(card.parentElement.querySelectorAll('a[href*=\\"/listing/\\"]').length>1)break;
+      card=card.parentElement;
+    }
+    var texts=[];
+    (function walk(n){
+      if(n.nodeType===3){var t=n.textContent.trim();if(t)texts.push(t);}
+      else if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){
+        Array.from(n.childNodes).forEach(walk);
+      }
+    })(card);
+    var title=texts.find(function(t){return/^\\[\\$[\\d,.]/.test(t);})||'';
+    if(!title){
+      title=texts.filter(function(t){
+        return t.length>8&&t.length<400&&
+          !/^(\\$[\\d.]+|Qty\\.?\\s*\\d|Filter|Search|Sort|Shop|Browse|Sign|Home|Products|Following|Followers|\\d+[KM]?\\s*(sold|review|follow))/i.test(t)&&
+          !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(t);
+      }).sort(function(a,b){return b.length-a.length;})[0]||'';
+    }
+    if(!title||title.length<4)return;
+    var ct=card.textContent||'';
+    var pm=ct.replace(/\\[\\$[\\d,.]+\\]/g,'').match(/\\$([\\d]+(?:\\.[\\d]{1,2})?)/);
+    var price=pm?'$'+parseFloat(pm[1]).toFixed(2):'';
+    var qm=ct.match(/Qty\\.?\\s*(\\d+)/i);
+    var qty=qm?qm[1]:'';
+    rows.push(['"'+title.replace(/"/g,'""')+'"',price,qty,'https://www.whatnot.com/listing/'+id]);
+  });
+  if(rows.length<2){console.error('No products found. Are you on the Shop tab?');return;}
+  var csv=rows.map(function(r){return r.join(',');}).join('\\r\\n');
+  var blob=new Blob(['\\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=seller+'_whatnot_'+Date.now()+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  console.log('Done! Downloaded '+( rows.length-1)+' products.');
+})();`;
+
   return (
-    <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-5 mb-6">
-      <div className="flex items-start gap-3 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-800 flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-black text-violet-800 dark:text-violet-300">Bookmarklet — Get ALL Products (Recommended)</p>
-          <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
-            Auto-scrolls the Whatnot shop page and captures every product. Manual search only gets ~20.
-          </p>
-        </div>
-      </div>
-      <div className="space-y-2 mb-4">
-        {[
-          'Drag the button below to your bookmarks bar',
-          "Open the seller's Whatnot shop (Shop tab)",
-          'Click the bookmark — it auto-scrolls (~30 sec) then opens this page with all products ready to download',
-        ].map((text, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-violet-200 dark:bg-violet-700 flex items-center justify-center text-[10px] font-black text-violet-700 dark:text-violet-300 flex-shrink-0 mt-0.5">{i + 1}</div>
-            <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">{text}</p>
+    <div className="space-y-4 mb-6">
+      {/* ── Console Script (Primary) ── */}
+      <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center flex-shrink-0 text-base">💻</div>
+          <div>
+            <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">Console Script — Most Reliable Method</p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">Runs inside Chrome DevTools with full page access. Downloads CSV directly from Whatnot — no server, no CORS, no issues.</p>
           </div>
-        ))}
+        </div>
+        <div className="space-y-1.5 mb-4">
+          {[
+            'Open the seller\'s Whatnot shop page (make sure you\'re on the Shop tab)',
+            'Press F12 to open DevTools → click the Console tab',
+            'Click the Copy button below, paste into the console, press Enter',
+            'The page auto-scrolls (~30-60 sec), then CSV downloads automatically',
+          ].map((text, i) => (
+            <div key={i} className="flex items-start gap-2.5">
+              <div className="w-5 h-5 rounded-full bg-emerald-200 dark:bg-emerald-700 flex items-center justify-center text-[10px] font-black text-emerald-800 dark:text-emerald-200 flex-shrink-0 mt-0.5">{i + 1}</div>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">{text}</p>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={() => { navigator.clipboard.writeText(consoleScript); alert('Script copied! Now paste it in the Chrome DevTools Console and press Enter.'); }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          Copy Console Script
+        </button>
+        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-2">Opens DevTools? Press F12 → Console tab → paste → Enter. The CSV will download automatically when done.</p>
       </div>
-      <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this to your bookmarks bar — don't click it here!"); }} draggable
-        className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl cursor-grab active:cursor-grabbing select-none">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-        </svg>
-        Scrape Whatnot Shop
-      </a>
-      <p className="text-[10px] text-violet-500 dark:text-violet-400 mt-2">Drag to bookmarks bar — do not click here</p>
+
+      {/* ── Bookmarklet (Alternative) ── */}
+      <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-4">
+        <p className="text-xs font-black text-violet-700 dark:text-violet-300 mb-2">Alternative: Bookmarklet</p>
+        <p className="text-[11px] text-violet-600 dark:text-violet-400 mb-3">Drag to bookmarks bar, then click while on the Whatnot shop page.</p>
+        <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this to your bookmarks bar — don't click it here!"); }} draggable
+          className="inline-flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg cursor-grab active:cursor-grabbing select-none">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+          Scrape Whatnot Shop
+        </a>
+      </div>
     </div>
   );
 }
