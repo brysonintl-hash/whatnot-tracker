@@ -5,7 +5,17 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
-import type { HDProduct } from '@/app/api/homedepot/route';
+
+type HDProduct = {
+  itemId: string;
+  name: string;
+  model: string;
+  brand: string;
+  price: number | null;
+  originalPrice: number | null;
+  image: string;
+  url: string;
+};
 
 type Session = { username: string; role: Role; name: string };
 
