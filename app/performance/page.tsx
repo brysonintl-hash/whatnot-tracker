@@ -617,7 +617,7 @@ export default function PerformancePage() {
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
       if (!s) { router.push('/login'); return; }
-      if (s.role !== 'admin' && s.role !== 'manager') { router.push('/login'); return; }
+      if (s.role !== 'admin' && s.role !== 'manager' && s.role !== 'host') { router.push('/login'); return; }
       setSession(s);
     });
     Promise.all([
@@ -660,6 +660,20 @@ export default function PerformancePage() {
   }, [orders, selectedDate]);
 
   const hostStats = useMemo(() => computeHostStats(dayOrders), [dayOrders]);
+
+  // Hosts only see their own shows; admin/manager see all
+  const visibleHostStats = useMemo(() => {
+    if (session?.role !== 'host') return hostStats;
+    const myName = session.name.toLowerCase();
+    const filtered = hostStats.filter(hs => hs.host.toLowerCase() === myName);
+    return filtered.length > 0 ? filtered : hostStats;
+  }, [hostStats, session]);
+
+  const hostDayOrders = useMemo(() => {
+    if (session?.role !== 'host') return dayOrders;
+    const myName = session.name.toLowerCase();
+    return dayOrders.filter(o => (o.host ?? '').toLowerCase() === myName);
+  }, [dayOrders, session]);
 
   if (!session) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
@@ -761,14 +775,14 @@ export default function PerformancePage() {
                         {isoToDisplay(selectedDate)}
                       </h2>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {hostStats.length} livestream{hostStats.length !== 1 ? 's' : ''} · {dayOrders.length} orders
+                        {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} · {hostDayOrders.length} orders
                       </p>
                     </div>
                   </div>
 
                   {/* Host cards */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                    {hostStats.map((hs, idx) => {
+                    {visibleHostStats.map((hs, idx) => {
                       const color = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
                       const revenuePerHour = hs.durationHours > 0 ? hs.totalSales / hs.durationHours : null;
                       const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
@@ -848,7 +862,7 @@ export default function PerformancePage() {
 
                   {/* Margin Analyzer — admin / manager / host only */}
                   {(session?.role === 'admin' || session?.role === 'manager' || session?.role === 'host') && (
-                    <MarginAnalyzer orders={dayOrders} />
+                    <MarginAnalyzer orders={hostDayOrders} />
                   )}
                 </>
               )}

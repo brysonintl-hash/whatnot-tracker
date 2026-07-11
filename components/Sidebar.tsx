@@ -104,6 +104,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
+      { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
     ]},

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
@@ -42,6 +42,51 @@ function downloadCSV(result: ScraperResult) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function CopyScriptButton({ script }: { script: string }) {
+  const [copied, setCopied] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(script);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Clipboard API blocked — show textarea for manual copy
+      setShowFallback(true);
+      setTimeout(() => { taRef.current?.select(); taRef.current?.focus(); }, 50);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={handleCopy}
+        className={`inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-bold rounded-xl transition-colors ${copied ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+      >
+        {copied ? (
+          <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Copied! Now paste in DevTools Console</>
+        ) : (
+          <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy Script</>
+        )}
+      </button>
+      {showFallback && (
+        <div className="mt-3">
+          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mb-1 font-bold">Clipboard blocked — select all and copy manually (Ctrl+A, Ctrl+C):</p>
+          <textarea
+            ref={taRef}
+            readOnly
+            value={script}
+            rows={3}
+            className="w-full text-[10px] font-mono bg-slate-900 text-emerald-400 border border-emerald-700 rounded-lg p-2 resize-none focus:outline-none"
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function BookmarkletSection({ appUrl }: { appUrl: string }) {
@@ -226,21 +271,18 @@ var t=setInterval(function(){
             </div>
           ))}
         </div>
-        <button
-          onClick={() => { navigator.clipboard.writeText(consoleScript); alert('Script copied! Now paste it in the Chrome DevTools Console and press Enter.'); }}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-          Copy Console Script
-        </button>
-        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-2">Opens DevTools? Press F12 → Console tab → paste → Enter. The CSV will download automatically when done.</p>
+        {/* Copy button + fallback textarea */}
+        <CopyScriptButton script={consoleScript} />
       </div>
 
       {/* ── Bookmarklet (Alternative) ── */}
-      <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-4">
-        <p className="text-xs font-black text-violet-700 dark:text-violet-300 mb-2">Alternative: Bookmarklet</p>
-        <p className="text-[11px] text-violet-600 dark:text-violet-400 mb-3">Drag to bookmarks bar, then click while on the Whatnot shop page.</p>
-        <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this to your bookmarks bar — don't click it here!"); }} draggable
-          className="inline-flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg cursor-grab active:cursor-grabbing select-none">
+      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black text-slate-700 dark:text-slate-300">Alternative: Bookmarklet</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Drag the button to your Chrome bookmarks bar. Click it while on the Whatnot shop page — opens the scraper automatically.</p>
+        </div>
+        <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this button to your bookmarks bar — don't click it here!"); }} draggable
+          className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl cursor-grab active:cursor-grabbing select-none transition-colors">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
           Scrape Whatnot Shop
         </a>
@@ -358,54 +400,30 @@ function ScraperPageInner() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-2xl mx-auto">
 
-            {/* Bookmarklet */}
-            {appUrl && <BookmarkletSection appUrl={appUrl} />}
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">or search by username</span>
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+            {/* How to use — top banner */}
+            <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl p-5 mb-5 border border-slate-700">
+              <p className="text-xs font-black text-white uppercase tracking-widest mb-3">How to use</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                {[
+                  { step: '1', label: 'Open seller shop', desc: 'Go to whatnot.com/user/USERNAME/shop in Chrome', icon: '🌐' },
+                  { step: '2', label: 'Run the script', desc: 'Press F12 → Console → paste the script below → Enter', icon: '💻' },
+                  { step: '3', label: 'CSV downloads', desc: 'Page auto-scrolls, extracts all products, downloads CSV', icon: '📥' },
+                ].map(s => (
+                  <div key={s.step} className="bg-slate-800 rounded-xl p-3">
+                    <div className="text-2xl mb-1">{s.icon}</div>
+                    <p className="text-[10px] font-black text-white mb-0.5">Step {s.step} — {s.label}</p>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">{s.desc}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Search */}
-            <form onSubmit={handleSearch} className="flex gap-3 mb-6">
-              <div className="flex-1 relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                </div>
-                <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-                  placeholder="Whatnot username"
-                  className="w-full pl-10 pr-4 py-3 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500" />
-              </div>
-              <button type="submit" disabled={loading || !username.trim()}
-                className="px-6 py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors flex items-center gap-2">
-                {loading
-                  ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Scraping...</>
-                  : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>Scrape</>
-                }
-              </button>
-            </form>
+            {/* Bookmarklet + Console Script */}
+            {appUrl && <BookmarkletSection appUrl={appUrl} />}
 
-            {/* Error */}
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-5 text-sm text-red-600 dark:text-red-400 flex items-start gap-3">
-                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                {error}
-              </div>
-            )}
-
-            {/* Setup banner */}
-            {setupMessage && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-5 text-xs text-blue-700 dark:text-blue-300">
-                <p className="font-black text-sm mb-1">ScraperAPI Key Required</p>
-                <p>Add <code className="bg-blue-100 dark:bg-blue-800/50 px-1 rounded font-mono">SCRAPER_API_KEY</code> in Railway → Variables. Or just use the bookmarklet above — it requires no API key.</p>
-              </div>
-            )}
-
-            {/* Result — just the download card */}
+            {/* Result card (from bookmarklet hash) */}
             {result && (
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+              <div className="mt-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
                 <div className="flex items-center gap-4 mb-5">
                   {result.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -429,14 +447,10 @@ function ScraperPageInner() {
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                   </a>
                 </div>
-
-                {/* Download block */}
                 {productCount > 0 ? (
                   <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-4 flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">
-                        {productCount} product{productCount !== 1 ? 's' : ''} ready
-                      </p>
+                      <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">{productCount} products ready</p>
                       <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">CSV includes Title, Price, Qty, URL</p>
                     </div>
                     <button onClick={() => downloadCSV(result)}
@@ -447,30 +461,10 @@ function ScraperPageInner() {
                   </div>
                 ) : (
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
-                    <p className="text-sm font-black text-amber-800 dark:text-amber-300 mb-1">No products captured via search</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Whatnot loads products via JavaScript — the server can&apos;t render them.
-                      Use the <span className="font-bold">bookmarklet above</span> while the seller&apos;s shop is open in your browser to capture all products.
-                    </p>
+                    <p className="text-sm font-black text-amber-800 dark:text-amber-300 mb-1">No products captured</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">Use the Console Script above while the seller&apos;s shop is open — it runs directly in Chrome and captures everything.</p>
                   </div>
                 )}
-
-                {productCount > 0 && result.totalDetected && result.totalDetected > productCount && (
-                  <p className="text-[10px] text-slate-400 text-center mt-3">
-                    For all {result.totalDetected} products, use the <span className="text-violet-500 font-bold">bookmarklet</span> above while the shop is open in your browser.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!result && !loading && !error && !setupMessage && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                </div>
-                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Search a seller or use the bookmarklet</p>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs">The bookmarklet captures all products. Manual search is limited to ~20 by Whatnot&apos;s infinite scroll.</p>
               </div>
             )}
 
