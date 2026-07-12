@@ -115,33 +115,15 @@ function getPayTier(profitPerHour: number | null) {
 function buildPDFHtml(
   date: string,
   hostStats: HostStat[],
-  tkEntries: TKEntry[],
 ) {
   const dateLabel = isoToDisplay(date) || date;
   const now = new Date().toLocaleString('en-US');
 
-  const fmtTime = (ts: string | null) => {
-    if (!ts) return '—';
-    const d = new Date(ts);
-    return isNaN(d.getTime()) ? ts : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  };
-  const fmtDateShort = (ts: string) => {
-    const d = new Date(ts);
-    return isNaN(d.getTime()) ? ts : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-  const fmtWorkedHours = (inTs: string, outTs: string | null) => {
-    if (!outTs) return 'Active';
-    const diff = (new Date(outTs).getTime() - new Date(inTs).getTime()) / 3600000;
-    if (isNaN(diff) || diff <= 0) return '—';
-    const h = Math.floor(diff);
-    const m = Math.round((diff - h) * 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  };
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const hostRows = hostStats.map(hs => {
-    const pph  = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
-    const tier = getPayTier(pph);
+    const pph      = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
+    const tier     = getPayTier(pph);
     const payColor = tier?.color ?? '#94a3b8';
     return `<tr>
       <td><strong>${hs.host}</strong></td>
@@ -155,19 +137,6 @@ function buildPDFHtml(
     </tr>`;
   }).join('');
 
-  const tkSorted = [...tkEntries].sort((a, b) => new Date(a.clockIn).getTime() - new Date(b.clockIn).getTime());
-  const tkRows = tkSorted.length > 0
-    ? tkSorted.map(e => `<tr>
-        <td>${e.name}</td>
-        <td style="text-transform:capitalize">${e.role}</td>
-        <td>${fmtDateShort(e.clockIn)}</td>
-        <td>${fmtTime(e.clockIn)}</td>
-        <td>${fmtTime(e.clockOut)}</td>
-        <td><strong>${fmtWorkedHours(e.clockIn, e.clockOut)}</strong></td>
-        <td style="color:#64748b">${e.note || '—'}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="7" style="color:#94a3b8;padding:12px">No timekeeping entries</td></tr>`;
-
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>Stack Bargains — Performance Report — ${dateLabel}</title>
 <style>
@@ -179,13 +148,12 @@ h2{font-size:12px;font-weight:900;color:#64748b;margin:28px 0 10px;text-transfor
 table{width:100%;border-collapse:collapse;margin-bottom:8px}
 th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
 td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;vertical-align:middle}
-tr:hover td{background:#fafafa}
 .tier-chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
 .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;border:1px solid #e2e8f0}
 .chip-pay{font-weight:900;font-size:18px}
 .chip-range{font-size:11px;color:#64748b}
 .footer{margin-top:40px;font-size:11px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:14px}
-@media print{@page{margin:16mm}body{padding:0}button{display:none!important}}
+@media print{@page{margin:16mm}body{padding:0}}
 </style></head><body>
 <h1>Stack Bargains</h1>
 <p class="sub">Performance Report &nbsp;·&nbsp; ${dateLabel} &nbsp;·&nbsp; Exported ${now}</p>
@@ -202,11 +170,6 @@ tr:hover td{background:#fafafa}
   <div class="chip"><span class="chip-pay" style="color:#F59E0B">$25/hr</span><span class="chip-range">$400–$499 profit / hr</span></div>
   <div class="chip"><span class="chip-pay" style="color:#3B82F6">$20/hr</span><span class="chip-range">$300–$399 profit / hr</span></div>
 </div>
-
-<h2>Timekeeping</h2>
-<table><thead><tr>
-  <th>Name</th><th>Role</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Note</th>
-</tr></thead><tbody>${tkRows}</tbody></table>
 
 <p class="footer">Stack Bargains &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
 <script>window.onload=function(){window.print();}</script>
@@ -775,18 +738,23 @@ export default function PerformancePage() {
 
   const hostStats = useMemo(() => computeHostStats(dayOrders), [dayOrders]);
 
-  // Hosts only see their own shows; admin/manager see all
+  // Hosts only see their own shows — flexible name matching (handles partial / reversed names)
   const visibleHostStats = useMemo(() => {
     if (session?.role !== 'host') return hostStats;
-    const myName = session.name.toLowerCase();
-    const filtered = hostStats.filter(hs => hs.host.toLowerCase() === myName);
-    return filtered.length > 0 ? filtered : hostStats;
+    const myName = session.name.toLowerCase().trim();
+    return hostStats.filter(hs => {
+      const h = hs.host.toLowerCase().trim();
+      return h === myName || h.includes(myName) || myName.includes(h);
+    });
   }, [hostStats, session]);
 
   const hostDayOrders = useMemo(() => {
     if (session?.role !== 'host') return dayOrders;
-    const myName = session.name.toLowerCase();
-    return dayOrders.filter(o => (o.host ?? '').toLowerCase() === myName);
+    const myName = session.name.toLowerCase().trim();
+    return dayOrders.filter(o => {
+      const h = (o.host ?? '').toLowerCase().trim();
+      return h === myName || h.includes(myName) || myName.includes(h);
+    });
   }, [dayOrders, session]);
 
   if (!session) return (
@@ -825,7 +793,7 @@ export default function PerformancePage() {
             {selectedDate && hostStats.length > 0 && (
               <button
                 onClick={() => {
-                  const html = buildPDFHtml(selectedDate, visibleHostStats, tkEntries);
+                  const html = buildPDFHtml(selectedDate, visibleHostStats);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); }
                 }}
@@ -926,7 +894,9 @@ export default function PerformancePage() {
                         },
                         {
                           label: 'Orders / Units',
-                          value: `${hs.totalOrders} / ${hs.totalUnits}`,
+                          value: hs.totalOrders === hs.totalUnits
+                            ? `${hs.totalOrders}`
+                            : `${hs.totalOrders} / ${hs.totalUnits}`,
                           valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
                         },
                         {
@@ -956,7 +926,7 @@ export default function PerformancePage() {
                         },
                         {
                           label: 'Orders per Hour',
-                          value: ordersPerHour !== null ? ordersPerHour.toFixed(1) : '—',
+                          value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—',
                           valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
                         },
                       ];
