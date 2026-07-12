@@ -266,6 +266,219 @@ function computeHostStats(orders: Order[]): HostStat[] {
     .sort((a, b) => a.host.localeCompare(b.host) || a.livestream - b.livestream);
 }
 
+// ─── Pay Tier Board ───────────────────────────────────────────────────────────
+
+type TierEntry = HostStat & { pph: number; tierNum: 1 | 2 | 3 };
+
+const TIER_DISPLAY_CONFIG = [
+  {
+    num: 1 as const, payRate: 30, payLabel: '$30/hr', threshold: '≥ $500/hr profit',
+    gradFrom: '#78350F', gradTo: '#B45309',
+    avatarBg: '#D97706', avatarRing: '#FDE68A',
+  },
+  {
+    num: 2 as const, payRate: 25, payLabel: '$25/hr', threshold: '$400–499/hr profit',
+    gradFrom: '#1E293B', gradTo: '#64748B',
+    avatarBg: '#94A3B8', avatarRing: '#E2E8F0',
+  },
+  {
+    num: 3 as const, payRate: 20, payLabel: '$20/hr', threshold: '$300–399/hr profit',
+    gradFrom: '#92400E', gradTo: '#F59E0B',
+    avatarBg: '#F59E0B', avatarRing: '#FDE68A',
+  },
+];
+
+function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
+  const tieredEntries: TierEntry[] = hostStats
+    .filter(hs => hs.durationHours > 0)
+    .flatMap(hs => {
+      const pph = hs.totalProfit / hs.durationHours;
+      const tier = getPayTier(pph);
+      if (!tier) return [] as TierEntry[];
+      const tierNum: 1 | 2 | 3 = tier.pay === 30 ? 1 : tier.pay === 25 ? 2 : 3;
+      return [{ ...hs, pph, tierNum }];
+    });
+
+  if (tieredEntries.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Pay Tier Ranking</p>
+      <div className="space-y-2.5">
+        {TIER_DISPLAY_CONFIG.map(cfg => {
+          const hosts = tieredEntries.filter(e => e.tierNum === cfg.num);
+          if (hosts.length === 0) return null;
+          return (
+            <div
+              key={cfg.num}
+              className="relative rounded-2xl overflow-hidden px-5 py-4 flex items-center justify-between gap-4 shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${cfg.gradFrom} 0%, ${cfg.gradTo} 100%)` }}
+            >
+              <span
+                className="absolute top-3 left-4 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md"
+                style={{ background: 'rgba(0,0,0,0.25)', color: 'rgba(255,255,255,0.85)' }}
+              >
+                Tier {cfg.num}
+              </span>
+              <div className="pt-5 min-w-0">
+                <p className="text-xl font-black text-white leading-tight truncate">
+                  {hosts.map(h => h.host).join(', ')}
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                  {cfg.payLabel}&nbsp;·&nbsp;{hosts.map(h => `$${Math.round(h.pph)}/hr`).join(' · ')} profit/hr
+                </p>
+              </div>
+              <div className="flex -space-x-3 flex-shrink-0">
+                {hosts.map((h, i) => (
+                  <div
+                    key={h.host + h.livestream}
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-xl flex-shrink-0"
+                    style={{
+                      backgroundColor: cfg.avatarBg,
+                      boxShadow: `0 0 0 4px ${cfg.avatarRing}, 0 8px 20px rgba(0,0,0,0.35)`,
+                      zIndex: hosts.length - i,
+                    }}
+                  >
+                    {(h.host[0] ?? '?').toUpperCase()}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tier History Dashboard ────────────────────────────────────────────────────
+
+function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName: string | null }) {
+  const [open, setOpen] = useState(false);
+
+  const showDates = useMemo(() => {
+    const tabs = Array.from(new Set(allOrders.map(o => o.tab).filter(Boolean)));
+    return tabs
+      .sort((a, b) => parseTabDate(b).getTime() - parseTabDate(a).getTime())
+      .slice(0, 10);
+  }, [allOrders]);
+
+  const allHosts = useMemo(() => {
+    const hosts = Array.from(new Set(allOrders.map(o => o.host).filter(Boolean))) as string[];
+    if (!myName) return hosts.sort();
+    const mn = myName.toLowerCase().trim();
+    return hosts
+      .filter(h => {
+        const hn = h.toLowerCase().trim();
+        return hn === mn || hn.includes(mn) || mn.includes(hn);
+      })
+      .sort();
+  }, [allOrders, myName]);
+
+  const historyMap = useMemo(() => {
+    const result: Record<string, Record<string, { tierNum: 1 | 2 | 3; pph: number } | null>> = {};
+    showDates.forEach(tab => {
+      const dateOrders = allOrders.filter(o => o.tab === tab);
+      const stats = computeHostStats(dateOrders);
+      result[tab] = {};
+      stats.forEach(hs => {
+        const pph = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
+        const tier = getPayTier(pph);
+        if (tier && pph !== null) {
+          const tierNum: 1 | 2 | 3 = tier.pay === 30 ? 1 : tier.pay === 25 ? 2 : 3;
+          const existing = result[tab][hs.host];
+          if (!existing || tierNum < existing.tierNum) {
+            result[tab][hs.host] = { tierNum, pph };
+          }
+        } else if (!(hs.host in result[tab])) {
+          result[tab][hs.host] = null;
+        }
+      });
+    });
+    return result;
+  }, [allOrders, showDates]);
+
+  if (showDates.length < 2 || allHosts.length === 0) return null;
+
+  const tierBadge = (entry: { tierNum: 1 | 2 | 3; pph: number } | null | undefined) => {
+    if (!entry) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
+    const clr: Record<1 | 2 | 3, string> = {
+      1: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
+      2: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
+      3: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+    };
+    return (
+      <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full ${clr[entry.tierNum]}`}>
+        T{entry.tierNum}
+      </span>
+    );
+  };
+
+  const shortDate = (tab: string) => {
+    const iso = tabToISO(tab);
+    if (!iso) return tab;
+    const [, m, d] = iso.split('-').map(Number);
+    return `${m}/${d}`;
+  };
+
+  return (
+    <div className="mt-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <button
+        className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div>
+          <p className="text-sm font-black text-slate-900 dark:text-white">Tier History</p>
+          <p className="text-xs text-slate-400 mt-0.5">Last {showDates.length} shows · Best tier per date</p>
+        </div>
+        <svg className={`w-5 h-5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50 dark:bg-slate-700/30 border-b border-slate-100 dark:border-slate-700">
+                <th className="py-2.5 px-4 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Host</th>
+                {showDates.map(tab => (
+                  <th key={tab} className="py-2.5 px-3 text-center text-[10px] font-bold text-slate-400 whitespace-nowrap">
+                    {shortDate(tab)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {allHosts.map(host => (
+                <tr key={host} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50/50 dark:hover:bg-slate-700/20">
+                  <td className="py-3 px-4 text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">{host}</td>
+                  {showDates.map(tab => (
+                    <td key={tab} className="py-3 px-3 text-center">
+                      {tierBadge(historyMap[tab]?.[host])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="px-5 py-3 border-t border-slate-50 dark:border-slate-700 flex flex-wrap gap-4 bg-slate-50/50 dark:bg-slate-800/60">
+            {TIER_DISPLAY_CONFIG.map(cfg => (
+              <div key={cfg.num} className="flex items-center gap-1.5">
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  cfg.num === 1 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300' :
+                  cfg.num === 2 ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' :
+                                 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
+                }`}>T{cfg.num}</span>
+                <span className="text-[10px] text-slate-400">{cfg.payLabel} · {cfg.threshold}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Margin Analyzer ─────────────────────────────────────────────────────────
 
 const MARGIN_LOW    = 20;
@@ -876,6 +1089,8 @@ export default function PerformancePage() {
                     </div>
                   </div>
 
+                  <PayTierBoard hostStats={visibleHostStats} />
+
                   {/* Host cards */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                     {visibleHostStats.map((hs, idx) => {
@@ -1002,6 +1217,11 @@ export default function PerformancePage() {
                   {(session?.role === 'admin' || session?.role === 'manager' || session?.role === 'host') && (
                     <MarginAnalyzer orders={hostDayOrders} />
                   )}
+
+                  <TierHistorySection
+                    allOrders={orders}
+                    myName={session?.role === 'host' ? session.name : null}
+                  />
                 </>
               )}
             </>
