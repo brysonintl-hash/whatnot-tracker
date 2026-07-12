@@ -99,6 +99,120 @@ function fmtMoney(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ─── Host Pay Rate Tiers ─────────────────────────────────────────────────────
+const PAY_TIERS = [
+  { min: 500, pay: 30, label: '$30/hr', color: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-700', text: 'text-emerald-700 dark:text-emerald-400' },
+  { min: 400, pay: 25, label: '$25/hr', color: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-900/20',   border: 'border-amber-200 dark:border-amber-700',   text: 'text-amber-700 dark:text-amber-400' },
+  { min: 300, pay: 20, label: '$20/hr', color: '#3B82F6', bg: 'bg-blue-50 dark:bg-blue-900/20',     border: 'border-blue-200 dark:border-blue-700',     text: 'text-blue-700 dark:text-blue-400' },
+];
+
+function getPayTier(profitPerHour: number | null) {
+  if (profitPerHour === null || profitPerHour <= 0) return null;
+  return PAY_TIERS.find(t => profitPerHour >= t.min) ?? null;
+}
+
+// ─── PDF Report Generator ─────────────────────────────────────────────────────
+function buildPDFHtml(
+  date: string,
+  hostStats: HostStat[],
+  tkEntries: TKEntry[],
+) {
+  const dateLabel = isoToDisplay(date) || date;
+  const now = new Date().toLocaleString('en-US');
+
+  const fmtTime = (ts: string | null) => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? ts : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const fmtDateShort = (ts: string) => {
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? ts : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const fmtWorkedHours = (inTs: string, outTs: string | null) => {
+    if (!outTs) return 'Active';
+    const diff = (new Date(outTs).getTime() - new Date(inTs).getTime()) / 3600000;
+    if (isNaN(diff) || diff <= 0) return '—';
+    const h = Math.floor(diff);
+    const m = Math.round((diff - h) * 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const hostRows = hostStats.map(hs => {
+    const pph  = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
+    const tier = getPayTier(pph);
+    const payColor = tier?.color ?? '#94a3b8';
+    return `<tr>
+      <td><strong>${hs.host}</strong></td>
+      <td>$${fmt(hs.totalSales)}</td>
+      <td>$${fmt(hs.totalProfit)}</td>
+      <td>${hs.overallMargin.toFixed(1)}%</td>
+      <td>${hs.durationHours > 0 ? fmtDuration(hs.durationHours) : '—'}</td>
+      <td>${pph !== null ? `$${fmt(pph)}/hr` : '—'}</td>
+      <td style="font-weight:900;color:${payColor}">${tier ? tier.label : '—'}</td>
+      <td style="font-weight:900;color:${payColor}">${tier ? `$${fmt(tier.pay * hs.durationHours)}` : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const tkSorted = [...tkEntries].sort((a, b) => new Date(a.clockIn).getTime() - new Date(b.clockIn).getTime());
+  const tkRows = tkSorted.length > 0
+    ? tkSorted.map(e => `<tr>
+        <td>${e.name}</td>
+        <td style="text-transform:capitalize">${e.role}</td>
+        <td>${fmtDateShort(e.clockIn)}</td>
+        <td>${fmtTime(e.clockIn)}</td>
+        <td>${fmtTime(e.clockOut)}</td>
+        <td><strong>${fmtWorkedHours(e.clockIn, e.clockOut)}</strong></td>
+        <td style="color:#64748b">${e.note || '—'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" style="color:#94a3b8;padding:12px">No timekeeping entries</td></tr>`;
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Stack Bargains — Performance Report — ${dateLabel}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1e293b;padding:40px;font-size:13px;line-height:1.5;background:#fff}
+h1{font-size:24px;font-weight:900;color:#0f172a;letter-spacing:-0.5px}
+.sub{font-size:12px;color:#64748b;margin-top:4px}
+h2{font-size:12px;font-weight:900;color:#64748b;margin:28px 0 10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;padding-bottom:6px}
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;vertical-align:middle}
+tr:hover td{background:#fafafa}
+.tier-chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;border:1px solid #e2e8f0}
+.chip-pay{font-weight:900;font-size:18px}
+.chip-range{font-size:11px;color:#64748b}
+.footer{margin-top:40px;font-size:11px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:14px}
+@media print{@page{margin:16mm}body{padding:0}button{display:none!important}}
+</style></head><body>
+<h1>Stack Bargains</h1>
+<p class="sub">Performance Report &nbsp;·&nbsp; ${dateLabel} &nbsp;·&nbsp; Exported ${now}</p>
+
+<h2>Host Performance</h2>
+<table><thead><tr>
+  <th>Host</th><th>Total Sales</th><th>Gross Profit</th><th>Margin</th>
+  <th>Duration</th><th>Profit / Hour</th><th>Pay Rate</th><th>Estimated Pay</th>
+</tr></thead><tbody>${hostRows}</tbody></table>
+
+<h2>Pay Rate Scale</h2>
+<div class="tier-chips">
+  <div class="chip"><span class="chip-pay" style="color:#10B981">$30/hr</span><span class="chip-range">$500+ profit / hr</span></div>
+  <div class="chip"><span class="chip-pay" style="color:#F59E0B">$25/hr</span><span class="chip-range">$400–$499 profit / hr</span></div>
+  <div class="chip"><span class="chip-pay" style="color:#3B82F6">$20/hr</span><span class="chip-range">$300–$399 profit / hr</span></div>
+</div>
+
+<h2>Timekeeping</h2>
+<table><thead><tr>
+  <th>Name</th><th>Role</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Note</th>
+</tr></thead><tbody>${tkRows}</tbody></table>
+
+<p class="footer">Stack Bargains &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+<script>window.onload=function(){window.print();}</script>
+</body></html>`;
+}
+
 function fmtDuration(hours: number): string {
   if (hours <= 0) return '—';
   const h = Math.floor(hours);
@@ -707,6 +821,20 @@ export default function PerformancePage() {
                 Team Calendar
               </button>
             </div>
+            {/* PDF Export */}
+            {selectedDate && hostStats.length > 0 && (
+              <button
+                onClick={() => {
+                  const html = buildPDFHtml(selectedDate, visibleHostStats, tkEntries);
+                  const w = window.open('', '_blank');
+                  if (w) { w.document.write(html); w.document.close(); }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-white hover:bg-slate-700 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Export PDF
+              </button>
+            )}
             <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
           </div>
         </header>
@@ -783,9 +911,12 @@ export default function PerformancePage() {
                   {/* Host cards */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                     {visibleHostStats.map((hs, idx) => {
-                      const color = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
-                      const revenuePerHour = hs.durationHours > 0 ? hs.totalSales / hs.durationHours : null;
-                      const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+                      const color           = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
+                      const profitPerHour   = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
+                      const revenuePerHour  = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
+                      const ordersPerHour   = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+                      const tier            = getPayTier(profitPerHour);
+                      const estimatedPay    = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
 
                       const stats = [
                         {
@@ -814,9 +945,14 @@ export default function PerformancePage() {
                           valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}`,
                         },
                         {
+                          label: 'Profit per Hour',
+                          value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—',
+                          valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`,
+                        },
+                        {
                           label: 'Revenue per Hour',
                           value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—',
-                          valueClass: 'text-amber-500 font-black',
+                          valueClass: 'text-slate-500 dark:text-slate-400 font-bold',
                         },
                         {
                           label: 'Orders per Hour',
@@ -838,12 +974,19 @@ export default function PerformancePage() {
                             >
                               {hs.host[0]?.toUpperCase()}
                             </div>
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="font-black text-slate-900 dark:text-white text-base leading-tight">{hs.host}</p>
                               <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
                                 Livestream {idx + 1}
                               </p>
                             </div>
+                            {/* Pay rate badge in header */}
+                            {tier && (
+                              <div className={`flex-shrink-0 rounded-lg border px-3 py-1.5 text-center ${tier.bg} ${tier.border}`}>
+                                <p className={`text-base font-black leading-none ${tier.text}`}>{tier.label}</p>
+                                <p className={`text-[9px] font-bold mt-0.5 ${tier.text} opacity-70`}>pay rate</p>
+                              </div>
+                            )}
                           </div>
 
                           {/* Stats list */}
@@ -855,6 +998,31 @@ export default function PerformancePage() {
                               </div>
                             ))}
                           </div>
+
+                          {/* Pay rate footer */}
+                          {hs.durationHours > 0 && (
+                            <div className={`px-5 py-3 border-t border-slate-100 dark:border-slate-700 ${tier ? `${tier.bg} ${tier.border}` : 'bg-slate-50 dark:bg-slate-700/30'}`}>
+                              {tier ? (
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                      {tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
+                                    </p>
+                                  </div>
+                                  <span className={`text-xl font-black ${tier.text}`}>${fmtMoney(estimatedPay!)}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-400">
+                                    {profitPerHour !== null
+                                      ? `$${fmtMoney(profitPerHour)}/hr profit — needs $300+/hr to qualify for pay tier`
+                                      : 'Duration needed to calculate pay rate'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
