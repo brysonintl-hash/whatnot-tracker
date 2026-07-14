@@ -10,7 +10,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler);
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type Session = { username: string; role: string; name: string };
 type Order = {
@@ -18,11 +18,10 @@ type Order = {
   buyer: string; modelNum: string; productName: string; timestamp: string;
 };
 type Item = { qty: number; modelNum: string; description: string; retail: number; total: number };
-type DateRange    = '7d' | '30d' | '90d' | 'all' | 'custom';
-type DashTab      = 'today' | 'historical' | 'calendar' | 'reports';
-type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'custom';
-type SortCol      = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | 'timestamp' | null;
-type SortDir      = 'asc' | 'desc';
+type DateRange = '7d' | '30d' | '90d' | 'all' | 'custom';
+type DashTab   = 'historical' | 'calendar';
+type SortCol   = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | 'timestamp' | null;
+type SortDir   = 'asc' | 'desc';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -44,8 +43,6 @@ function dKey(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function startOfDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-
 function fmtTimestamp(ts: string): string {
   if (!ts) return '—';
   const d = new Date(ts.replace(' ', 'T'));
@@ -58,40 +55,14 @@ function pct(curr: number, prev: number) {
   return ((curr - prev) / prev) * 100;
 }
 
-function pctDiff(curr: number, prev: number): number | null {
-  if (prev === 0 && curr === 0) return null;
-  if (prev === 0) return curr > 0 ? 100 : -100;
-  return ((curr - prev) / Math.abs(prev)) * 100;
-}
-
-function downloadCSV(rows: string[][], filename: string) {
-  const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
-    download: filename,
-  });
-  a.click();
-}
-
-const HOST_COLORS  = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
-const MONTH_NAMES  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const HOST_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 const IC = {
-  revenue:   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  cart:      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
-  box:       <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
-  wallet:    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
-  cash:      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
-  chart:     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
-  calIcon:   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-  barIcon:   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
-  todayIcon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
-  docIcon:   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-  pdf:       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
-  csv:       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 3v18M14 3v18M3 3h18v18H3z" /></svg>,
-  excel:     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+  calIcon: <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  barIcon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
 };
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
@@ -140,7 +111,7 @@ function CalendarView({ orders }: { orders: Order[] }) {
     orders.filter(o => { const d = parseTabDate(o.tab); return d.getFullYear() === calYear && d.getMonth() === calMonth; }),
   [orders, calYear, calMonth]);
 
-  const mRev = monthOrders.reduce((s, o) => s + o.sold, 0);
+  const mRev    = monthOrders.reduce((s, o) => s + o.sold, 0);
   const mProfit = monthOrders.reduce((s, o) => s + o.profit, 0);
   const mMargin = mRev > 0 ? (mProfit / mRev) * 100 : 0;
   const mCount  = monthOrders.length;
@@ -172,7 +143,6 @@ function CalendarView({ orders }: { orders: Order[] }) {
 
   return (
     <div>
-      {/* Monthly summary — same card style as Historical Analytics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 shadow-lg">
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Revenue</p>
@@ -196,7 +166,6 @@ function CalendarView({ orders }: { orders: Order[] }) {
         </div>
       </div>
 
-      {/* Calendar */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
           <div className="flex items-center gap-2.5">
@@ -253,14 +222,9 @@ export default function AdminPage() {
   const [items, setItems]     = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [dashTab, setDashTab]     = useState<DashTab>('today');
+  const [dashTab, setDashTab]     = useState<DashTab>('historical');
   const [dateRange, setDateRange] = useState<DateRange>('all');
   const [customDate, setCustomDate] = useState('');
-
-  // Reports
-  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('daily');
-  const [reportDate, setReportDate]     = useState(() => new Date().toISOString().split('T')[0]);
-  const [reportEndDate, setReportEndDate] = useState('');
 
   const [search, setSearch]   = useState('');
   const [perPage, setPerPage] = useState(20);
@@ -294,44 +258,6 @@ export default function AdminPage() {
   }, []);
 
   const now = new Date();
-  const todayStart     = startOfDay(now);
-  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(todayStart.getDate() - 1);
-
-  // ── Today / Yesterday ────────────────────────────────────────────────────────
-
-  const todayOrders = useMemo(() => orders.filter(o => parseTabDate(o.tab) >= todayStart), [orders]);
-  const yesterdayOrders = useMemo(() => orders.filter(o => { const d = parseTabDate(o.tab); return d >= yesterdayStart && d < todayStart; }), [orders]);
-
-  const last7Sparkline = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (let i = 6; i >= 0; i--) { const d = new Date(now); d.setDate(now.getDate() - i); map[dKey(d.getFullYear(), d.getMonth(), d.getDate())] = 0; }
-    orders.forEach(o => { const k = tabToKey(o.tab); if (k in map) map[k] = (map[k] || 0) + o.sold; });
-    return Object.values(map);
-  }, [orders]);
-
-  const todayByHost = useMemo(() => {
-    const m: Record<string, { rev: number; profit: number; count: number }> = {};
-    todayOrders.forEach(o => {
-      if (!o.host) return;
-      if (!m[o.host]) m[o.host] = { rev: 0, profit: 0, count: 0 };
-      m[o.host].rev += o.sold; m[o.host].profit += o.profit; m[o.host].count++;
-    });
-    return Object.entries(m).sort((a, b) => b[1].rev - a[1].rev);
-  }, [todayOrders]);
-
-  const tRev    = todayOrders.reduce((s, o) => s + o.sold, 0);
-  const tProfit = todayOrders.reduce((s, o) => s + o.profit, 0);
-  const tCOGS   = todayOrders.reduce((s, o) => s + (o.sold - o.profit), 0);
-  const tMargin = tRev > 0 ? (tProfit / tRev) * 100 : 0;
-  const tCount  = todayOrders.length;
-
-  const yRev    = yesterdayOrders.reduce((s, o) => s + o.sold, 0);
-  const yProfit = yesterdayOrders.reduce((s, o) => s + o.profit, 0);
-  const yCOGS   = yesterdayOrders.reduce((s, o) => s + (o.sold - o.profit), 0);
-  const yMargin = yRev > 0 ? (yProfit / yRev) * 100 : 0;
-  const yCount  = yesterdayOrders.length;
-
-  // ── Historical ────────────────────────────────────────────────────────────────
 
   const filteredOrders = useMemo(() => orders.filter(o => {
     const d = parseTabDate(o.tab);
@@ -398,113 +324,6 @@ export default function AdminPage() {
   const totalPages  = Math.ceil(searchedOrders.length / perPage);
   const pagedOrders = searchedOrders.slice(page * perPage, (page + 1) * perPage);
 
-  // ── Reports ───────────────────────────────────────────────────────────────────
-
-  const reportOrders = useMemo(() => {
-    return orders.filter(o => {
-      const d = parseTabDate(o.tab);
-      const sel = new Date(reportDate + 'T00:00:00');
-      if (reportPeriod === 'daily') return d.toDateString() === sel.toDateString();
-      if (reportPeriod === 'weekly') {
-        const ws = new Date(sel); ws.setDate(sel.getDate() - sel.getDay());
-        const we = new Date(ws); we.setDate(ws.getDate() + 6);
-        return d >= ws && d <= we;
-      }
-      if (reportPeriod === 'monthly') return d.getFullYear() === sel.getFullYear() && d.getMonth() === sel.getMonth();
-      if (reportPeriod === 'custom') {
-        const e = reportEndDate ? new Date(reportEndDate + 'T23:59:59') : sel;
-        return d >= sel && d <= e;
-      }
-      return false;
-    });
-  }, [orders, reportPeriod, reportDate, reportEndDate]);
-
-  const rRev    = reportOrders.reduce((s, o) => s + o.sold, 0);
-  const rProfit = reportOrders.reduce((s, o) => s + o.profit, 0);
-  const rCOGS   = reportOrders.reduce((s, o) => s + (o.sold - o.profit), 0);
-  const rMargin = rRev > 0 ? (rProfit / rRev) * 100 : 0;
-  const rCount  = reportOrders.length;
-  const rAvgSale = rCount > 0 ? rRev / rCount : 0;
-  const rOpDays = new Set(reportOrders.map(o => o.tab)).size;
-
-  const reportByProduct = useMemo(() => {
-    const m: Record<string, { name: string; count: number; rev: number; profit: number }> = {};
-    reportOrders.forEach(o => {
-      const k = o.modelNum || 'Unknown';
-      if (!m[k]) m[k] = { name: o.productName || o.modelNum || 'Unknown', count: 0, rev: 0, profit: 0 };
-      m[k].count += 1; m[k].rev += o.sold; m[k].profit += o.profit;
-    });
-    return Object.entries(m).sort((a, b) => b[1].rev - a[1].rev).slice(0, 10);
-  }, [reportOrders]);
-
-  const reportByHost = useMemo(() => {
-    const m: Record<string, { rev: number; profit: number; count: number }> = {};
-    reportOrders.forEach(o => {
-      if (!o.host) return;
-      if (!m[o.host]) m[o.host] = { rev: 0, profit: 0, count: 0 };
-      m[o.host].rev += o.sold; m[o.host].profit += o.profit; m[o.host].count++;
-    });
-    return Object.entries(m).sort((a, b) => b[1].rev - a[1].rev);
-  }, [reportOrders]);
-
-  function exportReportCSV() {
-    const rows = [
-      ['Product', 'Model', 'Buyer', 'Host', 'Show', 'Revenue', 'Profit', 'Margin%'],
-      ...reportOrders.map(o => [o.productName, o.modelNum, o.buyer, o.host, o.tab, o.sold.toFixed(2), o.profit.toFixed(2), o.margin.toFixed(1)]),
-    ];
-    downloadCSV(rows, `report-${reportDate}.csv`);
-  }
-
-  function exportReportExcel() {
-    const rows = [
-      ['Product', 'Model', 'Buyer', 'Host', 'Show', 'Revenue', 'Profit', 'Margin%'],
-      ...reportOrders.map(o => [o.productName, o.modelNum, o.buyer, o.host, o.tab, o.sold.toFixed(2), o.profit.toFixed(2), o.margin.toFixed(1)]),
-    ];
-    downloadCSV(rows, `report-${reportDate}.xls`);
-  }
-
-  function exportReportPDF() {
-    const w = window.open('', '_blank');
-    if (!w) return;
-    const periodLabel = reportPeriod === 'daily' ? reportDate
-      : reportPeriod === 'weekly' ? `Week of ${reportDate}`
-      : reportPeriod === 'monthly' ? reportDate.slice(0, 7)
-      : `${reportDate} – ${reportEndDate || reportDate}`;
-
-    const rows = reportByProduct.slice(0, 10).map(([model, d], i) => `
-      <tr>
-        <td>${i + 1}</td><td>${d.name}</td><td>${model}</td>
-        <td>${d.count}</td><td>$${fmt(d.rev)}</td>
-        <td style="color:${d.profit>=0?'#10B981':'#EF4444'}">$${fmt(d.profit)}</td>
-      </tr>`).join('');
-
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report — ${periodLabel}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;color:#1e293b;padding:40px;font-size:13px;background:#fff}
-h1{font-size:22px;font-weight:900;margin-bottom:4px}p.sub{font-size:11px;color:#64748b;margin-bottom:28px}
-.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
-.kpi-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
-.kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:4px}
-.kpi-value{font-size:22px;font-weight:900;color:#0f172a}
-h2{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:0 0 10px;border-bottom:2px solid #e2e8f0;padding-bottom:6px}
-table{width:100%;border-collapse:collapse}
-th{font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;padding:6px 10px;border-bottom:2px solid #e2e8f0;text-align:left}
-td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
-@media print{@page{margin:14mm}body{padding:0}}</style></head><body>
-<h1>Stack Bargains — Report</h1>
-<p class="sub">${periodLabel} &nbsp;·&nbsp; Generated ${new Date().toLocaleString('en-US')}</p>
-<div class="kpi">
-  <div class="kpi-card"><div class="kpi-label">Revenue</div><div class="kpi-value">$${fmt(rRev)}</div></div>
-  <div class="kpi-card"><div class="kpi-label">Gross Profit</div><div class="kpi-value" style="color:${rProfit>=0?'#10B981':'#EF4444'}">$${fmt(rProfit)}</div></div>
-  <div class="kpi-card"><div class="kpi-label">COGS</div><div class="kpi-value">$${fmt(rCOGS)}</div></div>
-  <div class="kpi-card"><div class="kpi-label">Avg Margin</div><div class="kpi-value">${rMargin.toFixed(1)}%</div></div>
-</div>
-<h2>Top Products</h2>
-<table><thead><tr><th>#</th><th>Product</th><th>Model</th><th>Qty</th><th>Revenue</th><th>Profit</th></tr></thead>
-<tbody>${rows}</tbody></table>
-<script>window.onload=()=>{window.print();}</script></body></html>`);
-    w.document.close();
-  }
-
   function applySort(col: SortCol, dir: SortDir) { setSortCol(col); setSortDir(dir); setFilterOpen(null); }
 
   function SortHeader({ col, label, align = 'left' }: { col: SortCol; label: string; align?: 'left' | 'right' | 'center' }) {
@@ -538,13 +357,6 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
 
   if (!session) return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
 
-  const tabDefs: { key: DashTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'today',      label: "Today's Sales",       icon: IC.todayIcon },
-    { key: 'historical', label: 'Historical Analytics', icon: IC.barIcon },
-    { key: 'calendar',   label: 'Calendar View',        icon: IC.calIcon },
-    { key: 'reports',    label: 'Reports',              icon: IC.docIcon },
-  ];
-
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden" onClick={() => setFilterOpen(null)}>
       <Sidebar role={session.role as Role} userName={session.name} />
@@ -568,8 +380,11 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
           ) : (
             <>
               {/* Tab bar */}
-              <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800 rounded-2xl p-1.5 w-fit mb-6 flex-wrap">
-                {tabDefs.map(t => (
+              <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800 rounded-2xl p-1.5 w-fit mb-6">
+                {([
+                  { key: 'historical' as const, label: 'Historical Analytics', icon: IC.barIcon },
+                  { key: 'calendar'   as const, label: 'Calendar View',        icon: IC.calIcon },
+                ]).map(t => (
                   <button key={t.key} onClick={() => setDashTab(t.key)}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${dashTab === t.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                     {t.icon}{t.label}
@@ -577,96 +392,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                 ))}
               </div>
 
-              {/* ── TODAY'S SALES ──────────────────────────────────────────── */}
-              {dashTab === 'today' && (
-                <>
-                  <div className="mb-6">
-                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Today&apos;s Sales Dashboard</h2>
-                    <p className="text-slate-400 text-sm mt-0.5">{now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                  </div>
-
-                  {/* KPI cards — same style as Historical Analytics */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    {/* Hero dark card */}
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
-                      <div className="flex items-start justify-between mb-1">
-                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Revenue</p>
-                        {(() => { const c = pctDiff(tRev, yRev); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}% vs yest.</span> : null; })()}
-                      </div>
-                      <p className="text-3xl font-black text-white mb-3">${fmt(tRev)}</p>
-                      <Sparkline data={last7Sparkline} color="#F59E0B" height={40} />
-                      <p className="text-slate-500 text-[11px] mt-2">{tCount} orders · last 7 days trend</p>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                      <div className="flex items-start justify-between mb-1">
-                        <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Profit</p>
-                        {(() => { const c = pctDiff(tProfit, yProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
-                      </div>
-                      <p className={`text-2xl font-black mb-2 ${tProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(tProfit)}</p>
-                      <Sparkline data={last7Sparkline.map(v => v * (tRev > 0 ? tProfit / tRev : 0))} color="#10B981" height={32} />
-                      <p className="text-slate-400 text-[11px] mt-1">after COGS</p>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                      <div className="flex items-start justify-between mb-1">
-                        <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Avg Margin</p>
-                        {(() => { const c = pctDiff(tMargin, yMargin); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
-                      </div>
-                      <p className={`text-2xl font-black mb-2 ${tMargin >= 30 ? 'text-emerald-600 dark:text-emerald-400' : tMargin >= 15 ? 'text-amber-500' : 'text-red-500'}`}>{tMargin.toFixed(1)}%</p>
-                      <Sparkline data={Array(last7Sparkline.length).fill(tMargin)} color="#3B82F6" height={32} />
-                      <p className="text-slate-400 text-[11px] mt-1">profit / revenue · target 30%</p>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                      <div className="flex items-start justify-between mb-1">
-                        <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">COGS</p>
-                        {(() => { const c = pctDiff(tCOGS, yCOGS); return c !== null ? <span className={`text-xs font-bold ${c <= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
-                      </div>
-                      <p className="text-2xl font-black text-slate-900 dark:text-white mb-2">${fmt(tCOGS)}</p>
-                      <div className="flex gap-2 mt-1">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-50 dark:bg-slate-700 text-slate-500">{tCount} orders</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-50 dark:bg-slate-700 text-slate-500">yest: ${fmt(yCOGS)}</span>
-                      </div>
-                      <p className="text-slate-400 text-[11px] mt-2">cost of goods sold</p>
-                    </div>
-                  </div>
-
-                  {/* Today's host performance */}
-                  {todayByHost.length > 0 ? (
-                    <>
-                      <p className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Today&apos;s Host Performance</p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {todayByHost.map(([host, data], i) => (
-                          <div key={host} className="bg-white dark:bg-slate-800 rounded-xl border-l-4 border border-slate-100 dark:border-slate-700 shadow-sm p-5" style={{ borderLeftColor: HOST_COLORS[i % HOST_COLORS.length] }}>
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black shadow" style={{ backgroundColor: HOST_COLORS[i % HOST_COLORS.length] }}>{host[0]}</div>
-                                <span className="font-black text-slate-900 dark:text-white text-base">{host}</span>
-                              </div>
-                              <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-semibold">{data.count} orders</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3">
-                                <p className="text-slate-400 text-xs mb-0.5">Revenue</p>
-                                <p className="font-black text-slate-900 dark:text-white text-lg">${fmt(data.rev)}</p>
-                              </div>
-                              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3">
-                                <p className="text-slate-400 text-xs mb-0.5">Profit</p>
-                                <p className={`font-black text-lg ${data.profit >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>${fmt(data.profit)}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-slate-400 text-sm py-8">No sales recorded for today yet.</div>
-                  )}
-                </>
-              )}
-
-              {/* ── HISTORICAL ANALYTICS ───────────────────────────────────── */}
+              {/* ── HISTORICAL ANALYTICS ─────────────────────────────────── */}
               {dashTab === 'historical' && (
                 <>
                   <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -789,166 +515,8 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                 </>
               )}
 
-              {/* ── CALENDAR VIEW ──────────────────────────────────────────── */}
+              {/* ── CALENDAR VIEW ────────────────────────────────────────── */}
               {dashTab === 'calendar' && <CalendarView orders={orders} />}
-
-              {/* ── REPORTS ────────────────────────────────────────────────── */}
-              {dashTab === 'reports' && (
-                <>
-                  <div className="mb-6">
-                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Reports</h2>
-                    <p className="text-slate-400 text-sm mt-0.5">Generate and export business reports</p>
-                  </div>
-
-                  {/* Report Configuration */}
-                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-6">
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Report Configuration</h3>
-
-                    {/* Period tabs */}
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl p-1 w-fit mb-5">
-                      {(['daily','weekly','monthly','custom'] as ReportPeriod[]).map(p => (
-                        <button key={p} onClick={() => setReportPeriod(p)}
-                          className={`px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all flex items-center gap-1.5 ${reportPeriod === p ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}>
-                          {IC.calIcon}{p.charAt(0).toUpperCase() + p.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Date selector */}
-                    <div className="flex flex-wrap items-center gap-4 mb-5">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Select Date:</span>
-                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2">
-                          {IC.calIcon}
-                          <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)}
-                            className="text-sm bg-transparent text-slate-700 dark:text-slate-300 outline-none font-medium" />
-                        </div>
-                        {reportPeriod === 'custom' && (
-                          <>
-                            <span className="text-sm text-slate-400">to</span>
-                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2">
-                              {IC.calIcon}
-                              <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)}
-                                className="text-sm bg-transparent text-slate-700 dark:text-slate-300 outline-none font-medium" />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Export buttons */}
-                    <div className="flex items-center gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-                      <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Export:</span>
-                      <button onClick={exportReportPDF} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-lg transition-colors shadow-sm">{IC.pdf} PDF</button>
-                      <button onClick={exportReportCSV} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-lg transition-colors">{IC.csv} CSV</button>
-                      <button onClick={exportReportExcel} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-lg transition-colors">{IC.excel} Excel</button>
-                      <span className="ml-auto text-xs text-slate-400">{reportOrders.length} orders in range</span>
-                    </div>
-                  </div>
-
-                  {/* Report KPI cards — colored style matching screenshot */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    {[
-                      { label: 'REVENUE', value: `$${fmt(rRev)}`, icon: IC.revenue, iconBg: 'bg-amber-400', cardBg: 'bg-amber-50 dark:bg-amber-900/10', vc: 'text-amber-500' },
-                      { label: 'GROSS PROFIT', value: `$${fmt(rProfit)}`, icon: IC.wallet, iconBg: 'bg-blue-500', cardBg: 'bg-blue-50 dark:bg-blue-900/10', vc: rProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500' },
-                      { label: 'COGS', value: `$${fmt(rCOGS)}`, icon: IC.box, iconBg: 'bg-amber-400', cardBg: 'bg-amber-50 dark:bg-amber-900/10', vc: 'text-amber-500' },
-                      { label: 'NET PROFIT', value: `$${fmt(rProfit)}`, icon: IC.cash, iconBg: 'bg-amber-400', cardBg: 'bg-amber-50 dark:bg-amber-900/10', vc: rProfit >= 0 ? 'text-amber-500' : 'text-red-500' },
-                    ].map(c => (
-                      <div key={c.label} className={`${c.cardBg} rounded-2xl p-5 flex items-start gap-4`}>
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg}`}>{c.icon}</div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">{c.label}</p>
-                          <p className={`text-2xl font-black ${c.vc}`}>{c.value}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Secondary stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    {[
-                      { label: 'Total Sales', value: String(rCount), sub: 'orders' },
-                      { label: 'Avg Sale', value: `$${fmt(rAvgSale)}`, sub: 'per order' },
-                      { label: 'Gross Margin', value: `${rMargin.toFixed(1)}%`, sub: 'profit / revenue' },
-                      { label: 'Operating Days', value: String(rOpDays), sub: 'unique show dates' },
-                    ].map(s => (
-                      <div key={s.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 text-center">
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">{s.label}</p>
-                        <p className="text-2xl font-black text-slate-900 dark:text-white">{s.value}</p>
-                        <p className="text-[10px] text-slate-400 mt-1">{s.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Top Products + Host Breakdown */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    {/* Top Products */}
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                        <h3 className="font-bold text-slate-900 dark:text-white text-sm">Top Products</h3>
-                      </div>
-                      {reportByProduct.length === 0 ? (
-                        <div className="py-10 text-center text-slate-400 text-sm">No data for this period</div>
-                      ) : (
-                        <table className="w-full">
-                          <thead><tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/20">
-                            <th className="py-2.5 px-4 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">#</th>
-                            <th className="py-2.5 px-4 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">Product</th>
-                            <th className="py-2.5 px-4 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400">Qty</th>
-                            <th className="py-2.5 px-4 text-right text-[10px] font-bold uppercase tracking-wide text-slate-400">Revenue</th>
-                            <th className="py-2.5 px-4 text-right text-[10px] font-bold uppercase tracking-wide text-slate-400">Profit</th>
-                          </tr></thead>
-                          <tbody>
-                            {reportByProduct.map(([model, d], i) => (
-                              <tr key={model} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20">
-                                <td className="py-3 px-4 text-xs text-slate-400">{i + 1}</td>
-                                <td className="py-3 px-4">
-                                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{d.name}</p>
-                                  <p className="text-[10px] text-slate-400 font-mono">{model}</p>
-                                </td>
-                                <td className="py-3 px-4 text-center text-xs text-slate-600 dark:text-slate-400">{d.count}</td>
-                                <td className="py-3 px-4 text-right text-xs font-bold text-slate-900 dark:text-white">${fmt(d.rev)}</td>
-                                <td className={`py-3 px-4 text-right text-xs font-bold ${d.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmt(d.profit)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-
-                    {/* Revenue by Host */}
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                        <h3 className="font-bold text-slate-900 dark:text-white text-sm">Revenue by Host</h3>
-                      </div>
-                      {reportByHost.length === 0 ? (
-                        <div className="py-10 text-center text-slate-400 text-sm">No data</div>
-                      ) : (
-                        <div className="p-4 space-y-3">
-                          {reportByHost.map(([host, d], i) => {
-                            const share = rRev > 0 ? (d.rev / rRev) * 100 : 0;
-                            return (
-                              <div key={host}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black" style={{ backgroundColor: HOST_COLORS[i % HOST_COLORS.length] }}>{host[0]}</div>
-                                    <span className="text-xs font-bold text-slate-900 dark:text-white">{host}</span>
-                                  </div>
-                                  <span className="text-xs font-black text-slate-700 dark:text-slate-300">${fmt(d.rev)}</span>
-                                </div>
-                                <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                                  <div className="h-full rounded-full transition-all" style={{ width: `${share}%`, backgroundColor: HOST_COLORS[i % HOST_COLORS.length] }} />
-                                </div>
-                                <p className="text-[10px] text-slate-400 mt-0.5">{share.toFixed(1)}% of revenue · {d.count} orders</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
             </>
           )}
         </main>
