@@ -432,7 +432,7 @@ export default function AdminPage() {
     reportOrders.forEach(o => {
       const k = o.modelNum || 'Unknown';
       if (!m[k]) m[k] = { name: o.productName || o.modelNum || 'Unknown', count: 0, rev: 0, profit: 0 };
-      m[k].count += o.qty || 1; m[k].rev += o.sold; m[k].profit += o.profit;
+      m[k].count += 1; m[k].rev += o.sold; m[k].profit += o.profit;
     });
     return Object.entries(m).sort((a, b) => b[1].rev - a[1].rev).slice(0, 10);
   }, [reportOrders]);
