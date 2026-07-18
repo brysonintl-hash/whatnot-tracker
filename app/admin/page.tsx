@@ -2,9 +2,12 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
 import OnlineUsers from '@/components/OnlineUsers';
 import type { Role } from '@/lib/types';
+
+const USChoroplethMap = dynamic(() => import('@/components/USChoroplethMap'), { ssr: false });
 import { Line, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 
@@ -217,28 +220,6 @@ function CalendarView({ orders }: { orders: Order[] }) {
 
 // ── ShipmentDistribution ──────────────────────────────────────────────────────
 
-const STATE_GRID: Record<string, [number, number]> = {
-  AK: [0, 0],                                                                                                                                    ME: [9, 0],
-  WA: [0, 1], MT: [1, 1], ND: [2, 1], MN: [3, 1], WI: [4, 1], MI: [5, 1],                                             VT: [8, 1], NH: [9, 1],
-  OR: [0, 2], ID: [1, 2], SD: [2, 2], IA: [3, 2], IL: [4, 2], IN: [5, 2], OH: [6, 2], PA: [7, 2], NY: [8, 2], MA: [9, 2], RI: [10, 2],
-  CA: [0, 3], NV: [1, 3], WY: [2, 3], NE: [3, 3], MO: [4, 3], KY: [5, 3], WV: [6, 3], VA: [7, 3], MD: [8, 3], NJ: [9, 3], CT: [10, 3], DE: [11, 3],
-              AZ: [1, 4], UT: [2, 4], CO: [3, 4], KS: [4, 4], AR: [5, 4], TN: [6, 4], NC: [7, 4], SC: [8, 4],
-                          NM: [2, 5], OK: [3, 5], MS: [4, 5], AL: [5, 5], GA: [6, 5],
-  HI: [0, 6],                         TX: [3, 6], LA: [4, 6], FL: [5, 6],
-};
-
-const STEP = 38, TILE = 34, COLS = 12, ROWS = 7;
-
-function tileColor(count: number, max: number): string {
-  if (!count || !max) return '#1e293b';
-  const r = count / max;
-  if (r > 0.75) return '#065f46';
-  if (r > 0.5)  return '#047857';
-  if (r > 0.25) return '#059669';
-  if (r > 0.1)  return '#10b981';
-  return '#6ee7b7';
-}
-
 function ShipmentDistribution({ orders }: { orders: Order[] }) {
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -263,8 +244,9 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
-        <div className="flex items-start justify-between mb-4">
+      {/* Map card */}
+      <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
+        <div className="flex items-start justify-between mb-2">
           <div>
             <h2 className="text-base font-black text-slate-900 dark:text-white">Shipment Distribution</h2>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -281,43 +263,34 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
           )}
         </div>
 
-        <svg
-          viewBox={`0 0 ${COLS * STEP} ${ROWS * STEP}`}
-          className="w-full"
-          onMouseLeave={() => setHovered(null)}
-        >
-          {Object.entries(STATE_GRID).map(([st, [col, row]]) => {
-            const count = stateData[st] || 0;
-            return (
-              <g key={st} onMouseEnter={() => setHovered(st)} style={{ cursor: 'pointer' }}>
-                <rect
-                  x={col * STEP} y={row * STEP}
-                  width={TILE} height={TILE} rx={5}
-                  fill={tileColor(count, maxCount)}
-                  stroke={hovered === st ? '#f59e0b' : 'transparent'}
-                  strokeWidth={2}
-                />
-                <text
-                  x={col * STEP + TILE / 2} y={row * STEP + TILE / 2 + 4}
-                  textAnchor="middle" fontSize="9" fontWeight="700"
-                  fill={count > 0 ? '#ffffff' : '#475569'}
-                >
-                  {st}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+        <USChoroplethMap
+          stateData={stateData}
+          maxCount={maxCount}
+          hovered={hovered}
+          onHover={setHovered}
+        />
 
-        <div className="flex items-center gap-2 mt-3 justify-end">
-          <span className="text-[10px] text-slate-500">Fewer</span>
-          {['#6ee7b7','#10b981','#059669','#047857','#065f46'].map(c => (
-            <div key={c} className="w-6 h-2.5 rounded-sm" style={{ background: c }} />
-          ))}
-          <span className="text-[10px] text-slate-500">More</span>
+        {/* Color legend */}
+        <div className="flex items-center gap-2 mt-1 justify-center">
+          <span className="text-[10px] text-slate-500">0</span>
+          <div className="flex gap-0.5">
+            {Array.from({ length: 12 }, (_, i) => {
+              const t = i / 11;
+              const stops = [[209,250,229],[110,231,183],[16,185,129],[4,120,87],[6,78,59]] as const;
+              const raw = t * 4;
+              const si = Math.min(Math.floor(raw), 3);
+              const f = raw - si;
+              const r = Math.round(stops[si][0] * (1 - f) + stops[si + 1][0] * f);
+              const g = Math.round(stops[si][1] * (1 - f) + stops[si + 1][1] * f);
+              const b = Math.round(stops[si][2] * (1 - f) + stops[si + 1][2] * f);
+              return <div key={i} className="w-5 h-2.5 rounded-sm" style={{ background: `rgb(${r},${g},${b})` }} />;
+            })}
+          </div>
+          <span className="text-[10px] text-slate-500">{maxCount > 0 ? maxCount.toLocaleString() : 'Max'}</span>
         </div>
       </div>
 
+      {/* Top states table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
         <h2 className="text-base font-black text-slate-900 dark:text-white mb-4">Top States</h2>
         {total === 0 ? (
