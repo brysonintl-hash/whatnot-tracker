@@ -32,6 +32,7 @@ declare module 'react-simple-maps' {
       pressed?: CSSProperties;
     };
     onMouseEnter?: MouseEventHandler<SVGPathElement>;
+    onMouseMove?: MouseEventHandler<SVGPathElement>;
     onMouseLeave?: MouseEventHandler<SVGPathElement>;
     onClick?: MouseEventHandler<SVGPathElement>;
     [key: string]: unknown;
