@@ -226,13 +226,18 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
   const stateData = useMemo(() => {
     const counts: Record<string, number> = {};
     orders.forEach(o => {
-      const addr = o.shippingAddress;
+      const addr = o.shippingAddress?.trim();
       if (!addr) return;
-      const parts = addr.split(',').map((p: string) => p.trim());
-      const st = parts[1] ?? '';
-      if (/^[A-Z]{2}$/.test(st) && st !== 'US') {
-        counts[st] = (counts[st] || 0) + 1;
+      let st = '';
+      if (/^[A-Z]{2}$/.test(addr)) {
+        st = addr; // new format: just "TX"
+      } else {
+        // old format: "City, ST, ZIP, US"
+        const parts = addr.split(',').map((p: string) => p.trim());
+        const candidate = parts[1] ?? '';
+        if (/^[A-Z]{2}$/.test(candidate) && candidate !== 'US') st = candidate;
       }
+      if (st) counts[st] = (counts[st] || 0) + 1;
     });
     return counts;
   }, [orders]);
