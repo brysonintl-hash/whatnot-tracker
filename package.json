@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
     "chart.js": "^4.4.3",
     "chartjs-plugin-zoom": "^2.2.0",
     "googleapis": "^144.0.0",
