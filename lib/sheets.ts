@@ -77,6 +77,7 @@ export async function getSalesData(): Promise<SaleOrder[]> {
           timestamp: row[11] || '',
           host: parseHost(row[12]) || '',
           livestream: parseInt(row[13]) || 1,
+          shippingAddress: row[14] || '',
         });
       }
     });

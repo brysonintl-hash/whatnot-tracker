@@ -16,10 +16,11 @@ type Session = { username: string; role: string; name: string };
 type Order = {
   tab: string; sold: number; profit: number; margin: number; host: string;
   buyer: string; modelNum: string; productName: string; timestamp: string;
+  shippingAddress?: string;
 };
 type Item = { qty: number; modelNum: string; description: string; retail: number; total: number };
 type DateRange = '7d' | '30d' | '90d' | 'all' | 'custom';
-type DashTab   = 'historical' | 'calendar';
+type DashTab   = 'historical' | 'calendar' | 'shipping';
 type SortCol   = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | 'timestamp' | null;
 type SortDir   = 'asc' | 'desc';
 
@@ -63,6 +64,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 const IC = {
   calIcon: <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
   barIcon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+  mapIcon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>,
 };
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
@@ -208,6 +210,147 @@ function CalendarView({ orders }: { orders: Order[] }) {
             <div key={l} className="flex items-center gap-1.5"><div className={`w-2.5 h-2.5 rounded-full ${d}`}/><span className="text-[11px] text-slate-500 dark:text-slate-400">{l}</span></div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ShipmentDistribution ──────────────────────────────────────────────────────
+
+const STATE_GRID: Record<string, [number, number]> = {
+  AK: [0, 0],                                                                                                                                    ME: [9, 0],
+  WA: [0, 1], MT: [1, 1], ND: [2, 1], MN: [3, 1], WI: [4, 1], MI: [5, 1],                                             VT: [8, 1], NH: [9, 1],
+  OR: [0, 2], ID: [1, 2], SD: [2, 2], IA: [3, 2], IL: [4, 2], IN: [5, 2], OH: [6, 2], PA: [7, 2], NY: [8, 2], MA: [9, 2], RI: [10, 2],
+  CA: [0, 3], NV: [1, 3], WY: [2, 3], NE: [3, 3], MO: [4, 3], KY: [5, 3], WV: [6, 3], VA: [7, 3], MD: [8, 3], NJ: [9, 3], CT: [10, 3], DE: [11, 3],
+              AZ: [1, 4], UT: [2, 4], CO: [3, 4], KS: [4, 4], AR: [5, 4], TN: [6, 4], NC: [7, 4], SC: [8, 4],
+                          NM: [2, 5], OK: [3, 5], MS: [4, 5], AL: [5, 5], GA: [6, 5],
+  HI: [0, 6],                         TX: [3, 6], LA: [4, 6], FL: [5, 6],
+};
+
+const STEP = 38, TILE = 34, COLS = 12, ROWS = 7;
+
+function tileColor(count: number, max: number): string {
+  if (!count || !max) return '#1e293b';
+  const r = count / max;
+  if (r > 0.75) return '#065f46';
+  if (r > 0.5)  return '#047857';
+  if (r > 0.25) return '#059669';
+  if (r > 0.1)  return '#10b981';
+  return '#6ee7b7';
+}
+
+function ShipmentDistribution({ orders }: { orders: Order[] }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+
+  const stateData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    orders.forEach(o => {
+      const addr = o.shippingAddress;
+      if (!addr) return;
+      const parts = addr.split(',').map((p: string) => p.trim());
+      const st = parts[1] ?? '';
+      if (/^[A-Z]{2}$/.test(st) && st !== 'US') {
+        counts[st] = (counts[st] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [orders]);
+
+  const total = Object.values(stateData).reduce((s, v) => s + v, 0);
+  const maxCount = total > 0 ? Math.max(...Object.values(stateData)) : 0;
+  const topStates = Object.entries(stateData).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const hovData = hovered ? { count: stateData[hovered] || 0, pct: total > 0 ? ((stateData[hovered] || 0) / total) * 100 : 0 } : null;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-base font-black text-slate-900 dark:text-white">Shipment Distribution</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {total > 0
+                ? `${total.toLocaleString()} orders across ${Object.keys(stateData).length} states`
+                : 'No shipping data — add addresses to column O in your spreadsheet'}
+            </p>
+          </div>
+          {hovered && hovData && (
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-900 dark:text-white">{hovered}</p>
+              <p className="text-xs text-slate-400">{hovData.count.toLocaleString()} order{hovData.count !== 1 ? 's' : ''} · {hovData.pct.toFixed(1)}%</p>
+            </div>
+          )}
+        </div>
+
+        <svg
+          viewBox={`0 0 ${COLS * STEP} ${ROWS * STEP}`}
+          className="w-full"
+          onMouseLeave={() => setHovered(null)}
+        >
+          {Object.entries(STATE_GRID).map(([st, [col, row]]) => {
+            const count = stateData[st] || 0;
+            return (
+              <g key={st} onMouseEnter={() => setHovered(st)} style={{ cursor: 'pointer' }}>
+                <rect
+                  x={col * STEP} y={row * STEP}
+                  width={TILE} height={TILE} rx={5}
+                  fill={tileColor(count, maxCount)}
+                  stroke={hovered === st ? '#f59e0b' : 'transparent'}
+                  strokeWidth={2}
+                />
+                <text
+                  x={col * STEP + TILE / 2} y={row * STEP + TILE / 2 + 4}
+                  textAnchor="middle" fontSize="9" fontWeight="700"
+                  fill={count > 0 ? '#ffffff' : '#475569'}
+                >
+                  {st}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+
+        <div className="flex items-center gap-2 mt-3 justify-end">
+          <span className="text-[10px] text-slate-500">Fewer</span>
+          {['#6ee7b7','#10b981','#059669','#047857','#065f46'].map(c => (
+            <div key={c} className="w-6 h-2.5 rounded-sm" style={{ background: c }} />
+          ))}
+          <span className="text-[10px] text-slate-500">More</span>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
+        <h2 className="text-base font-black text-slate-900 dark:text-white mb-4">Top States</h2>
+        {total === 0 ? (
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Add shipping addresses to column O in your spreadsheet.<br /><br />
+            Format: <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">City, ST, ZIP, US</span>
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {topStates.map(([st, count], i) => (
+              <div
+                key={st}
+                className={`rounded-lg px-2 py-1.5 cursor-pointer transition-colors ${hovered === st ? 'bg-amber-50 dark:bg-amber-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}
+                onMouseEnter={() => setHovered(st)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-400 w-4 text-right">{i + 1}</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">{st}</span>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{count.toLocaleString()}</span>
+                    <span className="text-[11px] text-slate-400">{((count / total) * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1">
+                  <div className="h-1 rounded-full bg-emerald-500" style={{ width: `${(count / topStates[0][1]) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -384,6 +527,7 @@ export default function AdminPage() {
                 {([
                   { key: 'historical' as const, label: 'Historical Analytics', icon: IC.barIcon },
                   { key: 'calendar'   as const, label: 'Calendar View',        icon: IC.calIcon },
+                  { key: 'shipping'   as const, label: 'Shipping Map',         icon: IC.mapIcon },
                 ]).map(t => (
                   <button key={t.key} onClick={() => setDashTab(t.key)}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${dashTab === t.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
@@ -517,6 +661,9 @@ export default function AdminPage() {
 
               {/* ── CALENDAR VIEW ────────────────────────────────────────── */}
               {dashTab === 'calendar' && <CalendarView orders={orders} />}
+
+              {/* ── SHIPPING MAP ──────────────────────────────────────────── */}
+              {dashTab === 'shipping' && <ShipmentDistribution orders={filteredOrders} />}
             </>
           )}
         </main>

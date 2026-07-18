@@ -14,6 +14,7 @@ export type SaleOrder = {
   timestamp: string;
   host: string;
   livestream: number;
+  shippingAddress?: string;
 };
 
 export type InventoryItem = {
