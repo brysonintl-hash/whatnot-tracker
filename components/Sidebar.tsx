@@ -7,6 +7,7 @@ import { useTheme } from '@/lib/useTheme';
 import { useIdleLogout } from '@/lib/useIdleLogout';
 import type { Role } from '@/lib/types';
 import Chat from '@/components/Chat';
+import FeatureRequestModal from '@/components/FeatureRequestModal';
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; children?: NavItem[] };
 type Section = { title: string; items: NavItem[] };
@@ -60,8 +61,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
-      { href: '/homedepot', label: 'Home Depot Search', icon: I.hd },
-      { href: '/scraper', label: 'Seller Scraper', icon: I.scraper },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -85,8 +84,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
-      { href: '/homedepot', label: 'Home Depot Search', icon: I.hd },
-      { href: '/scraper', label: 'Seller Scraper', icon: I.scraper },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -143,6 +140,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const [shipmentCount, setShipmentCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [featureOpen, setFeatureOpen] = useState(false);
 
   useEffect(() => {
     if (pathname.startsWith('/shipping')) setExpandedItems(new Set(['/shipping']));
@@ -355,6 +353,15 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
           </div>
         </div>
         <button
+          onClick={() => setFeatureOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 text-sm font-medium transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          Request a Feature
+        </button>
+        <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 text-sm font-medium transition-colors"
         >
@@ -366,6 +373,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       </div>
     </aside>
     <Chat />
+    {featureOpen && <FeatureRequestModal userName={userName} onClose={() => setFeatureOpen(false)} />}
     </>
   );
 }

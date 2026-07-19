@@ -3,10 +3,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import SalesCalendar from '@/components/SalesCalendar';
+import ShipmentMap from '@/components/ShipmentMap';
 
 type Session = { username: string; role: string; name: string };
-type Order = { tab: string; sold: number; profit: number; margin: number; host: string; buyer: string; productName: string; modelNum: string; qty: number };
+type Order = { tab: string; sold: number; profit: number; margin: number; host: string; buyer: string; productName: string; modelNum: string; qty: number; shippingAddress?: string };
 type Item = { qty: number; modelNum: string; description: string; retail: number };
+type DashTab = 'overview' | 'calendar' | 'shipping';
 
 function fmt(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function parseTabDate(tab: string) {
@@ -14,12 +17,19 @@ function parseTabDate(tab: string) {
   return new Date(2000 + y, m - 1, d);
 }
 
+const TABS: { key: DashTab; label: string; icon: React.ReactNode }[] = [
+  { key: 'overview', label: 'Overview', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
+  { key: 'calendar', label: 'Calendar View', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+  { key: 'shipping', label: 'Shipping Map', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
+];
+
 export default function HostPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
+  const [orders, setOrders]   = useState<Order[]>([]);
+  const [items, setItems]     = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dashTab, setDashTab] = useState<DashTab>('overview');
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
@@ -44,8 +54,8 @@ export default function HostPage() {
   }, [orders, session]);
 
   const revenue = myOrders.reduce((s, o) => s + o.sold, 0);
-  const profit = myOrders.reduce((s, o) => s + o.profit, 0);
-  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+  const profit  = myOrders.reduce((s, o) => s + o.profit, 0);
+  const margin  = revenue > 0 ? (profit / revenue) * 100 : 0;
 
   const showBreakdown = useMemo(() => {
     const m: Record<string, { sales: number; profit: number; orders: number }> = {};
@@ -87,17 +97,38 @@ export default function HostPage() {
           <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold">Host</span>
         </header>
 
+        {/* Tab bar */}
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6">
+          <div className="flex gap-1 -mb-px">
+            {TABS.map(tab => (
+              <button key={tab.key} onClick={() => setDashTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-3.5 text-xs font-bold border-b-2 transition-colors ${
+                  dashTab === tab.key
+                    ? 'border-amber-400 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab.icon}{tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <main className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Loading...</div>
+          ) : dashTab === 'calendar' ? (
+            <SalesCalendar orders={myOrders} />
+          ) : dashTab === 'shipping' ? (
+            <ShipmentMap orders={orders} />
           ) : (
             <>
               {/* KPIs */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {[
-                  { label: 'My Revenue', value: `$${fmt(revenue)}`, border: 'border-l-amber-400', text: 'text-slate-900 dark:text-white' },
-                  { label: 'My Profit', value: `$${fmt(profit)}`, border: 'border-l-emerald-400', text: profit >= 0 ? 'text-emerald-600' : 'text-red-500' },
-                  { label: 'Avg Margin', value: `${margin.toFixed(1)}%`, border: 'border-l-blue-400', text: 'text-blue-600' },
+                  { label: 'My Revenue',   value: `$${fmt(revenue)}`, border: 'border-l-amber-400',  text: 'text-slate-900 dark:text-white' },
+                  { label: 'My Profit',    value: `$${fmt(profit)}`,  border: 'border-l-emerald-400', text: profit >= 0 ? 'text-emerald-600' : 'text-red-500' },
+                  { label: 'Avg Margin',   value: `${margin.toFixed(1)}%`, border: 'border-l-blue-400', text: 'text-blue-600' },
                   { label: 'Total Orders', value: myOrders.length.toLocaleString(), border: 'border-l-violet-400', text: 'text-slate-900 dark:text-white' },
                 ].map(k => (
                   <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.border} shadow-sm p-5`}>

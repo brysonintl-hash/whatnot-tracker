@@ -278,7 +278,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
               </div>
 
               {/* Top Products + Host Breakdown */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                   <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
                     <h3 className="font-bold text-slate-900 dark:text-white text-sm">Top Products</h3>
@@ -341,6 +341,55 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                     </div>
                   )}
                 </div>
+              </div>
+              {/* Orders Detail — individual rows with Host */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">Order Details</h3>
+                  <span className="text-xs text-slate-400">{reportOrders.length} orders</span>
+                </div>
+                {reportOrders.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 text-sm">No orders for this period</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead><tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/20">
+                        {['Date', 'Host', 'Product', 'Buyer', 'Revenue', 'Profit', 'Margin'].map(h => (
+                          <th key={h} className="py-2.5 px-4 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {reportOrders.slice(0, 100).map((o, i) => (
+                          <tr key={i} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20">
+                            <td className="py-2.5 px-4 text-xs text-slate-400 whitespace-nowrap">{o.tab}</td>
+                            <td className="py-2.5 px-4">
+                              {o.host ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-black flex-shrink-0"
+                                    style={{ backgroundColor: HOST_COLORS[reportByHost.findIndex(([h])=>h===o.host) % HOST_COLORS.length] || '#64748b' }}>
+                                    {o.host[0]}
+                                  </span>
+                                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.host}</span>
+                                </span>
+                              ) : <span className="text-xs text-slate-400">—</span>}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{o.productName || o.modelNum}</p>
+                              {o.modelNum && o.productName && <p className="text-[10px] text-slate-400 font-mono">{o.modelNum}</p>}
+                            </td>
+                            <td className="py-2.5 px-4 text-xs text-slate-500 dark:text-slate-400">{o.buyer}</td>
+                            <td className="py-2.5 px-4 text-xs font-bold text-slate-900 dark:text-white text-right">${fmt(o.sold)}</td>
+                            <td className={`py-2.5 px-4 text-xs font-bold text-right ${o.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmt(o.profit)}</td>
+                            <td className={`py-2.5 px-4 text-xs font-bold text-right ${o.margin >= 30 ? 'text-emerald-600' : o.margin >= 15 ? 'text-amber-500' : 'text-red-500'}`}>{o.margin.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {reportOrders.length > 100 && (
+                      <p className="text-center text-xs text-slate-400 py-3">Showing first 100 of {reportOrders.length} orders. Export CSV/Excel for the full list.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

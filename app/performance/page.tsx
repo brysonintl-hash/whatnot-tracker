@@ -1002,20 +1002,6 @@ export default function PerformancePage() {
                 Team Calendar
               </button>
             </div>
-            {/* PDF Export */}
-            {selectedDate && hostStats.length > 0 && (
-              <button
-                onClick={() => {
-                  const html = buildPDFHtml(selectedDate, visibleHostStats);
-                  const w = window.open('', '_blank');
-                  if (w) { w.document.write(html); w.document.close(); }
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-white hover:bg-slate-700 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Export PDF
-              </button>
-            )}
             <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
           </div>
         </header>
