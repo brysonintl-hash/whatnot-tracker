@@ -5,6 +5,10 @@ import { google } from 'googleapis';
 
 export const dynamic = 'force-dynamic';
 
+// Dedicated Feature Requests spreadsheet (shared with service account)
+const FEATURE_SHEET_ID = '1f3KoC0ofvo7xDKO-WIT8EElxVD9u2OYks5I-TlYSv2A';
+const HEADERS = ['Date', 'User', 'Role', 'Category', 'Feature Title', 'Description', 'Priority', 'Status'];
+
 function getAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
@@ -33,48 +37,46 @@ export async function POST(req: NextRequest) {
   }
 
   const auth = getAuth();
-  const spreadsheetId = process.env.SALES_SHEET_ID;
-  if (!auth || !spreadsheetId) {
-    return NextResponse.json({ error: 'Sheets not configured' }, { status: 500 });
-  }
+  if (!auth) return NextResponse.json({ error: 'Google credentials not configured' }, { status: 500 });
 
   const sheets = google.sheets({ version: 'v4', auth });
-  const TAB = 'Feature Requests';
   const row = [
     new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }),
-    name, role, category, title, description, priority,
+    name, role, category, title, description, priority, 'Open',
   ];
 
   try {
+    // Get the first sheet name from the spreadsheet
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: FEATURE_SHEET_ID });
+    const firstSheet = meta.data.sheets?.[0]?.properties?.title ?? 'Sheet1';
+
+    // Check if headers exist (row 1)
+    const headersRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: FEATURE_SHEET_ID,
+      range: `'${firstSheet}'!A1:H1`,
+    });
+    const firstRow = headersRes.data.values?.[0];
+    if (!firstRow || firstRow.length === 0) {
+      // Add headers to row 1
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: FEATURE_SHEET_ID,
+        range: `'${firstSheet}'!A1:H1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [HEADERS] },
+      });
+    }
+
+    // Append the new row
     await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: `'${TAB}'!A:G`,
+      spreadsheetId: FEATURE_SHEET_ID,
+      range: `'${firstSheet}'!A:H`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
+
     return NextResponse.json({ success: true });
-  } catch {
-    // Sheet probably doesn't exist — create it, add headers, then append
-    try {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId });
-      const exists = meta.data.sheets?.some(s => s.properties?.title === TAB);
-      if (!exists) {
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId,
-          requestBody: { requests: [{ addSheet: { properties: { title: TAB } } }] },
-        });
-        await sheets.spreadsheets.values.update({
-          spreadsheetId, range: `'${TAB}'!A1:G1`, valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [['Date', 'User', 'Role', 'Category', 'Feature Title', 'Description', 'Priority']] },
-        });
-      }
-      await sheets.spreadsheets.values.append({
-        spreadsheetId, range: `'${TAB}'!A:G`, valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [row] },
-      });
-      return NextResponse.json({ success: true });
-    } catch (e2) {
-      return NextResponse.json({ error: String(e2) }, { status: 500 });
-    }
+  } catch (e) {
+    console.error('Feature request error:', e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
