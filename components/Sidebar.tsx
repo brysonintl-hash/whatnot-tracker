@@ -236,27 +236,20 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       )}
 
     <aside className={`
-      fixed md:static top-0 left-0 z-50 h-screen w-64 flex flex-col flex-shrink-0
+      fixed md:static top-0 left-0 z-50 h-screen w-64 bg-slate-900 flex flex-col flex-shrink-0 border-r border-slate-800
       transition-transform duration-200 ease-in-out
       ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-    `} style={{
-      background: 'rgba(0,0,0,0.55)',
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
-      borderRight: '1px solid rgba(255,255,255,0.07)',
-    }}>
+    `}>
       {/* Logo */}
-      <div className="h-16 flex items-center px-5 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="h-16 flex items-center px-5 border-b border-slate-800 flex-shrink-0">
         <div className="flex items-center gap-3 flex-1">
-          <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 shadow-lg shadow-red-900/40">
-            <img src="/logo.png" alt="SB" className="w-full h-full object-cover" />
-          </div>
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-white text-xs shadow">SB</div>
           <div>
             <div className="text-white font-black text-sm leading-none">Stack Bargains</div>
-            <div className="text-white/30 text-[10px] capitalize mt-0.5">{role} Portal</div>
+            <div className="text-slate-500 text-[10px] capitalize mt-0.5">{role} Portal</div>
           </div>
         </div>
-        <button onClick={() => setMobileOpen(false)} className="md:hidden text-white/40 hover:text-white p-1.5 rounded-lg transition-colors ml-auto" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <button onClick={() => setMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors ml-auto">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -265,7 +258,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-6">
         {sections.map(section => (
           <div key={section.title}>
-            <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">{section.title}</p>
+            <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">{section.title}</p>
             {section.items.map(item => {
               const active = pathname === item.href || (item.href !== '/admin' && item.href !== '/manager' && item.href !== '/employee' && item.href !== '/shipper' && item.href !== '/host' && pathname.startsWith(item.href));
               const isUsers = item.href === '/users';
@@ -287,10 +280,8 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                       className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all ${
                         parentActive
                           ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-                          : 'text-white/50 hover:text-white border border-transparent'
-                      }`} style={parentActive ? {} : { ['--hover-bg' as string]: 'rgba(255,255,255,0.06)' }}
-                      onMouseEnter={e => { if (!parentActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                      onMouseLeave={e => { if (!parentActive) (e.currentTarget as HTMLElement).style.background = ''; }}
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+                      }`}
                     >
                       <span className="flex-shrink-0">{item.icon}</span>
                       {item.label}
@@ -307,15 +298,13 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                       </svg>
                     </button>
                     {isExpanded && (
-                      <div className="ml-3 pl-3 mt-0.5 mb-1 space-y-0.5" style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div className="ml-3 pl-3 border-l border-slate-700 mt-0.5 mb-1 space-y-0.5">
                         {item.children.map(child => (
                           <Link
                             key={child.href}
                             href={child.href}
                             onClick={() => setMobileOpen(false)}
-                            className="flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all text-white/35 hover:text-white"
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                            className="flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-200 hover:bg-slate-800"
                           >
                             {child.label}
                           </Link>
@@ -335,7 +324,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all ${
                     active
                       ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-                      : 'text-white/50 hover:text-white border border-transparent'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
                   }`}
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
@@ -359,19 +348,19 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       </nav>
 
       {/* User footer */}
-      <div className="p-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="p-3 border-t border-slate-800 flex-shrink-0">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-800 mb-1">
           <div className={`w-8 h-8 rounded-full ${ROLE_COLOR[role]} flex items-center justify-center text-white font-black text-sm flex-shrink-0`}>
             {userName[0]?.toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-white text-sm font-semibold truncate">{userName}</div>
-            <div className="text-white/35 text-[10px] capitalize font-medium">{role}</div>
+            <div className="text-slate-400 text-[10px] capitalize font-medium">{role}</div>
           </div>
         </div>
         <button
           onClick={() => setFeatureOpen(true)}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/40 hover:text-amber-400 hover:bg-amber-400/10 text-sm font-medium transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 text-sm font-medium transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -380,7 +369,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         </button>
         <button
           onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 text-sm font-medium transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 text-sm font-medium transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
