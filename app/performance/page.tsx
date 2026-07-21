@@ -428,7 +428,7 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
         onClick={() => setOpen(o => !o)}
       >
         <div>
-          <p className="text-sm font-black text-white">Tier History</p>
+          <p className="text-sm font-black text-slate-900 dark:text-white">Tier History</p>
           <p className="text-xs text-slate-400 mt-0.5">Last {showDates.length} shows · Best tier per date</p>
         </div>
         <svg className={`w-5 h-5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -593,7 +593,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
       {/* â"€â"€ Fix These Items â"€â"€ */}
       {topDrags.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-          <p className="text-base font-black text-white mb-1">Raise these prices on Whatnot</p>
+          <p className="text-base font-black text-slate-900 dark:text-white mb-1">Raise these prices on Whatnot</p>
           <p className="text-xs text-slate-400 mb-4">These {topDrags.length} items are costing you the most money. Fix them first.</p>
           <div className="space-y-3">
             {topDrags.map((d, i) => (
@@ -603,7 +603,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-white leading-snug">{d.shortName}</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white leading-snug">{d.shortName}</p>
                     {d.count > 1 && <p className="text-[11px] text-slate-400 mt-0.5">Sold {d.count} times</p>}
                     {/* Simple 3-column action row */}
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -635,7 +635,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
             onClick={() => setShowTable(s => !s)}
             className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
             <div>
-              <p className="text-sm font-black text-white">
+              <p className="text-sm font-black text-slate-900 dark:text-white">
                 See all {belowTarget.length} orders that need attention
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">Tap to {showTable ? 'hide' : 'show'} the full list — sorted worst first</p>
@@ -752,7 +752,7 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
           <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
         <div className="text-center">
-          <h2 className="text-base font-black text-white">
+          <h2 className="text-base font-black text-slate-900 dark:text-white">
             {calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </h2>
           {totalDays > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{totalDays} days with activity</p>}
@@ -1032,7 +1032,7 @@ export default function PerformancePage() {
                 <div className="flex items-center gap-3 flex-1 justify-center">
                   <div className="text-center">
                     <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-1">Show Date</p>
-                    <p className="text-lg font-black text-white">
+                    <p className="text-lg font-black text-slate-900 dark:text-white">
                       {selectedDate ? isoToDisplay(selectedDate) : '—'}
                     </p>
                   </div>

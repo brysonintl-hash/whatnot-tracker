@@ -434,11 +434,11 @@ function ScraperPageInner() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-black text-white">{result.displayName}</p>
+                    <p className="text-base font-black text-slate-900 dark:text-white">{result.displayName}</p>
                     <p className="text-xs text-violet-500 font-mono">@{result.username}</p>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {result.totalSold != null && <span className="text-[10px] text-slate-400">{fmtNum(result.totalSold)} sold</span>}
-                      {result.reviewScore != null && <span className="text-[10px] text-slate-400">{result.reviewScore.toFixed(1)} â˜… ({fmtNum(result.reviewCount)})</span>}
+                      {result.reviewScore != null && <span className="text-[10px] text-slate-400">{result.reviewScore.toFixed(1)} ★ ({fmtNum(result.reviewCount)})</span>}
                     </div>
                   </div>
                   <a href={`https://www.whatnot.com/user/${result.username}/shop`} target="_blank" rel="noreferrer"

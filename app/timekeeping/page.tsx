@@ -224,7 +224,7 @@ function ManagementView({ session }: { session: Session }) {
                 ].map(k => (
                   <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.color} shadow-sm p-5`}>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
-                    <p className="text-2xl font-black text-white">{k.value}</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{k.value}</p>
                   </div>
                 ))}
               </div>
@@ -491,7 +491,7 @@ function ManagementView({ session }: { session: Session }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.999L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16.001c-.77 1.332.192 2.999 1.732 2.999z" />
               </svg>
             </div>
-            <h3 className="text-base font-black text-white text-center mb-1">
+            <h3 className="text-base font-black text-slate-900 dark:text-white text-center mb-1">
               {confirmModal.scope === 'all' ? 'Clear All History?' : 'Clear This Week?'}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">

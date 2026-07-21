@@ -269,7 +269,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                 ].map(s => (
                   <div key={s.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 text-center">
                     <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">{s.label}</p>
-                    <p className="text-2xl font-black text-white">{s.value}</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{s.value}</p>
                     <p className="text-[10px] text-slate-400 mt-1">{s.sub}</p>
                   </div>
                 ))}
