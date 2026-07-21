@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -69,7 +69,7 @@ export default function ShipperPage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Shipper Dashboard</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -81,7 +81,7 @@ export default function ShipperPage() {
         </header>
 
         {/* Tab bar */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6">
+        <div className="bg-slate-900 border-b border-slate-800 px-6">
           <div className="flex gap-1 -mb-px">
             {TABS.map(tab => (
               <button key={tab.key} onClick={() => setDashTab(tab.key)}
@@ -162,7 +162,7 @@ export default function ShipperPage() {
                           <td className="py-3 px-4 text-xs font-bold text-violet-600 dark:text-violet-400">{s.id}</td>
                           <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300 font-medium">{s.buyer}</td>
                           <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 max-w-[160px] truncate">{s.item}</td>
-                          <td className="py-3 px-4 text-xs font-mono text-slate-400 dark:text-slate-500">{s.tracking.slice(0, 16)}…</td>
+                          <td className="py-3 px-4 text-xs font-mono text-slate-400 dark:text-slate-500">{s.tracking.slice(0, 16)}â€¦</td>
                           <td className="py-3 px-4 text-xs text-slate-400 dark:text-slate-500">{s.date}</td>
                           <td className="py-3 px-4">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.status] ?? ''}`}>{s.status}</span>

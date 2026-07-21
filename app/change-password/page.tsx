@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -51,7 +51,7 @@ export default function ChangePasswordPage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-6 flex-shrink-0 shadow-sm">
           <h1 className="text-lg font-black text-slate-900 dark:text-white">Change Password</h1>
         </header>
         <main className="flex-1 overflow-y-auto p-6 flex items-start justify-center">

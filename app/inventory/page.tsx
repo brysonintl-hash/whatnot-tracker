@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -107,7 +107,7 @@ export default function InventoryPage() {
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Inventory</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -137,7 +137,7 @@ export default function InventoryPage() {
               <p className="text-2xl font-black text-red-500">{outOfStock.toLocaleString()}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 border-l-amber-400 rounded-xl shadow-sm p-5">
-              <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Low Stock (≤5)</p>
+              <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Low Stock (â‰¤5)</p>
               <p className="text-2xl font-black text-amber-500">{lowStock.toLocaleString()}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 border-l-emerald-500 rounded-xl shadow-sm p-5">
@@ -211,12 +211,12 @@ export default function InventoryPage() {
           {pageCount > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} items
+                Showing {(page - 1) * PAGE_SIZE + 1}â€“{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} items
               </p>
               <div className="flex gap-1">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">
-                  ← Prev
+                  â† Prev
                 </button>
                 {Array.from({ length: pageCount }, (_, i) => i + 1)
                   .filter(n => n === 1 || n === pageCount || Math.abs(n - page) <= 2)
@@ -225,7 +225,7 @@ export default function InventoryPage() {
                     acc.push(n); return acc;
                   }, [])
                   .map((n, i) => n === '...' ? (
-                    <span key={`e${i}`} className="px-2 py-1.5 text-slate-400 text-xs">…</span>
+                    <span key={`e${i}`} className="px-2 py-1.5 text-slate-400 text-xs">â€¦</span>
                   ) : (
                     <button key={n} onClick={() => setPage(n as number)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${page === n ? 'bg-amber-400 border-amber-400 text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400'}`}>
@@ -234,7 +234,7 @@ export default function InventoryPage() {
                   ))}
                 <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">
-                  Next →
+                  Next â†’
                 </button>
               </div>
             </div>

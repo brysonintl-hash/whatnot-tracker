@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler);
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type Session = { username: string; role: string; name: string };
 type Order = {
@@ -26,7 +26,7 @@ type DashTab   = 'historical' | 'calendar' | 'shipping';
 type SortCol   = 'product' | 'buyer' | 'host' | 'tab' | 'sold' | 'profit' | 'timestamp' | null;
 type SortDir   = 'asc' | 'desc';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function fmt(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -47,7 +47,7 @@ function dKey(year: number, month: number, day: number): string {
 }
 
 function fmtTimestamp(ts: string): string {
-  if (!ts) return '—';
+  if (!ts) return 'â€”';
   const d = new Date(ts.replace(' ', 'T'));
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
@@ -61,7 +61,7 @@ function pct(curr: number, prev: number) {
 const HOST_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const IC = {
   calIcon: <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
@@ -69,7 +69,7 @@ const IC = {
   mapIcon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>,
 };
 
-// ── Sparkline ─────────────────────────────────────────────────────────────────
+// â”€â”€ Sparkline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Sparkline({ data, color, height = 40 }: { data: number[]; color: string; height?: number }) {
   if (data.length < 2) return <div style={{ height }} />;
@@ -93,7 +93,7 @@ function Sparkline({ data, color, height = 40 }: { data: number[]; color: string
   );
 }
 
-// ── CalendarView ──────────────────────────────────────────────────────────────
+// â”€â”€ CalendarView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CalendarView({ orders }: { orders: Order[] }) {
   const now = new Date();
@@ -217,7 +217,7 @@ function CalendarView({ orders }: { orders: Order[] }) {
   );
 }
 
-// ── ShipmentDistribution ──────────────────────────────────────────────────────
+// â”€â”€ ShipmentDistribution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ShipPeriod = 'all' | '7d' | '30d' | '90d' | 'thisMonth' | 'lastMonth';
 
@@ -300,7 +300,7 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
             <p className="text-xs text-slate-400 mt-0.5">
               {total > 0
                 ? `${total.toLocaleString()} orders across ${Object.keys(stateData).length} states`
-                : 'No shipping data — add state codes to column O in your spreadsheet'}
+                : 'No shipping data â€” add state codes to column O in your spreadsheet'}
             </p>
           </div>
 
@@ -372,7 +372,7 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function AdminPage() {
   const router = useRouter();
@@ -500,8 +500,8 @@ export default function AdminPage() {
         </button>
         {filterOpen === colKey && (
           <div className="absolute top-full left-0 z-30 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <button onClick={() => applySort(col, 'asc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'asc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg> Sort A → Z</button>
-            <button onClick={() => applySort(col, 'desc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'desc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg> Sort Z → A</button>
+            <button onClick={() => applySort(col, 'asc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'asc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg> Sort A â†’ Z</button>
+            <button onClick={() => applySort(col, 'desc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'desc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg> Sort Z â†’ A</button>
             {isActive && (<><div className="border-t border-slate-100 dark:border-slate-700" /><button onClick={() => applySort(null, 'asc')} className="w-full text-left px-3 py-2 text-xs text-red-500 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg> Clear Sort</button></>)}
           </div>
         )}
@@ -521,7 +521,7 @@ export default function AdminPage() {
       <Sidebar role={session.role as Role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Dashboard</h1>
             <p className="text-xs text-slate-400">Welcome back, {session.name}</p>
@@ -551,7 +551,7 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              {/* ── HISTORICAL ANALYTICS ─────────────────────────────────── */}
+              {/* â”€â”€ HISTORICAL ANALYTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {dashTab === 'historical' && (
                 <>
                   <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -570,7 +570,7 @@ export default function AdminPage() {
                     <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Volume</p>
-                        {(() => { const c = pct(revenue, prevRevenue); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}% vs prev.</span> : null; })()}
+                        {(() => { const c = pct(revenue, prevRevenue); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}% vs prev.</span> : null; })()}
                       </div>
                       <p className="text-3xl font-black text-white mb-3">${fmt(revenue)}</p>
                       <Sparkline data={sparkData} color="#F59E0B" height={40} />
@@ -579,7 +579,7 @@ export default function AdminPage() {
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Profit</p>
-                        {(() => { const c = pct(profit, prevProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
+                        {(() => { const c = pct(profit, prevProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                       </div>
                       <p className={`text-2xl font-black mb-2 ${profit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(profit)}</p>
                       <Sparkline data={sparkData.map(v => v * (revenue > 0 ? profit / revenue : 0))} color="#10B981" height={32} />
@@ -588,7 +588,7 @@ export default function AdminPage() {
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Avg Margin</p>
-                        {(() => { const c = pct(margin, prevMargin); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
+                        {(() => { const c = pct(margin, prevMargin); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                       </div>
                       <p className={`text-2xl font-black mb-2 ${margin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : margin >= 0 ? 'text-amber-500' : 'text-red-500'}`}>{margin.toFixed(1)}%</p>
                       <Sparkline data={Array(sparkData.length).fill(margin)} color="#3B82F6" height={32} />
@@ -660,13 +660,13 @@ export default function AdminPage() {
                     </div>
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-700">
-                        <span className="text-xs text-slate-400">Page {page + 1} of {totalPages} · {searchedOrders.length.toLocaleString()} orders</span>
+                        <span className="text-xs text-slate-400">Page {page + 1} of {totalPages} Â· {searchedOrders.length.toLocaleString()} orders</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setPage(0)} disabled={page === 0} className="px-2 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">«</button>
+                          <button onClick={() => setPage(0)} disabled={page === 0} className="px-2 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">Â«</button>
                           <button onClick={() => setPage(p => Math.max(0, p-1))} disabled={page === 0} className="px-3 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">Prev</button>
                           {Array.from({length: Math.min(5, totalPages)}, (_, idx) => { const pn = Math.max(0, Math.min(totalPages-5, page-2)) + idx; return <button key={pn} onClick={() => setPage(pn)} className={`w-7 h-7 rounded text-xs font-bold transition-colors ${pn === page ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{pn+1}</button>; })}
                           <button onClick={() => setPage(p => Math.min(totalPages-1, p+1))} disabled={page >= totalPages-1} className="px-3 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">Next</button>
-                          <button onClick={() => setPage(totalPages-1)} disabled={page >= totalPages-1} className="px-2 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">»</button>
+                          <button onClick={() => setPage(totalPages-1)} disabled={page >= totalPages-1} className="px-2 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">Â»</button>
                         </div>
                       </div>
                     )}
@@ -674,10 +674,10 @@ export default function AdminPage() {
                 </>
               )}
 
-              {/* ── CALENDAR VIEW ────────────────────────────────────────── */}
+              {/* â”€â”€ CALENDAR VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {dashTab === 'calendar' && <CalendarView orders={orders} />}
 
-              {/* ── SHIPPING MAP ──────────────────────────────────────────── */}
+              {/* â”€â”€ SHIPPING MAP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {dashTab === 'shipping' && <ShipmentDistribution orders={orders} />}
             </>
           )}

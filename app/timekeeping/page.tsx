@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -25,7 +25,7 @@ function fmtHours(h: number) {
   return `${hh}h ${mm.toString().padStart(2, '0')}m`;
 }
 
-// Week = Sunday 00:00 → Saturday 23:59
+// Week = Sunday 00:00 â†’ Saturday 23:59
 function getWeekRange() {
   const now = new Date();
   const day = now.getDay(); // 0=Sun
@@ -45,7 +45,7 @@ function weekStartKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// ─── Admin / Manager View ───────────────────────────────────────────────────
+// â”€â”€â”€ Admin / Manager View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ManagementView({ session }: { session: Session }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -203,7 +203,7 @@ function ManagementView({ session }: { session: Session }) {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Timekeeping</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -229,7 +229,7 @@ function ManagementView({ session }: { session: Session }) {
                 ))}
               </div>
 
-              {/* ── Staff Timekeeping Dashboard ── */}
+              {/* â”€â”€ Staff Timekeeping Dashboard â”€â”€ */}
               {staffSummary.length > 0 && (
                 <div className="mb-6">
                   <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2">
@@ -277,7 +277,7 @@ function ManagementView({ session }: { session: Session }) {
                             </div>
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Earnings</p>
-                              <p className={`font-bold ${weekEarnings > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{rate > 0 ? `$${weekEarnings.toFixed(2)}` : '—'}</p>
+                              <p className={`font-bold ${weekEarnings > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{rate > 0 ? `$${weekEarnings.toFixed(2)}` : 'â€”'}</p>
                             </div>
                           </div>
 
@@ -288,7 +288,7 @@ function ManagementView({ session }: { session: Session }) {
                           )}
 
                           {isPaid && (
-                            <span className="mt-2 inline-block text-[10px] font-bold px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-full">Paid ✓</span>
+                            <span className="mt-2 inline-block text-[10px] font-bold px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-full">Paid âœ“</span>
                           )}
                         </div>
                       );
@@ -302,7 +302,7 @@ function ManagementView({ session }: { session: Session }) {
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
                   <h2 className="font-bold text-slate-900 dark:text-white text-sm">Weekly Staff Summary</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} –{' '}
+                    {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} â€“{' '}
                     {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
@@ -383,7 +383,7 @@ function ManagementView({ session }: { session: Session }) {
               {/* Detailed time log */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center gap-3">
-                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Time Log — This Week</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Time Log â€” This Week</h2>
                   <span className="text-xs text-slate-400">{weekEntries.length} entries</span>
                   <div className="ml-auto flex items-center gap-2">
                     <button
@@ -432,10 +432,10 @@ function ManagementView({ session }: { session: Session }) {
                                 {isEditing ? (
                                   <input type="datetime-local" value={editForm.clockOut} onChange={ev => setEditForm(f => ({ ...f, clockOut: ev.target.value }))}
                                     className="text-xs border border-blue-300 rounded px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-36" />
-                                ) : e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}
+                                ) : e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">â— Active</span>}
                               </td>
-                              <td className="py-3 px-3 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
-                              <td className="py-3 px-3 text-xs text-slate-500 dark:text-slate-400 max-w-[120px] truncate">{e.note || '—'}</td>
+                              <td className="py-3 px-3 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : 'â€”'}</td>
+                              <td className="py-3 px-3 text-xs text-slate-500 dark:text-slate-400 max-w-[120px] truncate">{e.note || 'â€”'}</td>
                               <td className="py-2 px-3">
                                 <div className="flex items-center gap-1">
                                   {isEditing ? (
@@ -520,7 +520,7 @@ function ManagementView({ session }: { session: Session }) {
   );
 }
 
-// ─── Staff Clock-In / Out View ───────────────────────────────────────────────
+// â”€â”€â”€ Staff Clock-In / Out View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StaffView({ session }: { session: Session }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -575,7 +575,7 @@ function StaffView({ session }: { session: Session }) {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Time Clock</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -625,7 +625,7 @@ function StaffView({ session }: { session: Session }) {
                         : 'bg-emerald-500 text-white hover:bg-emerald-600'
                     }`}
                   >
-                    {saving ? 'Processing...' : active ? '⏹ Clock Out' : '▶ Clock In'}
+                    {saving ? 'Processing...' : active ? 'â¹ Clock Out' : 'â–¶ Clock In'}
                   </button>
                 </div>
 
@@ -648,9 +648,9 @@ function StaffView({ session }: { session: Session }) {
               {/* My time log */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">My Time Log — This Week</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">My Time Log â€” This Week</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} –{' '}
+                    {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} â€“{' '}
                     {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
@@ -669,9 +669,9 @@ function StaffView({ session }: { session: Session }) {
                           <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                             <td className="py-3 px-5 text-xs text-slate-400">{new Date(e.clockIn).toLocaleDateString('en-US')}</td>
                             <td className="py-3 px-5 text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
-                            <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">● Active</span>}</td>
-                            <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
-                            <td className="py-3 px-5 text-xs text-slate-500 dark:text-slate-400">{e.note || '—'}</td>
+                            <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">â— Active</span>}</td>
+                            <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : 'â€”'}</td>
+                            <td className="py-3 px-5 text-xs text-slate-500 dark:text-slate-400">{e.note || 'â€”'}</td>
                           </tr>
                         ))
                       )}
@@ -687,7 +687,7 @@ function StaffView({ session }: { session: Session }) {
   );
 }
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function TimekeepingPage() {
   const router = useRouter();

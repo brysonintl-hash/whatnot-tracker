@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -94,7 +94,7 @@ export default function TrackingPage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">USPS Tracking</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -176,7 +176,7 @@ export default function TrackingPage() {
                               target="_blank" rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors"
                             >
-                              Track on USPS ↗
+                              Track on USPS â†—
                             </a>
                           </div>
                         )}
@@ -188,7 +188,7 @@ export default function TrackingPage() {
                                 {r.latest.event || 'Unknown Status'}
                               </span>
                               <span className="text-xs text-slate-400">
-                                {[r.latest.date, r.latest.time].filter(Boolean).join(' · ')}
+                                {[r.latest.date, r.latest.time].filter(Boolean).join(' Â· ')}
                               </span>
                             </div>
                             {(r.latest.city || r.latest.state) && (
@@ -215,9 +215,9 @@ export default function TrackingPage() {
                           target="_blank" rel="noopener noreferrer"
                           className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors"
                         >
-                          USPS ↗
+                          USPS â†—
                         </a>
-                        <button onClick={() => removeResult(r.trackingNumber)} className="text-xs text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors">✕</button>
+                        <button onClick={() => removeResult(r.trackingNumber)} className="text-xs text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors">âœ•</button>
                       </div>
                     </div>
 
@@ -229,7 +229,7 @@ export default function TrackingPage() {
                             <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 mt-1.5 flex-shrink-0" />
                             <div>
                               <span className="font-semibold text-slate-700 dark:text-slate-300">{ev.event}</span>
-                              <span className="text-slate-400 ml-2">{[ev.date, ev.time].filter(Boolean).join(' · ')}</span>
+                              <span className="text-slate-400 ml-2">{[ev.date, ev.time].filter(Boolean).join(' Â· ')}</span>
                               {(ev.city || ev.state) && (
                                 <span className="text-slate-400 ml-2">{[ev.city, ev.state].filter(Boolean).join(', ')}</span>
                               )}

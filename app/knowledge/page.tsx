@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -19,11 +19,11 @@ const CAT_STYLE: Record<string, string> = {
 };
 
 const CAT_ICON: Record<string, string> = {
-  'Google Sheets': '📊',
-  'Google Docs': '📄',
-  'USPS': '📦',
-  'WhatNot': '🛒',
-  'Other': '🔗',
+  'Google Sheets': 'ðŸ“Š',
+  'Google Docs': 'ðŸ“„',
+  'USPS': 'ðŸ“¦',
+  'WhatNot': 'ðŸ›’',
+  'Other': 'ðŸ”—',
 };
 
 export default function KnowledgePage() {
@@ -90,7 +90,7 @@ export default function KnowledgePage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Knowledge Base</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -172,7 +172,7 @@ export default function KnowledgePage() {
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-red-300 hover:text-red-600'
                   }`}
                 >
-                  {c === 'All' ? `All (${links.length})` : `${CAT_ICON[c] || '🔗'} ${c}`}
+                  {c === 'All' ? `All (${links.length})` : `${CAT_ICON[c] || 'ðŸ”—'} ${c}`}
                 </button>
               ))}
             </div>
@@ -183,7 +183,7 @@ export default function KnowledgePage() {
             <div className="flex items-center justify-center h-32 text-slate-400">Loading...</div>
           ) : displayed.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center">
-              <div className="text-4xl mb-3">📚</div>
+              <div className="text-4xl mb-3">ðŸ“š</div>
               <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No links yet</p>
               <p className="text-slate-400 text-xs mt-1">Add Google Docs, Sheets, or any useful links above</p>
             </div>
@@ -195,7 +195,7 @@ export default function KnowledgePage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${CAT_STYLE[link.category] ?? CAT_STYLE['Other']}`}>
-                          {CAT_ICON[link.category] || '🔗'} {link.category}
+                          {CAT_ICON[link.category] || 'ðŸ”—'} {link.category}
                         </span>
                       </div>
                       <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{link.title}</p>

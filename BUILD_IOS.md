@@ -20,7 +20,7 @@ This guide walks you through publishing the Stack Bargains web app as a native i
 Open `capacitor.config.ts` and replace the placeholder:
 
 ```ts
-const PRODUCTION_URL = 'https://YOUR-APP.up.railway.app';
+const PRODUCTION_URL = 'whatnot-tracker-production.up.railway.app';
 //                            ↑ replace this with your actual Railway URL
 ```
 

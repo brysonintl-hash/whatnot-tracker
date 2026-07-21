@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -55,7 +55,7 @@ type AsinResult = {
 };
 
 const AMAZON_FEE_PCT   = 0.15;
-const FBM_SHIP_LIGHT   = 10.31; // ≤5 lbs
+const FBM_SHIP_LIGHT   = 10.31; // â‰¤5 lbs
 const WN_COMMISSION    = 0.08;
 const WN_TRANSACTION   = 0.30;
 
@@ -155,7 +155,7 @@ function KeepaSection({ keepa }: { keepa: KeepaData }) {
   return (
     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
       <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mb-3">
-        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Keepa · 90-Day History</span>
+        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Keepa Â· 90-Day History</span>
         {keepa.avg30 != null && (
           <span className="text-[10px] text-slate-500 dark:text-slate-400">30d avg <span className="font-bold text-slate-700 dark:text-slate-200">${keepa.avg30.toFixed(2)}</span></span>
         )}
@@ -252,7 +252,7 @@ export default function AmazonPage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Amazon Analyzer</h1>
             <p className="text-xs text-slate-400 hidden sm:block">{today}</p>
@@ -264,7 +264,7 @@ export default function AmazonPage() {
           {/* Search panel */}
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 mb-6 max-w-2xl">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">Amazon vs Whatnot Profit Analyzer</h2>
-            <p className="text-xs text-slate-400 mb-4">Compares Amazon FBM · FBA · Whatnot to find the most profitable channel.</p>
+            <p className="text-xs text-slate-400 mb-4">Compares Amazon FBM Â· FBA Â· Whatnot to find the most profitable channel.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">ASIN *</label>
@@ -299,7 +299,7 @@ export default function AmazonPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No items analyzed yet</p>
-                <p className="text-slate-400 text-xs mt-1">Enter an ASIN with your cost to compare FBM · FBA · Whatnot</p>
+                <p className="text-slate-400 text-xs mt-1">Enter an ASIN with your cost to compare FBM Â· FBA Â· Whatnot</p>
               </div>
             )}
 
@@ -317,9 +317,9 @@ export default function AmazonPage() {
               const wnMargin  = wnProfit  != null && r.whatnotPrice ? (wnProfit  / r.whatnotPrice) * 100 : null;
 
               const verdictMap: Record<string, { icon: string; msg: string; cls: string }> = {
-                fbm: { icon: '📦', msg: `Amazon FBM wins — ship it yourself, keep more margin`, cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' },
-                fba: { icon: '🏭', msg: `Amazon FBA wins — let Amazon fulfill, Prime eligible`, cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
-                wn:  { icon: '🎯', msg: `Whatnot wins — sell live, lower fees overall`,         cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
+                fbm: { icon: 'ðŸ“¦', msg: `Amazon FBM wins â€” ship it yourself, keep more margin`, cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' },
+                fba: { icon: 'ðŸ­', msg: `Amazon FBA wins â€” let Amazon fulfill, Prime eligible`, cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+                wn:  { icon: 'ðŸŽ¯', msg: `Whatnot wins â€” sell live, lower fees overall`,         cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
               };
               const verdict = best ? verdictMap[best] : null;
 
@@ -339,7 +339,7 @@ export default function AmazonPage() {
                         <p className="text-xs font-mono text-slate-400 mb-1">{r.asin}</p>
                         <p className="text-sm text-red-500 font-semibold">{r.error}</p>
                       </div>
-                      <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none">✕</button>
+                      <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none">âœ•</button>
                     </div>
                   ) : (
                     <div className="p-5">
@@ -366,17 +366,17 @@ export default function AmazonPage() {
                                 )}
                                 {r.fba && (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                                    FBA {r.fba.tier} · ${r.fba.fee.toFixed(2)}
+                                    FBA {r.fba.tier} Â· ${r.fba.fee.toFixed(2)}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none flex-shrink-0">✕</button>
+                            <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none flex-shrink-0">âœ•</button>
                           </div>
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                             {r.bsr != null && (
                               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                BSR #{r.bsr.toLocaleString()} {r.bsrCategory ? `· ${r.bsrCategory}` : ''}
+                                BSR #{r.bsr.toLocaleString()} {r.bsrCategory ? `Â· ${r.bsrCategory}` : ''}
                               </span>
                             )}
                             {r.estimatedMonthlySales != null && (
@@ -388,14 +388,14 @@ export default function AmazonPage() {
                             {r.opportunity?.label && (
                               <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${opp.bg} ${opp.text} ${opp.border}`}>
                                 <span className={`w-1 h-1 rounded-full ${opp.dot}`} />
-                                {r.opportunity.label} demand · {r.reviews?.toLocaleString()} reviews · ⭐{r.rating}
+                                {r.opportunity.label} demand Â· {r.reviews?.toLocaleString()} reviews Â· â­{r.rating}
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* ── 3-column profit comparison ── */}
+                      {/* â”€â”€ 3-column profit comparison â”€â”€ */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
                         {/* Amazon FBM */}
@@ -408,28 +408,28 @@ export default function AmazonPage() {
                           <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <div className="flex justify-between">
                               <span>Sale price</span>
-                              <span className="font-bold text-slate-700 dark:text-slate-200">{r.price != null ? `$${r.price.toFixed(2)}` : '—'}</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-200">{r.price != null ? `$${r.price.toFixed(2)}` : 'â€”'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Amazon fee (15%)</span>
-                              <span className="text-red-500">{r.price != null ? `−$${(r.price * AMAZON_FEE_PCT).toFixed(2)}` : '—'}</span>
+                              <span className="text-red-500">{r.price != null ? `âˆ’$${(r.price * AMAZON_FEE_PCT).toFixed(2)}` : 'â€”'}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span>FBM shipping{fbmOverweight ? ` (${r.weightLbs!.toFixed(1)} lbs)` : ' (≤5 lbs)'}</span>
+                              <span>FBM shipping{fbmOverweight ? ` (${r.weightLbs!.toFixed(1)} lbs)` : ' (â‰¤5 lbs)'}</span>
                               {fbmOverweight
                                 ? <span className="text-amber-500 font-bold">Unknown</span>
-                                : <span className="text-red-500">−${FBM_SHIP_LIGHT.toFixed(2)}</span>}
+                                : <span className="text-red-500">âˆ’${FBM_SHIP_LIGHT.toFixed(2)}</span>}
                             </div>
                             {r.yourCost != null && (
                               <div className="flex justify-between">
                                 <span>Your cost</span>
-                                <span className="text-red-500">−${r.yourCost.toFixed(2)}</span>
+                                <span className="text-red-500">âˆ’${r.yourCost.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
                               <span className="font-bold">Net profit</span>
                               <span className={`font-black text-sm ${fbmOverweight ? 'text-amber-500' : fbmProfit != null ? fbmProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
-                                {fbmOverweight ? 'Unknown' : fbmProfit != null ? fmt(fbmProfit) : r.yourCost == null ? 'Add cost' : '—'}
+                                {fbmOverweight ? 'Unknown' : fbmProfit != null ? fmt(fbmProfit) : r.yourCost == null ? 'Add cost' : 'â€”'}
                               </span>
                             </div>
                             {fbmMargin != null && !fbmOverweight && (
@@ -457,16 +457,16 @@ export default function AmazonPage() {
                           <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <div className="flex justify-between">
                               <span>Sale price</span>
-                              <span className="font-bold text-slate-700 dark:text-slate-200">{r.price != null ? `$${r.price.toFixed(2)}` : '—'}</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-200">{r.price != null ? `$${r.price.toFixed(2)}` : 'â€”'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Amazon fee (15%)</span>
-                              <span className="text-red-500">{r.price != null ? `−$${(r.price * AMAZON_FEE_PCT).toFixed(2)}` : '—'}</span>
+                              <span className="text-red-500">{r.price != null ? `âˆ’$${(r.price * AMAZON_FEE_PCT).toFixed(2)}` : 'â€”'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>FBA fulfillment</span>
                               {r.fba
-                                ? <span className="text-red-500">−${r.fba.fee.toFixed(2)}</span>
+                                ? <span className="text-red-500">âˆ’${r.fba.fee.toFixed(2)}</span>
                                 : <span className="text-slate-400">No weight found</span>}
                             </div>
                             <div className="flex justify-between text-slate-300 dark:text-slate-600">
@@ -476,13 +476,13 @@ export default function AmazonPage() {
                             {r.yourCost != null && (
                               <div className="flex justify-between">
                                 <span>Your cost</span>
-                                <span className="text-red-500">−${r.yourCost.toFixed(2)}</span>
+                                <span className="text-red-500">âˆ’${r.yourCost.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
                               <span className="font-bold">Net profit</span>
                               <span className={`font-black text-sm ${fbaProfit != null ? fbaProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500' : 'text-slate-400'}`}>
-                                {fbaProfit != null ? fmt(fbaProfit) : r.yourCost == null ? 'Add cost' : r.fba == null ? 'No weight' : '—'}
+                                {fbaProfit != null ? fmt(fbaProfit) : r.yourCost == null ? 'Add cost' : r.fba == null ? 'No weight' : 'â€”'}
                               </span>
                             </div>
                             {fbaMargin != null && (
@@ -499,7 +499,7 @@ export default function AmazonPage() {
                             )}
                           </div>
                           {r.fba && (
-                            <p className="text-[10px] text-slate-400 mt-2 leading-tight">⚠ Tier estimated from weight. Verify in Seller Central if dimensions are large.</p>
+                            <p className="text-[10px] text-slate-400 mt-2 leading-tight">âš  Tier estimated from weight. Verify in Seller Central if dimensions are large.</p>
                           )}
                         </div>
 
@@ -516,11 +516,11 @@ export default function AmazonPage() {
                             </div>
                             <div className="flex justify-between">
                               <span>Commission (8%)</span>
-                              <span className="text-red-500">{r.whatnotPrice != null ? `−$${(r.whatnotPrice * WN_COMMISSION).toFixed(2)}` : '—'}</span>
+                              <span className="text-red-500">{r.whatnotPrice != null ? `âˆ’$${(r.whatnotPrice * WN_COMMISSION).toFixed(2)}` : 'â€”'}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Transaction fee</span>
-                              <span className="text-red-500">−$0.30</span>
+                              <span className="text-red-500">âˆ’$0.30</span>
                             </div>
                             <div className="flex justify-between text-slate-300 dark:text-slate-600">
                               <span>Shipping (buyer pays)</span>
@@ -529,7 +529,7 @@ export default function AmazonPage() {
                             {r.yourCost != null && (
                               <div className="flex justify-between">
                                 <span>Your cost</span>
-                                <span className="text-red-500">−${r.yourCost.toFixed(2)}</span>
+                                <span className="text-red-500">âˆ’${r.yourCost.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
@@ -558,13 +558,13 @@ export default function AmazonPage() {
                             const vals = Object.values(profits);
                             const max = Math.max(...vals);
                             const second = vals.sort((a,b) => b-a)[1];
-                            return ` — $${(max - second).toFixed(2)} more per unit`;
+                            return ` â€” $${(max - second).toFixed(2)} more per unit`;
                           })()}
                         </div>
                       )}
                       {fbmOverweight && !r.fba && (
                         <div className="mt-3 rounded-lg px-4 py-2.5 text-xs font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                          ⚠️ FBM rate unknown — item exceeds 5 lbs. FBA may be a better option since Amazon handles fulfillment.
+                          âš ï¸ FBM rate unknown â€” item exceeds 5 lbs. FBA may be a better option since Amazon handles fulfillment.
                         </div>
                       )}
 

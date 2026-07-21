@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 // Replace PRODUCTION_URL with your Railway app URL (e.g. https://whatnot-tracker-production.up.railway.app)
-const PRODUCTION_URL = 'https://YOUR-APP.up.railway.app';
+const PRODUCTION_URL = 'whatnot-tracker-production.up.railway.app';
 
 const config: CapacitorConfig = {
   appId: 'com.stackbargains.app',

@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type Session = { username: string; role: string; name: string };
 type Order = {
@@ -14,7 +14,7 @@ type Order = {
 };
 type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'custom';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function fmt(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -34,7 +34,7 @@ function downloadCSV(rows: string[][], filename: string) {
 
 const HOST_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const IC = {
   revenue: <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -47,7 +47,7 @@ const IC = {
   excel:   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
 };
 
-// ── Reports Page ──────────────────────────────────────────────────────────────
+// â”€â”€ Reports Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -139,7 +139,7 @@ export default function ReportsPage() {
     const periodLabel = reportPeriod === 'daily' ? reportDate
       : reportPeriod === 'weekly' ? `Week of ${reportDate}`
       : reportPeriod === 'monthly' ? reportDate.slice(0, 7)
-      : `${reportDate} – ${reportEndDate || reportDate}`;
+      : `${reportDate} â€“ ${reportEndDate || reportDate}`;
 
     const rows = reportByProduct.map(([ model, d], i) => `
       <tr>
@@ -148,7 +148,7 @@ export default function ReportsPage() {
         <td style="color:${d.profit>=0?'#10B981':'#EF4444'}">$${fmt(d.profit)}</td>
       </tr>`).join('');
 
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report — ${periodLabel}</title>
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report â€” ${periodLabel}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;color:#1e293b;padding:40px;font-size:13px;background:#fff}
 h1{font-size:22px;font-weight:900;margin-bottom:4px}p.sub{font-size:11px;color:#64748b;margin-bottom:28px}
 .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
@@ -160,8 +160,8 @@ table{width:100%;border-collapse:collapse}
 th{font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;padding:6px 10px;border-bottom:2px solid #e2e8f0;text-align:left}
 td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
 @media print{@page{margin:14mm}body{padding:0}}</style></head><body>
-<h1>Stack Bargains — Report</h1>
-<p class="sub">${periodLabel} &nbsp;·&nbsp; Generated ${new Date().toLocaleString('en-US')}</p>
+<h1>Stack Bargains â€” Report</h1>
+<p class="sub">${periodLabel} &nbsp;Â·&nbsp; Generated ${new Date().toLocaleString('en-US')}</p>
 <div class="kpi">
   <div class="kpi-card"><div class="kpi-label">Revenue</div><div class="kpi-value">$${fmt(rRev)}</div></div>
   <div class="kpi-card"><div class="kpi-label">Gross Profit</div><div class="kpi-value" style="color:${rProfit>=0?'#10B981':'#EF4444'}">$${fmt(rProfit)}</div></div>
@@ -182,7 +182,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
       <Sidebar role={session.role as Role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Reports</h1>
             <p className="text-xs text-slate-400">Generate and export business reports</p>
@@ -332,7 +332,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                             <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                               <div className="h-full rounded-full transition-all" style={{ width: `${share}%`, backgroundColor: HOST_COLORS[i % HOST_COLORS.length] }} />
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{share.toFixed(1)}% of revenue · {d.count} orders</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{share.toFixed(1)}% of revenue Â· {d.count} orders</p>
                           </div>
                         );
                       })}
@@ -340,7 +340,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                   )}
                 </div>
               </div>
-              {/* Orders Detail — individual rows with Host */}
+              {/* Orders Detail â€” individual rows with Host */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">Order Details</h3>
@@ -369,7 +369,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                                   </span>
                                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.host}</span>
                                 </span>
-                              ) : <span className="text-xs text-slate-400">—</span>}
+                              ) : <span className="text-xs text-slate-400">â€”</span>}
                             </td>
                             <td className="py-2.5 px-4">
                               <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{o.productName || o.modelNum}</p>

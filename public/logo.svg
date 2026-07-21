@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <filter id="roughen" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="4" result="noise" seed="5"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="roughen2" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="turbulence" baseFrequency="0.04" numOctaves="3" result="noise" seed="8"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- Red background -->
+  <rect width="500" height="500" fill="#CC1111"/>
+
+  <!-- STACK text with rough effect -->
+  <text x="252" y="215"
+    font-family="Impact, 'Arial Black', 'Franklin Gothic Heavy', sans-serif"
+    font-size="158"
+    font-weight="900"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-2"
+    filter="url(#roughen)">STACK</text>
+
+  <!-- Strikethrough line through STACK -->
+  <rect x="18" y="175" width="464" height="10" fill="white" rx="1" filter="url(#roughen2)"/>
+
+  <!-- BARGAINS text with rough effect -->
+  <text x="252" y="375"
+    font-family="Impact, 'Arial Black', 'Franklin Gothic Heavy', sans-serif"
+    font-size="124"
+    font-weight="900"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-3"
+    filter="url(#roughen)">BARGAINS</text>
+
+  <!-- Strikethrough line through BARGAINS -->
+  <rect x="10" y="333" width="480" height="10" fill="white" rx="1" filter="url(#roughen2)"/>
+</svg>

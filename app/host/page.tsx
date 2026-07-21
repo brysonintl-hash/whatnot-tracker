@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -89,7 +89,7 @@ export default function HostPage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role="host" userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Host Dashboard</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -98,7 +98,7 @@ export default function HostPage() {
         </header>
 
         {/* Tab bar */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6">
+        <div className="bg-slate-900 border-b border-slate-800 px-6">
           <div className="flex gap-1 -mb-px">
             {TABS.map(tab => (
               <button key={tab.key} onClick={() => setDashTab(tab.key)}

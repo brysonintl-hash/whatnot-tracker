@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -83,7 +83,7 @@ export default function UsersPage() {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role="admin" userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">User Management</h1>
             <p className="text-xs text-slate-400">{today}</p>
@@ -147,7 +147,7 @@ export default function UsersPage() {
                         </td>
                         <td className="py-3 px-4">
                           {u.username === session.username ? (
-                            <span className="text-[10px] text-slate-400">— your account</span>
+                            <span className="text-[10px] text-slate-400">â€” your account</span>
                           ) : (
                             <div className="flex items-center gap-2">
                               <select
@@ -159,7 +159,7 @@ export default function UsersPage() {
                                 {u.status === 'pending' && <option value="" disabled>Assign role...</option>}
                                 {ROLES.map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                               </select>
-                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">↑ Activate</span>}
+                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">â†‘ Activate</span>}
                             </div>
                           )}
                         </td>

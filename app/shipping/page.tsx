@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -63,7 +63,7 @@ const emptyClaimForm = {
   amountRequested: '', amountApproved: '', dateSubmitted: '', trackingNumber: '',
 };
 
-// ─── Claims Section Component ─────────────────────────────────────────────────
+// â”€â”€â”€ Claims Section Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type TrackResult = { status: string; description: string; city: string; state: string; date: string; time: string };
 
@@ -229,7 +229,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
 
   return (
     <div>
-      {/* Add form — admin/manager only */}
+      {/* Add form â€” admin/manager only */}
       {isAdminOrManager && <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add {SECTION_LABELS[type].slice(0, -1)}</h3>
         {isUsps ? (
@@ -257,7 +257,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
             <div>
               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Status *</label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} required className={`w-full ${inputCls}`}>
-                <option value="">— select —</option>
+                <option value="">â€” select â€”</option>
                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -297,7 +297,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
             <div>
               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Status *</label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} required className={`w-full ${inputCls}`}>
-                <option value="">— select —</option>
+                <option value="">â€” select â€”</option>
                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -362,7 +362,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                             <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                               {c.username ? (
                                 <a href={`https://www.whatnot.com/user/${c.username}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.username}</a>
-                              ) : '—'}
+                              ) : 'â€”'}
                             </span>
                           )}
                         </td>
@@ -370,21 +370,21 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                           {isEditing ? (
                             <input type="number" step="0.01" min="0" value={editForm.amountRequested} onChange={e => setEditForm(f => ({ ...f, amountRequested: e.target.value }))} className={inCls} placeholder="0.00" />
                           ) : (
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{c.amountRequested != null ? `$${c.amountRequested.toFixed(2)}` : '—'}</span>
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{c.amountRequested != null ? `$${c.amountRequested.toFixed(2)}` : 'â€”'}</span>
                           )}
                         </td>
                         <td className="py-2 px-4">
                           {isEditing ? (
                             <input type="number" step="0.01" min="0" value={editForm.amountApproved} onChange={e => setEditForm(f => ({ ...f, amountApproved: e.target.value }))} className={inCls} placeholder="0.00" />
                           ) : (
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{c.amountApproved != null ? `$${c.amountApproved.toFixed(2)}` : <span className="text-slate-400 font-normal">—</span>}</span>
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{c.amountApproved != null ? `$${c.amountApproved.toFixed(2)}` : <span className="text-slate-400 font-normal">â€”</span>}</span>
                           )}
                         </td>
                         <td className="py-2 px-4">
                           {isEditing ? (
                             <input type="date" value={editForm.dateSubmitted} onChange={e => setEditForm(f => ({ ...f, dateSubmitted: e.target.value }))} className={inCls} />
                           ) : (
-                            <span className="text-xs text-slate-400">{c.dateSubmitted || '—'}</span>
+                            <span className="text-xs text-slate-400">{c.dateSubmitted || 'â€”'}</span>
                           )}
                         </td>
                         <td className="py-2 px-4">
@@ -392,7 +392,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                             <input value={editForm.trackingNumber} onChange={e => setEditForm(f => ({ ...f, trackingNumber: e.target.value }))} className={inCls} placeholder="Tracking #" />
                           ) : (
                             <>
-                              <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || '—'}</div>
+                              <div className="font-mono text-xs text-slate-600 dark:text-slate-300 mb-1">{c.trackingNumber || 'â€”'}</div>
                               {c.trackingNumber && (
                                 <a
                                   href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(c.trackingNumber)}`}
@@ -400,7 +400,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
                                 >
-                                  Track on USPS ↗
+                                  Track on USPS â†—
                                 </a>
                               )}
                             </>
@@ -409,11 +409,11 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                       </>
                     ) : (
                       <>
-                        <td className="py-3 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{c.orderNumber || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-400">{c.dateOrder || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.modelNumber || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">{c.itemName || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || '—'}</td>
+                        <td className="py-3 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{c.orderNumber || 'â€”'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-400">{c.dateOrder || 'â€”'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.modelNumber || 'â€”'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">{c.itemName || 'â€”'}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || 'â€”'}</td>
                       </>
                     )}
                     <td className="py-2 px-4">
@@ -431,7 +431,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                           {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       ) : (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(c.status)}`}>{c.status || '—'}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(c.status)}`}>{c.status || 'â€”'}</span>
                       )}
                     </td>
                     {isAdminOrManager && (
@@ -480,7 +480,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
   );
 }
 
-// ─── Main Shipping Page ───────────────────────────────────────────────────────
+// â”€â”€â”€ Main Shipping Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ShippingPageInner() {
   const router = useRouter();
@@ -738,7 +738,7 @@ function ShippingPageInner() {
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-900 dark:text-white">Shipments</h1>
             <p className="text-xs text-slate-400 hidden sm:block">{today}</p>
@@ -765,7 +765,7 @@ function ShippingPageInner() {
         </header>
 
         {/* Section tabs */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 flex gap-1 overflow-x-auto flex-shrink-0">
+        <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 flex gap-1 overflow-x-auto flex-shrink-0">
           {sections.map(s => (
             <button
               key={s}
@@ -811,7 +811,7 @@ function ShippingPageInner() {
                             Prev
                           </button>
                           <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-900 dark:text-white min-w-[80px] text-center">
-                            {selectedTab || '—'}
+                            {selectedTab || 'â€”'}
                           </div>
                           <button
                             onClick={() => nextTab && setSelectedTab(nextTab)}
@@ -850,7 +850,7 @@ function ShippingPageInner() {
                               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">To</label>
                               <select value={autoUser} onChange={e => setAutoUser(e.target.value)}
                                 className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-400">
-                                <option value="">— select —</option>
+                                <option value="">â€” select â€”</option>
                                 {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
                               </select>
                             </div>
@@ -987,18 +987,18 @@ function ShippingPageInner() {
                                         <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                           {s.assignment.assignedToName}
                                           <span className="ml-1 text-[10px] font-normal text-slate-400">({s.assignment.assignedToRole})</span>
-                                          {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">· {s.assignment.notes}</span>}
+                                          {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">Â· {s.assignment.notes}</span>}
                                         </p>
                                       )}
                                       {isPinged && !isResolved && (
-                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">📣 {s.assignment?.pingMessage || 'Follow up'}</p>
+                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">ðŸ“£ {s.assignment?.pingMessage || 'Follow up'}</p>
                                       )}
                                       {!isResolved && (
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <select value={form.username}
                                             onChange={e => { const sel = users.find(u => u.username === e.target.value); setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } })); }}
                                             className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500">
-                                            <option value="">— assign —</option>
+                                            <option value="">â€” assign â€”</option>
                                             {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
                                           </select>
                                           <input type="text" placeholder="Notes" value={form.notes}
@@ -1017,7 +1017,7 @@ function ShippingPageInner() {
                                           <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{s.assignment?.pingMessage || 'Follow-up requested'}</span>
                                         </div>
                                       )}
-                                      <span className="text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || '—'}</span>
+                                      <span className="text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || 'â€”'}</span>
                                     </td>
                                   )}
 
@@ -1025,7 +1025,7 @@ function ShippingPageInner() {
                                     <div className="flex items-center gap-1.5 justify-end flex-wrap">
                                       {isResolved ? (
                                         <>
-                                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Resolved</span>
+                                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">âœ“ Resolved</span>
                                           {isAdminOrManager && (
                                             <button onClick={() => unassign(s)} className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">Remove</button>
                                           )}
@@ -1049,7 +1049,7 @@ function ShippingPageInner() {
                                           {isAdminOrManager && s.assignment && (
                                             <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
                                               className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
-                                              {isPinged ? '📣 Pinged' : 'Follow Up'}
+                                              {isPinged ? 'ðŸ“£ Pinged' : 'Follow Up'}
                                             </button>
                                           )}
                                           {isAdminOrManager && s.assignment && (
