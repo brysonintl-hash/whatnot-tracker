@@ -162,7 +162,7 @@ export default function ShipperPage() {
                           <td className="py-3 px-4 text-xs font-bold text-violet-600 dark:text-violet-400">{s.id}</td>
                           <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300 font-medium">{s.buyer}</td>
                           <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 max-w-[160px] truncate">{s.item}</td>
-                          <td className="py-3 px-4 text-xs font-mono text-slate-400 dark:text-slate-500">{s.tracking.slice(0, 16)}â€¦</td>
+                          <td className="py-3 px-4 text-xs font-mono text-slate-400 dark:text-slate-500">{s.tracking.slice(0, 16)}…</td>
                           <td className="py-3 px-4 text-xs text-slate-400 dark:text-slate-500">{s.date}</td>
                           <td className="py-3 px-4">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.status] ?? ''}`}>{s.status}</span>

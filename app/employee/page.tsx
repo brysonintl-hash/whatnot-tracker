@@ -7,8 +7,8 @@ import Sidebar from '@/components/Sidebar';
 type Session = { username: string; role: string; name: string };
 
 const TASKS = [
-  { id: 1, label: 'Sort incoming shipments â€” Aisle 3', priority: 'High', done: false },
-  { id: 2, label: 'Update inventory count â€” Electronics shelf', priority: 'Medium', done: true },
+  { id: 1, label: 'Sort incoming shipments — Aisle 3', priority: 'High', done: false },
+  { id: 2, label: 'Update inventory count — Electronics shelf', priority: 'Medium', done: true },
   { id: 3, label: 'Pack 12 WhatNot orders for today\'s show', priority: 'High', done: false },
   { id: 4, label: 'Label items for FBM queue', priority: 'Low', done: false },
   { id: 5, label: 'Submit end-of-day report', priority: 'Medium', done: false },
@@ -70,7 +70,7 @@ export default function EmployeePage() {
           <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 mb-6 flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-1">Good {now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening'},</p>
-              <h2 className="text-white text-2xl font-black">{session.name} ðŸ‘‹</h2>
+              <h2 className="text-white text-2xl font-black">{session.name} 👋</h2>
               <p className="text-slate-400 text-xs mt-1">{completed} of {tasks.length} tasks completed today</p>
             </div>
             <div className="text-right">
@@ -108,7 +108,7 @@ export default function EmployeePage() {
               {[
                 { label: 'Hours This Week', value: '35h 47m', icon: 'â±', color: 'text-blue-500', bg: 'bg-blue-50' },
                 { label: 'Tasks Completed', value: `${completed}/${tasks.length}`, icon: 'âœ…', color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                { label: 'Attendance Rate', value: '96%', icon: 'ðŸ“…', color: 'text-amber-500', bg: 'bg-amber-50' },
+                { label: 'Attendance Rate', value: '96%', icon: '📅', color: 'text-amber-500', bg: 'bg-amber-50' },
                 { label: 'Performance Score', value: '94/100', icon: 'â­', color: 'text-violet-500', bg: 'bg-violet-50' },
               ].map(s => (
                 <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -152,7 +152,7 @@ export default function EmployeePage() {
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${a.status === 'Today' ? 'bg-amber-400 text-slate-900' : 'bg-white border border-slate-200 text-slate-500'}`}>{a.day}</div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-700">{a.in} â†’ {a.out}</span>
+                        <span className="text-xs font-semibold text-slate-700">{a.in} → {a.out}</span>
                         <span className="text-xs font-bold text-slate-500">{a.hrs}</span>
                       </div>
                     </div>

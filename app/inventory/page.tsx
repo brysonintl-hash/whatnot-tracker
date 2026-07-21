@@ -130,14 +130,14 @@ export default function InventoryPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
               <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Total Items</p>
-              <p className="text-2xl font-black text-white">{items.length.toLocaleString()}</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">{items.length.toLocaleString()}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 border-l-red-500 rounded-xl shadow-sm p-5">
               <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Out of Stock</p>
               <p className="text-2xl font-black text-red-500">{outOfStock.toLocaleString()}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 border-l-amber-400 rounded-xl shadow-sm p-5">
-              <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Low Stock (â‰¤5)</p>
+              <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Low Stock (≤5)</p>
               <p className="text-2xl font-black text-amber-500">{lowStock.toLocaleString()}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 border-l-emerald-500 rounded-xl shadow-sm p-5">
@@ -211,12 +211,12 @@ export default function InventoryPage() {
           {pageCount > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Showing {(page - 1) * PAGE_SIZE + 1}â€“{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} items
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} items
               </p>
               <div className="flex gap-1">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">
-                  â† Prev
+                  ← Prev
                 </button>
                 {Array.from({ length: pageCount }, (_, i) => i + 1)
                   .filter(n => n === 1 || n === pageCount || Math.abs(n - page) <= 2)
@@ -225,7 +225,7 @@ export default function InventoryPage() {
                     acc.push(n); return acc;
                   }, [])
                   .map((n, i) => n === '...' ? (
-                    <span key={`e${i}`} className="px-2 py-1.5 text-slate-400 text-xs">â€¦</span>
+                    <span key={`e${i}`} className="px-2 py-1.5 text-slate-400 text-xs">…</span>
                   ) : (
                     <button key={n} onClick={() => setPage(n as number)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${page === n ? 'bg-amber-400 border-amber-400 text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400'}`}>
@@ -234,7 +234,7 @@ export default function InventoryPage() {
                   ))}
                 <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">
-                  Next â†’
+                  Next →
                 </button>
               </div>
             </div>

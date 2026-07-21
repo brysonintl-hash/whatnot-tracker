@@ -176,7 +176,7 @@ export default function TrackingPage() {
                               target="_blank" rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors"
                             >
-                              Track on USPS â†—
+                              Track on USPS ↗
                             </a>
                           </div>
                         )}
@@ -188,7 +188,7 @@ export default function TrackingPage() {
                                 {r.latest.event || 'Unknown Status'}
                               </span>
                               <span className="text-xs text-slate-400">
-                                {[r.latest.date, r.latest.time].filter(Boolean).join(' Â· ')}
+                                {[r.latest.date, r.latest.time].filter(Boolean).join(' · ')}
                               </span>
                             </div>
                             {(r.latest.city || r.latest.state) && (
@@ -215,7 +215,7 @@ export default function TrackingPage() {
                           target="_blank" rel="noopener noreferrer"
                           className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors"
                         >
-                          USPS â†—
+                          USPS ↗
                         </a>
                         <button onClick={() => removeResult(r.trackingNumber)} className="text-xs text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors">âœ•</button>
                       </div>
@@ -229,7 +229,7 @@ export default function TrackingPage() {
                             <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 mt-1.5 flex-shrink-0" />
                             <div>
                               <span className="font-semibold text-slate-700 dark:text-slate-300">{ev.event}</span>
-                              <span className="text-slate-400 ml-2">{[ev.date, ev.time].filter(Boolean).join(' Â· ')}</span>
+                              <span className="text-slate-400 ml-2">{[ev.date, ev.time].filter(Boolean).join(' · ')}</span>
                               {(ev.city || ev.state) && (
                                 <span className="text-slate-400 ml-2">{[ev.city, ev.state].filter(Boolean).join(', ')}</span>
                               )}

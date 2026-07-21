@@ -23,7 +23,7 @@ const ALLOWED: Role[] = ['admin', 'manager', 'host'];
 
 function PriceTag({ price, originalPrice }: { price: number | null; originalPrice: number | null }) {
   const onSale = originalPrice != null && price != null && originalPrice > price;
-  if (price == null) return <span className="text-sm text-slate-400">â€”</span>;
+  if (price == null) return <span className="text-sm text-slate-400">—</span>;
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-xl font-black text-orange-500">${price.toFixed(2)}</span>
@@ -56,7 +56,7 @@ function ProductCard({ p }: { p: HDProduct }) {
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
         ) : (
-          <div className="text-4xl opacity-20">ðŸ </div>
+          <div className="text-4xl opacity-20">🏠</div>
         )}
         {onSale && (
           <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
@@ -183,7 +183,7 @@ export default function HomeDepotPage() {
                   type="text"
                   value={query}
                   onChange={e => setQuery(e.target.value)}
-                  placeholder="Enter model # or product nameâ€¦ e.g. DCB609"
+                  placeholder="Enter model # or product name… e.g. DCB609"
                   className="w-full pl-12 pr-4 py-4 text-base bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-orange-400 dark:focus:border-orange-500 text-slate-900 dark:text-white placeholder-slate-400 transition-colors shadow-sm"
                   autoFocus
                 />
@@ -214,7 +214,7 @@ export default function HomeDepotPage() {
           {loading && (
             <div className="text-center py-16">
               <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-500 dark:text-slate-400 font-semibold">Searching Home Depotâ€¦</p>
+              <p className="text-slate-500 dark:text-slate-400 font-semibold">Searching Home Depot…</p>
               <p className="text-xs text-slate-400 mt-1">This may take a few seconds</p>
             </div>
           )}
@@ -223,7 +223,7 @@ export default function HomeDepotPage() {
           {!loading && error && (
             <div className="max-w-2xl mx-auto">
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl p-5 flex gap-4">
-                <span className="text-2xl flex-shrink-0">âš ï¸</span>
+                <span className="text-2xl flex-shrink-0">⚠️</span>
                 <div>
                   <p className="font-bold text-amber-700 dark:text-amber-400 text-sm">No results</p>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{error}</p>
@@ -263,7 +263,7 @@ export default function HomeDepotPage() {
           {/* Empty state */}
           {!loading && !error && products.length === 0 && !searched && (
             <div className="text-center py-20">
-              <div className="text-7xl mb-6">ðŸ </div>
+              <div className="text-7xl mb-6">🏠</div>
               <h2 className="text-xl font-black text-slate-700 dark:text-slate-300 mb-2">Home Depot Product Search</h2>
               <p className="text-slate-400 text-sm max-w-xs mx-auto">
                 Type a model number above to see price, sale price, and product image from Home Depot.

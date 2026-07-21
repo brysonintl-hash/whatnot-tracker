@@ -12,7 +12,7 @@ import type { ScraperResult, Listing } from '@/app/api/scraper/route';
 type Session = { username: string; role: Role; name: string };
 
 function fmtNum(n: number | null): string {
-  if (n == null) return 'â€”';
+  if (n == null) return '—';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
@@ -55,7 +55,7 @@ function CopyScriptButton({ script }: { script: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Clipboard API blocked â€” show textarea for manual copy
+      // Clipboard API blocked — show textarea for manual copy
       setShowFallback(true);
       setTimeout(() => { taRef.current?.select(); taRef.current?.focus(); }, 50);
     }
@@ -75,7 +75,7 @@ function CopyScriptButton({ script }: { script: string }) {
       </button>
       {showFallback && (
         <div className="mt-3">
-          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mb-1 font-bold">Clipboard blocked â€” select all and copy manually (Ctrl+A, Ctrl+C):</p>
+          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mb-1 font-bold">Clipboard blocked — select all and copy manually (Ctrl+A, Ctrl+C):</p>
           <textarea
             ref={taRef}
             readOnly
@@ -91,7 +91,7 @@ function CopyScriptButton({ script }: { script: string }) {
 
 function BookmarkletSection({ appUrl }: { appUrl: string }) {
   // Bookmarklet: auto-scrolls page, extracts ALL products, encodes directly in URL hash
-  // No server POST needed â€” data travels in the URL itself, bypassing all caching/routing issues
+  // No server POST needed — data travels in the URL itself, bypassing all caching/routing issues
   const bm = `javascript:(function(){
 var m=location.href.match(/whatnot\\.com\\/user\\/([^/?#]+)/);
 if(!m){alert('Open a Whatnot seller shop page first (e.g. whatnot.com/user/USERNAME/shop)');return;}
@@ -100,7 +100,7 @@ var APP='${appUrl}';
 var lastH=0,stalls=0;
 
 function getCard(a){
-  // Walk up from the <a> link â€” stop when parent contains multiple listing links (= we've left the card)
+  // Walk up from the <a> link — stop when parent contains multiple listing links (= we've left the card)
   var el=a,prev=a;
   for(var i=0;i<10;i++){
     if(!el.parentElement)break;
@@ -120,7 +120,7 @@ function getTitle(card){
     }
   };
   walk(card);
-  // Priority 1: text starting with [$XX] â€” Whatnot MSRP format
+  // Priority 1: text starting with [$XX] — Whatnot MSRP format
   for(var i=0;i<texts.length;i++){
     if(/^\\[\\$[\\d,.]/.test(texts[i])&&texts[i].length>8)return texts[i];
   }
@@ -174,7 +174,7 @@ var t=setInterval(function(){
       var data=extract();
       if(!data)return;
       if(!data.length){alert('Products found but titles could not be extracted.\\nTry clicking Debug DOM bookmark and share the result.');return;}
-      // Encode all data into URL hash â€” no server POST needed, 100% reliable
+      // Encode all data into URL hash — no server POST needed, 100% reliable
       try{
         var payload=JSON.stringify({u:username,l:data});
         var b64=btoa(unescape(encodeURIComponent(payload)));
@@ -252,16 +252,16 @@ var t=setInterval(function(){
       {/* â”€â”€ Console Script (Primary) â”€â”€ */}
       <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-5">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center flex-shrink-0 text-base">ðŸ’»</div>
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center flex-shrink-0 text-base">💻</div>
           <div>
-            <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">Console Script â€” Most Reliable Method</p>
-            <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">Runs inside Chrome DevTools with full page access. Downloads CSV directly from Whatnot â€” no server, no CORS, no issues.</p>
+            <p className="text-sm font-black text-emerald-800 dark:text-emerald-300">Console Script — Most Reliable Method</p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">Runs inside Chrome DevTools with full page access. Downloads CSV directly from Whatnot — no server, no CORS, no issues.</p>
           </div>
         </div>
         <div className="space-y-1.5 mb-4">
           {[
             'Open the seller\'s Whatnot shop page (make sure you\'re on the Shop tab)',
-            'Press F12 to open DevTools â†’ click the Console tab',
+            'Press F12 to open DevTools → click the Console tab',
             'Click the Copy button below, paste into the console, press Enter',
             'The page auto-scrolls (~30-60 sec), then CSV downloads automatically',
           ].map((text, i) => (
@@ -279,9 +279,9 @@ var t=setInterval(function(){
       <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-slate-700 dark:text-slate-300">Alternative: Bookmarklet</p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Drag the button to your Chrome bookmarks bar. Click it while on the Whatnot shop page â€” opens the scraper automatically.</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Drag the button to your Chrome bookmarks bar. Click it while on the Whatnot shop page — opens the scraper automatically.</p>
         </div>
-        <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this button to your bookmarks bar â€” don't click it here!"); }} draggable
+        <a href={bm} onClick={e => { e.preventDefault(); alert("Drag this button to your bookmarks bar — don't click it here!"); }} draggable
           className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl cursor-grab active:cursor-grabbing select-none transition-colors">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
           Scrape Whatnot Shop
@@ -305,7 +305,7 @@ function ScraperPageInner() {
 
   useEffect(() => { setAppUrl(window.location.origin); }, []);
 
-  // Decode bookmarklet data from URL hash (#wn=BASE64) â€” no server needed
+  // Decode bookmarklet data from URL hash (#wn=BASE64) — no server needed
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash.startsWith('#wn=')) return;
@@ -338,7 +338,7 @@ function ScraperPageInner() {
       });
       // Remove hash from URL bar without reloading
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    } catch { /* malformed hash â€” ignore */ }
+    } catch { /* malformed hash — ignore */ }
   }, []);
 
   const runSearch = useCallback(async (q: string) => {
@@ -355,7 +355,7 @@ function ScraperPageInner() {
       else if (!r.ok || data.error) setError(data.error || 'Failed to scrape seller.');
       else setResult(data as ScraperResult);
     } catch {
-      setError('Network error â€” please try again.');
+      setError('Network error — please try again.');
     } finally {
       setLoading(false);
     }
@@ -392,7 +392,7 @@ function ScraperPageInner() {
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-white">Seller Scraper</h1>
-            <p className="text-xs text-slate-400">Scrape any Whatnot seller â†’ download CSV</p>
+            <p className="text-xs text-slate-400">Scrape any Whatnot seller → download CSV</p>
           </div>
           <span className="text-xs bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
         </header>
@@ -400,18 +400,18 @@ function ScraperPageInner() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-2xl mx-auto">
 
-            {/* How to use â€” top banner */}
+            {/* How to use — top banner */}
             <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl p-5 mb-5 border border-slate-700">
               <p className="text-xs font-black text-white uppercase tracking-widest mb-3">How to use</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                 {[
-                  { step: '1', label: 'Open seller shop', desc: 'Go to whatnot.com/user/USERNAME/shop in Chrome', icon: 'ðŸŒ' },
-                  { step: '2', label: 'Run the script', desc: 'Press F12 â†’ Console â†’ paste the script below â†’ Enter', icon: 'ðŸ’»' },
-                  { step: '3', label: 'CSV downloads', desc: 'Page auto-scrolls, extracts all products, downloads CSV', icon: 'ðŸ“¥' },
+                  { step: '1', label: 'Open seller shop', desc: 'Go to whatnot.com/user/USERNAME/shop in Chrome', icon: '🌐' },
+                  { step: '2', label: 'Run the script', desc: 'Press F12 → Console → paste the script below → Enter', icon: '💻' },
+                  { step: '3', label: 'CSV downloads', desc: 'Page auto-scrolls, extracts all products, downloads CSV', icon: '📥' },
                 ].map(s => (
                   <div key={s.step} className="bg-slate-800 rounded-xl p-3">
                     <div className="text-2xl mb-1">{s.icon}</div>
-                    <p className="text-[10px] font-black text-white mb-0.5">Step {s.step} â€” {s.label}</p>
+                    <p className="text-[10px] font-black text-white mb-0.5">Step {s.step} — {s.label}</p>
                     <p className="text-[10px] text-slate-400 leading-relaxed">{s.desc}</p>
                   </div>
                 ))}
@@ -462,7 +462,7 @@ function ScraperPageInner() {
                 ) : (
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
                     <p className="text-sm font-black text-amber-800 dark:text-amber-300 mb-1">No products captured</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400">Use the Console Script above while the seller&apos;s shop is open â€” it runs directly in Chrome and captures everything.</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">Use the Console Script above while the seller&apos;s shop is open — it runs directly in Chrome and captures everything.</p>
                   </div>
                 )}
               </div>

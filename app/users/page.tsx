@@ -147,7 +147,7 @@ export default function UsersPage() {
                         </td>
                         <td className="py-3 px-4">
                           {u.username === session.username ? (
-                            <span className="text-[10px] text-slate-400">â€” your account</span>
+                            <span className="text-[10px] text-slate-400">— your account</span>
                           ) : (
                             <div className="flex items-center gap-2">
                               <select
@@ -159,7 +159,7 @@ export default function UsersPage() {
                                 {u.status === 'pending' && <option value="" disabled>Assign role...</option>}
                                 {ROLES.map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                               </select>
-                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">â†‘ Activate</span>}
+                              {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">↑ Activate</span>}
                             </div>
                           )}
                         </td>

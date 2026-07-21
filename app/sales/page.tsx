@@ -155,7 +155,7 @@ export default function SalesPage() {
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
             <h1 className="text-lg font-black text-white">Sales Analytics</h1>
-            <p className="text-xs text-slate-400">{today} Â· {filtered.length} orders</p>
+            <p className="text-xs text-slate-400">{today} · {filtered.length} orders</p>
           </div>
           <div className="flex flex-wrap gap-1.5 items-center">
             {DATE_PRESETS.map(p => (
@@ -218,7 +218,7 @@ export default function SalesPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="font-bold text-slate-900 dark:text-white text-sm">Sales & Profit by Show</h2>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Scroll to zoom Â· Drag to pan</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Scroll to zoom · Drag to pan</p>
                   </div>
                   <button
                     onClick={() => lineChartRef.current?.resetZoom()}
@@ -259,15 +259,15 @@ export default function SalesPage() {
                   </table>
                   {Math.ceil(byTab.length / SHOW_PAGE_SIZE) > 1 && (
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                      <p className="text-xs text-slate-400">{(showPage - 1) * SHOW_PAGE_SIZE + 1}â€“{Math.min(showPage * SHOW_PAGE_SIZE, byTab.length)} of {byTab.length}</p>
+                      <p className="text-xs text-slate-400">{(showPage - 1) * SHOW_PAGE_SIZE + 1}–{Math.min(showPage * SHOW_PAGE_SIZE, byTab.length)} of {byTab.length}</p>
                       <div className="flex gap-1">
                         <button onClick={() => setShowPage(p => Math.max(1, p - 1))} disabled={showPage === 1}
-                          className="px-2.5 py-1 rounded text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">â†</button>
+                          className="px-2.5 py-1 rounded text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">←</button>
                         {Array.from({ length: Math.ceil(byTab.length / SHOW_PAGE_SIZE) }, (_, i) => i + 1)
                           .filter(n => n === 1 || n === Math.ceil(byTab.length / SHOW_PAGE_SIZE) || Math.abs(n - showPage) <= 1)
                           .reduce<(number | string)[]>((acc, n, i, arr) => { if (i > 0 && (n as number) - (arr[i - 1] as number) > 1) acc.push('...'); acc.push(n); return acc; }, [])
                           .map((n, i) => n === '...' ? (
-                            <span key={`e${i}`} className="px-1.5 py-1 text-slate-400 text-xs">â€¦</span>
+                            <span key={`e${i}`} className="px-1.5 py-1 text-slate-400 text-xs">…</span>
                           ) : (
                             <button key={n} onClick={() => setShowPage(n as number)}
                               className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${showPage === n ? 'bg-amber-400 border-amber-400 text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
@@ -275,7 +275,7 @@ export default function SalesPage() {
                             </button>
                           ))}
                         <button onClick={() => setShowPage(p => Math.min(Math.ceil(byTab.length / SHOW_PAGE_SIZE), p + 1))} disabled={showPage === Math.ceil(byTab.length / SHOW_PAGE_SIZE)}
-                          className="px-2.5 py-1 rounded text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">â†’</button>
+                          className="px-2.5 py-1 rounded text-xs font-bold border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40">→</button>
                       </div>
                     </div>
                   )}

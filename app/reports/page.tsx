@@ -139,7 +139,7 @@ export default function ReportsPage() {
     const periodLabel = reportPeriod === 'daily' ? reportDate
       : reportPeriod === 'weekly' ? `Week of ${reportDate}`
       : reportPeriod === 'monthly' ? reportDate.slice(0, 7)
-      : `${reportDate} â€“ ${reportEndDate || reportDate}`;
+      : `${reportDate} – ${reportEndDate || reportDate}`;
 
     const rows = reportByProduct.map(([ model, d], i) => `
       <tr>
@@ -148,7 +148,7 @@ export default function ReportsPage() {
         <td style="color:${d.profit>=0?'#10B981':'#EF4444'}">$${fmt(d.profit)}</td>
       </tr>`).join('');
 
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report â€” ${periodLabel}</title>
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report — ${periodLabel}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;color:#1e293b;padding:40px;font-size:13px;background:#fff}
 h1{font-size:22px;font-weight:900;margin-bottom:4px}p.sub{font-size:11px;color:#64748b;margin-bottom:28px}
 .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
@@ -160,8 +160,8 @@ table{width:100%;border-collapse:collapse}
 th{font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;padding:6px 10px;border-bottom:2px solid #e2e8f0;text-align:left}
 td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
 @media print{@page{margin:14mm}body{padding:0}}</style></head><body>
-<h1>Stack Bargains â€” Report</h1>
-<p class="sub">${periodLabel} &nbsp;Â·&nbsp; Generated ${new Date().toLocaleString('en-US')}</p>
+<h1>Stack Bargains — Report</h1>
+<p class="sub">${periodLabel} &nbsp;·&nbsp; Generated ${new Date().toLocaleString('en-US')}</p>
 <div class="kpi">
   <div class="kpi-card"><div class="kpi-label">Revenue</div><div class="kpi-value">$${fmt(rRev)}</div></div>
   <div class="kpi-card"><div class="kpi-label">Gross Profit</div><div class="kpi-value" style="color:${rProfit>=0?'#10B981':'#EF4444'}">$${fmt(rProfit)}</div></div>
@@ -332,7 +332,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                             <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                               <div className="h-full rounded-full transition-all" style={{ width: `${share}%`, backgroundColor: HOST_COLORS[i % HOST_COLORS.length] }} />
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{share.toFixed(1)}% of revenue Â· {d.count} orders</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{share.toFixed(1)}% of revenue · {d.count} orders</p>
                           </div>
                         );
                       })}
@@ -340,7 +340,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                   )}
                 </div>
               </div>
-              {/* Orders Detail â€” individual rows with Host */}
+              {/* Orders Detail — individual rows with Host */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">Order Details</h3>
@@ -369,7 +369,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                                   </span>
                                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.host}</span>
                                 </span>
-                              ) : <span className="text-xs text-slate-400">â€”</span>}
+                              ) : <span className="text-xs text-slate-400">—</span>}
                             </td>
                             <td className="py-2.5 px-4">
                               <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{o.productName || o.modelNum}</p>

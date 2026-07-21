@@ -50,7 +50,7 @@ function parseTimestamp(ts: string): number | null {
   const s = ts.trim();
   if (!s) return null;
 
-  // "YYYY-MM-DD HH:MM:SS" / "YYYY/MM/DD HH:MM:SS" / ISO with T â€” handles 1 or 2 digit hour
+  // "YYYY-MM-DD HH:MM:SS" / "YYYY/MM/DD HH:MM:SS" / ISO with T — handles 1 or 2 digit hour
   const iso = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[\sT](\d{1,2}):(\d{2}):(\d{2})/);
   if (iso) {
     const [, yr, mo, dy, hr, min, sec] = iso;
@@ -69,8 +69,8 @@ function parseTimestamp(ts: string): number | null {
     if (!isNaN(d.getTime())) return d.getTime();
   }
 
-  // Google Sheets serial date (days since Dec 30, 1899) â€” returned when cell has no text format
-  // Valid modern dates are serial ~40000â€“50000 (year 2009â€“2036)
+  // Google Sheets serial date (days since Dec 30, 1899) — returned when cell has no text format
+  // Valid modern dates are serial ~40000–50000 (year 2009–2036)
   if (/^\d+(\.\d+)?$/.test(s)) {
     const serial = parseFloat(s);
     if (serial > 40000 && serial < 60000) {
@@ -88,7 +88,7 @@ function parseTimestamp(ts: string): number | null {
   return null;
 }
 
-// "02h 14m" or "2h 14m" or "00h 51m" â†’ fractional hours
+// "02h 14m" or "2h 14m" or "00h 51m" → fractional hours
 function parseDurationStr(ts: string): number | null {
   const m = ts.match(/^(\d+)h\s*(\d+)m$/);
   if (m) return parseInt(m[1]) + parseInt(m[2]) / 60;
@@ -130,15 +130,15 @@ function buildPDFHtml(
       <td>$${fmt(hs.totalSales)}</td>
       <td>$${fmt(hs.totalProfit)}</td>
       <td>${hs.overallMargin.toFixed(1)}%</td>
-      <td>${hs.durationHours > 0 ? fmtDuration(hs.durationHours) : 'â€”'}</td>
-      <td>${pph !== null ? `$${fmt(pph)}/hr` : 'â€”'}</td>
-      <td style="font-weight:900;color:${payColor}">${tier ? tier.label : 'â€”'}</td>
-      <td style="font-weight:900;color:${payColor}">${tier ? `$${fmt(tier.pay * hs.durationHours)}` : 'â€”'}</td>
+      <td>${hs.durationHours > 0 ? fmtDuration(hs.durationHours) : '—'}</td>
+      <td>${pph !== null ? `$${fmt(pph)}/hr` : '—'}</td>
+      <td style="font-weight:900;color:${payColor}">${tier ? tier.label : '—'}</td>
+      <td style="font-weight:900;color:${payColor}">${tier ? `$${fmt(tier.pay * hs.durationHours)}` : '—'}</td>
     </tr>`;
   }).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Stack Bargains â€” Performance Report â€” ${dateLabel}</title>
+<title>Stack Bargains — Performance Report — ${dateLabel}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1e293b;padding:40px;font-size:13px;line-height:1.5;background:#fff}
@@ -156,7 +156,7 @@ td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;vertical-alig
 @media print{@page{margin:16mm}body{padding:0}}
 </style></head><body>
 <h1>Stack Bargains</h1>
-<p class="sub">Performance Report &nbsp;Â·&nbsp; ${dateLabel} &nbsp;Â·&nbsp; Exported ${now}</p>
+<p class="sub">Performance Report &nbsp;·&nbsp; ${dateLabel} &nbsp;·&nbsp; Exported ${now}</p>
 
 <h2>Host Performance</h2>
 <table><thead><tr>
@@ -167,17 +167,17 @@ td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;vertical-alig
 <h2>Pay Rate Scale</h2>
 <div class="tier-chips">
   <div class="chip"><span class="chip-pay" style="color:#10B981">$30/hr</span><span class="chip-range">$500+ profit / hr</span></div>
-  <div class="chip"><span class="chip-pay" style="color:#F59E0B">$25/hr</span><span class="chip-range">$400â€“$499 profit / hr</span></div>
-  <div class="chip"><span class="chip-pay" style="color:#3B82F6">$20/hr</span><span class="chip-range">$300â€“$399 profit / hr</span></div>
+  <div class="chip"><span class="chip-pay" style="color:#F59E0B">$25/hr</span><span class="chip-range">$400–$499 profit / hr</span></div>
+  <div class="chip"><span class="chip-pay" style="color:#3B82F6">$20/hr</span><span class="chip-range">$300–$399 profit / hr</span></div>
 </div>
 
-<p class="footer">Stack Bargains &nbsp;Â·&nbsp; Confidential &nbsp;Â·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+<p class="footer">Stack Bargains &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
 <script>window.onload=function(){window.print();}</script>
 </body></html>`;
 }
 
 function fmtDuration(hours: number): string {
-  if (hours <= 0) return 'â€”';
+  if (hours <= 0) return '—';
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
   if (h === 0) return `${m}m`;
@@ -272,17 +272,17 @@ type TierEntry = HostStat & { pph: number; tierNum: 1 | 2 | 3 };
 
 const TIER_DISPLAY_CONFIG = [
   {
-    num: 1 as const, payRate: 30, payLabel: '$30/hr', threshold: 'â‰¥ $500/hr profit',
+    num: 1 as const, payRate: 30, payLabel: '$30/hr', threshold: '≥ $500/hr profit',
     gradFrom: '#78350F', gradTo: '#B45309',
     avatarBg: '#D97706', avatarRing: '#FDE68A',
   },
   {
-    num: 2 as const, payRate: 25, payLabel: '$25/hr', threshold: '$400â€“499/hr profit',
+    num: 2 as const, payRate: 25, payLabel: '$25/hr', threshold: '$400–499/hr profit',
     gradFrom: '#1E293B', gradTo: '#64748B',
     avatarBg: '#94A3B8', avatarRing: '#E2E8F0',
   },
   {
-    num: 3 as const, payRate: 20, payLabel: '$20/hr', threshold: '$300â€“399/hr profit',
+    num: 3 as const, payRate: 20, payLabel: '$20/hr', threshold: '$300–399/hr profit',
     gradFrom: '#92400E', gradTo: '#F59E0B',
     avatarBg: '#F59E0B', avatarRing: '#FDE68A',
   },
@@ -325,7 +325,7 @@ function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
                   {hosts.map(h => h.host).join(', ')}
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
-                  {cfg.payLabel}&nbsp;Â·&nbsp;{hosts.map(h => `$${Math.round(h.pph)}/hr`).join(' Â· ')} profit/hr
+                  {cfg.payLabel}&nbsp;·&nbsp;{hosts.map(h => `$${Math.round(h.pph)}/hr`).join(' · ')} profit/hr
                 </p>
               </div>
               <div className="flex -space-x-3 flex-shrink-0">
@@ -401,7 +401,7 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
   if (showDates.length < 2 || allHosts.length === 0) return null;
 
   const tierBadge = (entry: { tierNum: 1 | 2 | 3; pph: number } | null | undefined) => {
-    if (!entry) return <span className="text-slate-300 dark:text-slate-600 text-xs">â€”</span>;
+    if (!entry) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
     const clr: Record<1 | 2 | 3, string> = {
       1: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
       2: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
@@ -429,7 +429,7 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
       >
         <div>
           <p className="text-sm font-black text-white">Tier History</p>
-          <p className="text-xs text-slate-400 mt-0.5">Last {showDates.length} shows Â· Best tier per date</p>
+          <p className="text-xs text-slate-400 mt-0.5">Last {showDates.length} shows · Best tier per date</p>
         </div>
         <svg className={`w-5 h-5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -469,7 +469,7 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
                   cfg.num === 2 ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' :
                                  'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
                 }`}>T{cfg.num}</span>
-                <span className="text-[10px] text-slate-400">{cfg.payLabel} Â· {cfg.threshold}</span>
+                <span className="text-[10px] text-slate-400">{cfg.payLabel} · {cfg.threshold}</span>
               </div>
             ))}
           </div>
@@ -515,7 +515,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
   const topDrags = Object.entries(productGroups)
     .map(([name, items]) => ({
       name,
-      shortName: name.length > 50 ? name.slice(0, 50) + 'â€¦' : name,
+      shortName: name.length > 50 ? name.slice(0, 50) + '…' : name,
       avgMargin:      items.reduce((s, i) => s + i.margin, 0) / items.length,
       totalProfitGap: items.reduce((s, i) => s + Math.max(0, i.profitGap), 0),
       count:          items.length,
@@ -529,7 +529,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
   // All good
   if (overallMargin >= MARGIN_TARGET && belowTarget.length === 0) return (
     <div className="mt-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-700 p-6 flex items-center gap-5">
-      <div className="text-5xl">ðŸŽ‰</div>
+      <div className="text-5xl">🎉</div>
       <div>
         <p className="text-xl font-black text-emerald-700 dark:text-emerald-400">You&apos;re doing great today!</p>
         <p className="text-sm text-emerald-600 dark:text-emerald-500 mt-1">
@@ -539,7 +539,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
     </div>
   );
 
-  const statusEmoji = losingMoney.length > 10 ? 'ðŸš¨' : losingMoney.length > 0 ? 'âš ï¸' : 'ðŸ“Š';
+  const statusEmoji = losingMoney.length > 10 ? '🚨' : losingMoney.length > 0 ? '⚠️' : '📊';
   const statusColor = losingMoney.length > 10 ? 'red' : losingMoney.length > 0 ? 'amber' : 'amber';
 
   return (
@@ -584,7 +584,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
           </div>
           <div className="flex justify-between text-[10px] text-slate-400 mt-1">
             <span>0%</span>
-            <span className="text-emerald-600 font-bold">â† Goal is 30%</span>
+            <span className="text-emerald-600 font-bold">← Goal is 30%</span>
             <span>40%+</span>
           </div>
         </div>
@@ -638,7 +638,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
               <p className="text-sm font-black text-white">
                 See all {belowTarget.length} orders that need attention
               </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Tap to {showTable ? 'hide' : 'show'} the full list â€” sorted worst first</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Tap to {showTable ? 'hide' : 'show'} the full list — sorted worst first</p>
             </div>
             <svg className={`w-5 h-5 text-slate-400 transition-transform ${showTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -653,8 +653,8 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
                   <div key={i} className={`px-5 py-3.5 ${o.profit < 0 ? 'bg-red-50/60 dark:bg-red-900/10' : ''}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug truncate">{o.productName || 'â€”'}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{o.buyer} {o.modelNum ? `Â· ${o.modelNum}` : ''}</p>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug truncate">{o.productName || '—'}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{o.buyer} {o.modelNum ? `· ${o.modelNum}` : ''}</p>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0 text-right">
                         <div>
@@ -664,7 +664,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
                         <div>
                           <p className="text-[9px] text-slate-400">Profit</p>
                           <p className={`text-xs font-black ${o.profit < 0 ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>
-                            {o.profit < 0 ? 'âˆ’' : '+'}${fmtMoney(Math.abs(o.profit))}
+                            {o.profit < 0 ? '−' : '+'}${fmtMoney(Math.abs(o.profit))}
                           </p>
                         </div>
                         <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-2.5 py-1.5 border border-emerald-100 dark:border-emerald-800">
@@ -921,7 +921,7 @@ export default function PerformancePage() {
     }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
-  // All available show dates sorted newest â†’ oldest
+  // All available show dates sorted newest → oldest
   const showDates = useMemo(() => {
     const tabs = Array.from(new Set(orders.map(o => o.tab).filter(Boolean)));
     return tabs
@@ -951,7 +951,7 @@ export default function PerformancePage() {
 
   const hostStats = useMemo(() => computeHostStats(dayOrders), [dayOrders]);
 
-  // Hosts only see their own shows â€” flexible name matching (handles partial / reversed names)
+  // Hosts only see their own shows — flexible name matching (handles partial / reversed names)
   const visibleHostStats = useMemo(() => {
     if (session?.role !== 'host') return hostStats;
     const myName = session.name.toLowerCase().trim();
@@ -1033,7 +1033,7 @@ export default function PerformancePage() {
                   <div className="text-center">
                     <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-1">Show Date</p>
                     <p className="text-lg font-black text-white">
-                      {selectedDate ? isoToDisplay(selectedDate) : 'â€”'}
+                      {selectedDate ? isoToDisplay(selectedDate) : '—'}
                     </p>
                   </div>
                   <input
@@ -1057,7 +1057,7 @@ export default function PerformancePage() {
               {/* Results */}
               {dayOrders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
-                  <div className="text-4xl mb-3">ðŸ“…</div>
+                  <div className="text-4xl mb-3">📅</div>
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No show data for this date</p>
                   <p className="text-slate-400 text-xs mt-1">Try a different date or use the arrows to navigate</p>
                 </div>
@@ -1070,7 +1070,7 @@ export default function PerformancePage() {
                         {isoToDisplay(selectedDate)}
                       </h2>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} Â· {hostDayOrders.length} orders
+                        {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} · {hostDayOrders.length} orders
                       </p>
                     </div>
                   </div>
@@ -1102,7 +1102,7 @@ export default function PerformancePage() {
                         },
                         {
                           label: 'Show Duration',
-                          value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : 'â€”',
+                          value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—',
                           valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
                         },
                         {
@@ -1117,17 +1117,17 @@ export default function PerformancePage() {
                         },
                         {
                           label: 'Profit per Hour',
-                          value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : 'â€”',
+                          value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—',
                           valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`,
                         },
                         {
                           label: 'Revenue per Hour',
-                          value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : 'â€”',
+                          value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—',
                           valueClass: 'text-slate-500 dark:text-slate-400 font-bold',
                         },
                         {
                           label: 'Orders per Hour',
-                          value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : 'â€”',
+                          value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—',
                           valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
                         },
                       ];
@@ -1187,7 +1187,7 @@ export default function PerformancePage() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] text-slate-400">
                                     {profitPerHour !== null
-                                      ? `$${fmtMoney(profitPerHour)}/hr profit â€” needs $300+/hr to qualify for pay tier`
+                                      ? `$${fmtMoney(profitPerHour)}/hr profit — needs $300+/hr to qualify for pay tier`
                                       : 'Duration needed to calculate pay rate'}
                                   </span>
                                 </div>
@@ -1199,7 +1199,7 @@ export default function PerformancePage() {
                     })}
                   </div>
 
-                  {/* Margin Analyzer â€” admin / manager / host only */}
+                  {/* Margin Analyzer — admin / manager / host only */}
                   {(session?.role === 'admin' || session?.role === 'manager' || session?.role === 'host') && (
                     <MarginAnalyzer orders={hostDayOrders} />
                   )}

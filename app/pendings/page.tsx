@@ -273,7 +273,7 @@ export default function PendingsPage() {
             <div className="flex items-center justify-center h-32 text-slate-400 text-sm">Loading...</div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center">
-              <div className="text-4xl mb-3">ðŸ“‹</div>
+              <div className="text-4xl mb-3">📋</div>
               <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No tasks found</p>
               <p className="text-slate-400 text-xs mt-1">{filter === 'open' ? 'All caught up!' : `No ${filter} tasks.`}</p>
             </div>
@@ -289,7 +289,7 @@ export default function PendingsPage() {
                   <div key={task.id}>
                     {showUrgentHeader && (
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-black text-red-500 uppercase tracking-widest">ðŸ”´ Urgent Tasks</span>
+                        <span className="text-xs font-black text-red-500 uppercase tracking-widest">🔴 Urgent Tasks</span>
                         <div className="flex-1 h-px bg-red-200 dark:bg-red-900" />
                       </div>
                     )}
@@ -309,10 +309,10 @@ export default function PendingsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-2">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${task.status === 'resolved' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}>
-                              {task.status === 'resolved' ? 'âœ“ Resolved' : 'Open'}
+                              {task.status === 'resolved' ? '✓ Resolved' : 'Open'}
                             </span>
-                            {task.urgent && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800">ðŸ”´ Urgent</span>}
-                            {task.followUp && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">ðŸ”” Follow-Up</span>}
+                            {task.urgent && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800">🔴 Urgent</span>}
+                            {task.followUp && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">🔔 Follow-Up</span>}
                           </div>
 
                           <div className="flex items-center gap-2 mb-1">
@@ -332,7 +332,7 @@ export default function PendingsPage() {
                           </div>
 
                           {task.description && <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-2">{task.description}</p>}
-                          <p className="text-[10px] text-slate-400">Added by <span className="font-semibold capitalize">{task.createdBy}</span> ({task.createdByRole}) Â· {fmtDate(task.createdAt)}</p>
+                          <p className="text-[10px] text-slate-400">Added by <span className="font-semibold capitalize">{task.createdBy}</span> ({task.createdByRole}) · {fmtDate(task.createdAt)}</p>
                         </div>
 
                         {/* Actions */}
@@ -343,28 +343,28 @@ export default function PendingsPage() {
                                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
                                 : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
                             }`}>
-                            {task.status === 'open' ? 'âœ“ Resolve' : 'â†© Reopen'}
+                            {task.status === 'open' ? '✓ Resolve' : '↩ Reopen'}
                           </button>
 
                           {/* Edit button - admin/manager only */}
                           {canManage && (
                             <button onClick={() => openEdit(task)}
                               className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                              âœï¸ Edit
+                              âœ️ Edit
                             </button>
                           )}
 
                           {canManage && task.status === 'open' && (
                             <button onClick={() => patch(task.id, { urgent: !task.urgent })} disabled={updatingId === task.id}
                               className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors disabled:opacity-50 ${task.urgent ? 'bg-red-500 border-red-500 text-white hover:bg-red-600' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-red-300 hover:text-red-600'}`}>
-                              ðŸ”´ Urgent
+                              🔴 Urgent
                             </button>
                           )}
 
                           {canManage && task.status === 'open' && (
                             <button onClick={() => patch(task.id, { followUp: !task.followUp })} disabled={updatingId === task.id}
                               className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors disabled:opacity-50 ${task.followUp ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-amber-300 hover:text-amber-600'}`}>
-                              ðŸ”” Follow-Up
+                              🔔 Follow-Up
                             </button>
                           )}
 

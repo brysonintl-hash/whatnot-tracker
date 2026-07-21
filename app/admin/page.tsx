@@ -47,7 +47,7 @@ function dKey(year: number, month: number, day: number): string {
 }
 
 function fmtTimestamp(ts: string): string {
-  if (!ts) return 'â€”';
+  if (!ts) return '—';
   const d = new Date(ts.replace(' ', 'T'));
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
@@ -300,7 +300,7 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
             <p className="text-xs text-slate-400 mt-0.5">
               {total > 0
                 ? `${total.toLocaleString()} orders across ${Object.keys(stateData).length} states`
-                : 'No shipping data â€” add state codes to column O in your spreadsheet'}
+                : 'No shipping data — add state codes to column O in your spreadsheet'}
             </p>
           </div>
 
@@ -500,8 +500,8 @@ export default function AdminPage() {
         </button>
         {filterOpen === colKey && (
           <div className="absolute top-full left-0 z-30 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <button onClick={() => applySort(col, 'asc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'asc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg> Sort A â†’ Z</button>
-            <button onClick={() => applySort(col, 'desc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'desc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg> Sort Z â†’ A</button>
+            <button onClick={() => applySort(col, 'asc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'asc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg> Sort A → Z</button>
+            <button onClick={() => applySort(col, 'desc')} className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${isActive && sortDir === 'desc' ? 'text-red-500 font-bold' : 'text-slate-700 dark:text-slate-300'}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg> Sort Z → A</button>
             {isActive && (<><div className="border-t border-slate-100 dark:border-slate-700" /><button onClick={() => applySort(null, 'asc')} className="w-full text-left px-3 py-2 text-xs text-red-500 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg> Clear Sort</button></>)}
           </div>
         )}
@@ -570,7 +570,7 @@ export default function AdminPage() {
                     <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Volume</p>
-                        {(() => { const c = pct(revenue, prevRevenue); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}% vs prev.</span> : null; })()}
+                        {(() => { const c = pct(revenue, prevRevenue); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}% vs prev.</span> : null; })()}
                       </div>
                       <p className="text-3xl font-black text-white mb-3">${fmt(revenue)}</p>
                       <Sparkline data={sparkData} color="#F59E0B" height={40} />
@@ -579,7 +579,7 @@ export default function AdminPage() {
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Profit</p>
-                        {(() => { const c = pct(profit, prevProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
+                        {(() => { const c = pct(profit, prevProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                       </div>
                       <p className={`text-2xl font-black mb-2 ${profit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(profit)}</p>
                       <Sparkline data={sparkData.map(v => v * (revenue > 0 ? profit / revenue : 0))} color="#10B981" height={32} />
@@ -588,7 +588,7 @@ export default function AdminPage() {
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Avg Margin</p>
-                        {(() => { const c = pct(margin, prevMargin); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
+                        {(() => { const c = pct(margin, prevMargin); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                       </div>
                       <p className={`text-2xl font-black mb-2 ${margin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : margin >= 0 ? 'text-amber-500' : 'text-red-500'}`}>{margin.toFixed(1)}%</p>
                       <Sparkline data={Array(sparkData.length).fill(margin)} color="#3B82F6" height={32} />
@@ -660,7 +660,7 @@ export default function AdminPage() {
                     </div>
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-700">
-                        <span className="text-xs text-slate-400">Page {page + 1} of {totalPages} Â· {searchedOrders.length.toLocaleString()} orders</span>
+                        <span className="text-xs text-slate-400">Page {page + 1} of {totalPages} · {searchedOrders.length.toLocaleString()} orders</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => setPage(0)} disabled={page === 0} className="px-2 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">Â«</button>
                           <button onClick={() => setPage(p => Math.max(0, p-1))} disabled={page === 0} className="px-3 py-1 rounded text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30">Prev</button>
