@@ -102,9 +102,9 @@ export default function RegisterPage() {
               background: 'rgba(8,8,12,0.78)',
               backdropFilter: 'blur(22px)',
               WebkitBackdropFilter: 'blur(22px)',
-              border: hovered ? '1px solid rgba(204,17,17,0.45)' : '1px solid rgba(255,255,255,0.10)',
+              border: hovered ? '1px solid rgba(200,200,210,0.38)' : '1px solid rgba(255,255,255,0.10)',
               boxShadow: hovered
-                ? '0 0 0 1px rgba(204,17,17,0.15), 0 24px 64px rgba(0,0,0,0.55), 0 0 40px rgba(204,17,17,0.08)'
+                ? '0 0 0 3px rgba(180,180,195,0.10), 0 24px 64px rgba(0,0,0,0.60)'
                 : '0 24px 64px rgba(0,0,0,0.45)',
             }}
             onMouseEnter={() => setHovered(true)}
