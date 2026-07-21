@@ -85,7 +85,7 @@ export default function UsersPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">User Management</h1>
+            <h1 className="text-lg font-black text-white">User Management</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-full font-bold">Admin</span>
@@ -95,10 +95,10 @@ export default function UsersPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Total Accounts', value: users.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Total Accounts', value: users.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
               { label: 'Pending Approval', value: users.filter(u => u.status === 'pending').length, cls: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', textCls: 'text-amber-600 dark:text-amber-400', labelCls: 'text-amber-600 dark:text-amber-400' },
-              { label: 'Active Users', value: users.filter(u => u.status === 'active').length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
-              { label: 'Roles Assigned', value: ROLES.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Active Users', value: users.filter(u => u.status === 'active').length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Roles Assigned', value: ROLES.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
             ].map(k => (
               <div key={k.label} className={`${k.cls} rounded-xl border shadow-sm p-5`}>
                 <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${k.labelCls}`}>{k.label}</p>
@@ -110,7 +110,7 @@ export default function UsersPage() {
           {/* Users table */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-              <h2 className="font-bold text-slate-900 dark:text-white text-sm">All Accounts</h2>
+              <h2 className="font-bold text-white text-sm">All Accounts</h2>
               <span className="text-xs text-slate-400">{users.length} total</span>
             </div>
 

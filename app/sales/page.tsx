@@ -154,7 +154,7 @@ export default function SalesPage() {
         {/* Header */}
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Sales Analytics</h1>
+            <h1 className="text-lg font-black text-white">Sales Analytics</h1>
             <p className="text-xs text-slate-400">{today} Â· {filtered.length} orders</p>
           </div>
           <div className="flex flex-wrap gap-1.5 items-center">
@@ -166,7 +166,7 @@ export default function SalesPage() {
             ))}
             {preset === 'custom' && (
               <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
-                className="text-xs py-1.5 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                className="text-xs py-1.5 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
             )}
           </div>
         </header>
@@ -199,11 +199,11 @@ export default function SalesPage() {
                   const profit = filtered.reduce((s, o) => s + o.profit, 0);
                   const margin = rev > 0 ? (profit / rev) * 100 : 0;
                   return [
-                    { label: 'Revenue', value: `$${fmt(rev)}`, color: 'text-slate-900 dark:text-white', border: 'border-l-slate-400' },
+                    { label: 'Revenue', value: `$${fmt(rev)}`, color: 'text-white', border: 'border-l-slate-400' },
                     { label: 'Profit', value: `$${fmt(profit)}`, color: profit >= 0 ? 'text-emerald-600' : 'text-red-500', border: profit >= 0 ? 'border-l-emerald-400' : 'border-l-red-400' },
                     { label: 'Avg Margin', value: `${margin.toFixed(1)}%`, color: 'text-amber-500', border: 'border-l-amber-400' },
-                    { label: 'Orders', value: fmtInt(filtered.length), color: 'text-slate-900 dark:text-white', border: 'border-l-blue-400' },
-                    { label: 'Shows', value: fmtInt(byTab.length), color: 'text-slate-900 dark:text-white', border: 'border-l-violet-400' },
+                    { label: 'Orders', value: fmtInt(filtered.length), color: 'text-white', border: 'border-l-blue-400' },
+                    { label: 'Shows', value: fmtInt(byTab.length), color: 'text-white', border: 'border-l-violet-400' },
                   ];
                 })().map(kpi => (
                   <div key={kpi.label} className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 ${kpi.border} rounded-xl shadow-sm p-4`}>
@@ -217,7 +217,7 @@ export default function SalesPage() {
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 mb-4">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="font-bold text-slate-900 dark:text-white text-sm">Sales & Profit by Show</h2>
+                    <h2 className="font-bold text-white text-sm">Sales & Profit by Show</h2>
                     <p className="text-[10px] text-slate-400 mt-0.5">Scroll to zoom Â· Drag to pan</p>
                   </div>
                   <button
@@ -239,7 +239,7 @@ export default function SalesPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 {/* Show breakdown */}
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
-                  <h2 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Show Breakdown</h2>
+                  <h2 className="font-bold text-white mb-4 text-sm">Show Breakdown</h2>
                   <table className="w-full text-sm">
                     <thead><tr className="border-b border-slate-100 dark:border-slate-700">
                       {['Show', 'Orders', 'Sales', 'Profit'].map(h => (
@@ -251,7 +251,7 @@ export default function SalesPage() {
                         <tr key={tab} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                           <td className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-xs">{tab}</td>
                           <td className="py-2 px-2 text-right text-slate-400 text-xs">{filtered.filter(o => o.tab === tab).length}</td>
-                          <td className="py-2 px-2 text-right font-semibold text-slate-900 dark:text-white text-xs">${fmt(d.sales)}</td>
+                          <td className="py-2 px-2 text-right font-semibold text-white text-xs">${fmt(d.sales)}</td>
                           <td className={`py-2 px-2 text-right font-bold text-xs ${d.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmt(d.profit)}</td>
                         </tr>
                       ))}
@@ -283,7 +283,7 @@ export default function SalesPage() {
 
                 {/* Top buyers */}
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
-                  <h2 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Top Buyers</h2>
+                  <h2 className="font-bold text-white mb-4 text-sm">Top Buyers</h2>
                   <table className="w-full text-sm">
                     <thead><tr className="border-b border-slate-100 dark:border-slate-700">
                       {['#', 'Buyer', 'Orders', 'Spent'].map(h => (

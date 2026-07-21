@@ -155,17 +155,17 @@ function CalendarView({ orders }: { orders: Order[] }) {
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Gross Profit</p>
-          <p className={`text-2xl font-black mb-1 ${mProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(mProfit)}</p>
+          <p className={`text-2xl font-black mb-1 ${mProfit >= 0 ? 'text-white' : 'text-red-500'}`}>${fmt(mProfit)}</p>
           <p className="text-slate-400 text-[11px]">{mMargin.toFixed(1)}% margin</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Net Profit</p>
-          <p className={`text-2xl font-black mb-1 ${mProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(mProfit)}</p>
+          <p className={`text-2xl font-black mb-1 ${mProfit >= 0 ? 'text-white' : 'text-red-500'}`}>${fmt(mProfit)}</p>
           <p className="text-slate-400 text-[11px]">{mProfit >= 0 ? 'Profitable' : 'Not profitable'}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Total Sales</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white mb-1">{mCount}</p>
+          <p className="text-2xl font-black text-white mb-1">{mCount}</p>
           <p className="text-slate-400 text-[11px]">{opDays > 0 ? (mCount / opDays).toFixed(1) : '0'} avg/day</p>
         </div>
       </div>
@@ -175,7 +175,7 @@ function CalendarView({ orders }: { orders: Order[] }) {
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-amber-400 flex items-center justify-center">{IC.calIcon}</div>
             <div>
-              <h2 className="text-base font-black text-slate-900 dark:text-white">{MONTH_NAMES[calMonth]} {calYear}</h2>
+              <h2 className="text-base font-black text-white">{MONTH_NAMES[calMonth]} {calYear}</h2>
               <p className="text-[10px] text-slate-400">Daily financial overview</p>
             </div>
           </div>
@@ -296,7 +296,7 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
         {/* Map card */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
           <div className="mb-3">
-            <h2 className="text-base font-black text-slate-900 dark:text-white">Shipment Distribution</h2>
+            <h2 className="text-base font-black text-white">Shipment Distribution</h2>
             <p className="text-xs text-slate-400 mt-0.5">
               {total > 0
                 ? `${total.toLocaleString()} orders across ${Object.keys(stateData).length} states`
@@ -334,7 +334,7 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
 
         {/* Top states table */}
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
-          <h2 className="text-base font-black text-slate-900 dark:text-white mb-4">Top States</h2>
+          <h2 className="text-base font-black text-white mb-4">Top States</h2>
           {total === 0 ? (
             <p className="text-slate-400 text-sm leading-relaxed">
               Add state codes to column O in your spreadsheet.<br /><br />
@@ -352,10 +352,10 @@ function ShipmentDistribution({ orders }: { orders: Order[] }) {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-400 w-4 text-right">{i + 1}</span>
-                      <span className="text-sm font-black text-slate-900 dark:text-white">{st}</span>
+                      <span className="text-sm font-black text-white">{st}</span>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">{count.toLocaleString()}</span>
+                      <span className="text-sm font-bold text-white">{count.toLocaleString()}</span>
                       <span className="text-[11px] text-slate-400">{((count / total) * 100).toFixed(1)}%</span>
                     </div>
                   </div>
@@ -523,11 +523,11 @@ export default function AdminPage() {
 
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Dashboard</h1>
+            <h1 className="text-lg font-black text-white">Dashboard</h1>
             <p className="text-xs text-slate-400">Welcome back, {session.name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
             <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-black text-sm">{session.name[0]}</div>
           </div>
         </header>
@@ -545,7 +545,7 @@ export default function AdminPage() {
                   { key: 'shipping'   as const, label: 'Shipping Map',         icon: IC.mapIcon },
                 ]).map(t => (
                   <button key={t.key} onClick={() => setDashTab(t.key)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${dashTab === t.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${dashTab === t.key ? 'bg-white dark:bg-slate-700 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                     {t.icon}{t.label}
                   </button>
                 ))}
@@ -581,7 +581,7 @@ export default function AdminPage() {
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Profit</p>
                         {(() => { const c = pct(profit, prevProfit); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{c >= 0 ? 'â†‘' : 'â†“'} {Math.abs(c).toFixed(1)}%</span> : null; })()}
                       </div>
-                      <p className={`text-2xl font-black mb-2 ${profit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(profit)}</p>
+                      <p className={`text-2xl font-black mb-2 ${profit >= 0 ? 'text-white' : 'text-red-500'}`}>${fmt(profit)}</p>
                       <Sparkline data={sparkData.map(v => v * (revenue > 0 ? profit / revenue : 0))} color="#10B981" height={32} />
                       <p className="text-slate-400 text-[11px] mt-1">after COGS</p>
                     </div>
@@ -596,7 +596,7 @@ export default function AdminPage() {
                     </div>
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                       <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Inventory Value</p>
-                      <p className="text-2xl font-black text-slate-900 dark:text-white mb-2">${fmt(invValue)}</p>
+                      <p className="text-2xl font-black text-white mb-2">${fmt(invValue)}</p>
                       <div className="flex gap-2 mt-1">
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400">{outOfStock} out</span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">{lowStock} low</span>
@@ -609,14 +609,14 @@ export default function AdminPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
                     <div className="lg:col-span-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
                       <div className="flex items-start justify-between mb-3">
-                        <div><h2 className="font-bold text-slate-900 dark:text-white text-sm">Gross Volume</h2><p className="text-xl font-black text-slate-900 dark:text-white">${fmt(revenue)}</p></div>
+                        <div><h2 className="font-bold text-white text-sm">Gross Volume</h2><p className="text-xl font-black text-white">${fmt(revenue)}</p></div>
                         <span className="flex items-center gap-1 text-xs text-slate-400"><span className="w-2.5 h-1.5 rounded-sm bg-amber-400 inline-block" /> This period</span>
                       </div>
                       <Line data={{ labels: byTab.map(([t]) => t), datasets: [{ label: 'Sales ($)', data: byTab.map(([, v]) => v), borderColor: '#F59E0B', backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#F59E0B', pointBorderColor: '#fff', pointBorderWidth: 1.5 }] }}
                         options={{ responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` $${fmt(c.raw as number)}` } } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }, y: { grid: { color: 'rgba(148,163,184,0.08)' }, ticks: { font: { size: 10 }, color: '#94a3b8', callback: v => `$${(Number(v)/1000).toFixed(0)}k` } } } }} />
                     </div>
                     <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex flex-col">
-                      <div className="mb-3"><h2 className="font-bold text-slate-900 dark:text-white text-sm">Revenue by Host</h2><p className="text-xs text-slate-400 mt-0.5">{Object.keys(byHost).length} hosts</p></div>
+                      <div className="mb-3"><h2 className="font-bold text-white text-sm">Revenue by Host</h2><p className="text-xs text-slate-400 mt-0.5">{Object.keys(byHost).length} hosts</p></div>
                       <div className="flex-1 flex items-center justify-center min-h-[240px]">
                         <Doughnut data={{ labels: Object.keys(byHost), datasets: [{ data: Object.values(byHost), backgroundColor: HOST_COLORS, borderWidth: 3, borderColor: 'transparent', hoverBorderColor: '#fff' }] }}
                           options={{ responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, color: '#94a3b8', usePointStyle: true, pointStyleWidth: 8 } } } }} />
@@ -626,7 +626,7 @@ export default function AdminPage() {
 
                   <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                      <h2 className="font-bold text-slate-900 dark:text-white text-sm">Recent Orders</h2>
+                      <h2 className="font-bold text-white text-sm">Recent Orders</h2>
                       <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 flex-1 min-w-[180px] max-w-xs">
                         <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search product, buyer, host..." className="bg-transparent text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 outline-none flex-1" />
@@ -650,7 +650,7 @@ export default function AdminPage() {
                                 <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs text-center">{o.buyer}</td>
                                 <td className="py-3 px-4 text-center"><span className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">{o.host}</span></td>
                                 <td className="py-3 px-4 text-slate-400 dark:text-slate-500 text-xs text-center">{o.tab}</td>
-                                <td className="py-3 px-4 text-center font-semibold text-slate-900 dark:text-white text-xs">${o.sold.toFixed(2)}</td>
+                                <td className="py-3 px-4 text-center font-semibold text-white text-xs">${o.sold.toFixed(2)}</td>
                                 <td className={`py-3 px-4 text-center font-bold text-xs ${o.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${o.profit.toFixed(2)}</td>
                                 <td className="py-3 px-4 text-slate-400 dark:text-slate-500 text-xs whitespace-nowrap text-center">{fmtTimestamp(o.timestamp)}</td>
                               </tr>

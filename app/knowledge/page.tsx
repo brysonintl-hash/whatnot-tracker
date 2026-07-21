@@ -92,7 +92,7 @@ export default function KnowledgePage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Knowledge Base</h1>
+            <h1 className="text-lg font-black text-white">Knowledge Base</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
@@ -101,7 +101,7 @@ export default function KnowledgePage() {
         <main className="flex-1 overflow-y-auto p-6">
           {/* Add link */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-6">
-            <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Add New Link</h2>
+            <h2 className="font-bold text-white text-sm mb-4">Add New Link</h2>
             <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="md:col-span-1">
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Title</label>
@@ -198,7 +198,7 @@ export default function KnowledgePage() {
                           {CAT_ICON[link.category] || 'ðŸ”—'} {link.category}
                         </span>
                       </div>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{link.title}</p>
+                      <p className="font-bold text-white text-sm truncate">{link.title}</p>
                       <p className="text-[10px] text-slate-400 mt-0.5 truncate">{link.url}</p>
                     </div>
                     <button

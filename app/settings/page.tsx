@@ -114,17 +114,17 @@ export default function SettingsPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Settings</h1>
+            <h1 className="text-lg font-black text-white">Settings</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
-          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+          <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 max-w-2xl">
           {/* Appearance */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-              <h2 className="font-bold text-slate-900 dark:text-white text-sm">Appearance</h2>
+              <h2 className="font-bold text-white text-sm">Appearance</h2>
             </div>
             <div className="p-6 space-y-5">
               {/* Theme toggle */}
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           {/* Change Password */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-              <h2 className="font-bold text-slate-900 dark:text-white text-sm">Change Password</h2>
+              <h2 className="font-bold text-white text-sm">Change Password</h2>
             </div>
             <form onSubmit={changePassword} className="p-6 space-y-4">
               {pwMsg && (

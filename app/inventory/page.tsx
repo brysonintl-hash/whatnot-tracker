@@ -93,7 +93,7 @@ export default function InventoryPage() {
         <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5">{label}</label>
         <input type={type} value={String(form[field])}
           onChange={e => setForm(f => ({ ...f, [field]: type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value }))}
-          className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
       </div>
     );
   }
@@ -109,7 +109,7 @@ export default function InventoryPage() {
         {/* Header */}
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Inventory</h1>
+            <h1 className="text-lg font-black text-white">Inventory</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           {session.role !== 'host' && (
@@ -130,7 +130,7 @@ export default function InventoryPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
               <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Total Items</p>
-              <p className="text-2xl font-black text-slate-900 dark:text-white">{items.length.toLocaleString()}</p>
+              <p className="text-2xl font-black text-white">{items.length.toLocaleString()}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-4 border-l-red-500 rounded-xl shadow-sm p-5">
               <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-2">Out of Stock</p>
@@ -151,7 +151,7 @@ export default function InventoryPage() {
             <input
               type="text" placeholder="Search model, description, UPC, ASIN..."
               value={search} onChange={e => setSearch(e.target.value)}
-              className="flex-1 min-w-48 max-w-sm px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-slate-400"
+              className="flex-1 min-w-48 max-w-sm px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-slate-400"
             />
             <div className="flex gap-1">
               {(['all', 'low', 'out'] as const).map(f => (
@@ -182,7 +182,7 @@ export default function InventoryPage() {
                         <td className="py-3 px-4 max-w-xs"><span className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 block">{item.description}</span></td>
                         <td className="py-3 px-4 font-mono text-xs text-slate-400">{item.upc}</td>
                         <td className="py-3 px-4 font-mono text-xs text-slate-400">{item.asin}</td>
-                        <td className="py-3 px-4 text-center font-black text-lg text-slate-900 dark:text-white">{item.qty.toLocaleString()}</td>
+                        <td className="py-3 px-4 text-center font-black text-lg text-white">{item.qty.toLocaleString()}</td>
                         <td className="py-3 px-4"><QtyBadge qty={item.qty} /></td>
                         <td className="py-3 px-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">${item.retail.toFixed(2)}</td>
                         <td className="py-3 px-4 text-right font-black text-sm text-emerald-600">${item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -247,7 +247,7 @@ export default function InventoryPage() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="font-black text-slate-900 dark:text-white">{modal === 'add' ? 'Add New Item' : 'Edit Item'}</h2>
+              <h2 className="font-black text-white">{modal === 'add' ? 'Add New Item' : 'Edit Item'}</h2>
               <button onClick={() => setModal(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>

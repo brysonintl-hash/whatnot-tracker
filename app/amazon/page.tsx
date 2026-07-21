@@ -254,16 +254,16 @@ export default function AmazonPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Amazon Analyzer</h1>
+            <h1 className="text-lg font-black text-white">Amazon Analyzer</h1>
             <p className="text-xs text-slate-400 hidden sm:block">{today}</p>
           </div>
-          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+          <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Search panel */}
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 mb-6 max-w-2xl">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">Amazon vs Whatnot Profit Analyzer</h2>
+            <h2 className="text-sm font-bold text-white mb-0.5">Amazon vs Whatnot Profit Analyzer</h2>
             <p className="text-xs text-slate-400 mb-4">Compares Amazon FBM Â· FBA Â· Whatnot to find the most profitable channel.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div>
@@ -353,7 +353,7 @@ export default function AmazonPage() {
                             <div className="min-w-0">
                               <p className="text-[10px] font-mono text-slate-400">{r.asin}</p>
                               <a href={r.url} target="_blank" rel="noopener noreferrer"
-                                className="text-sm font-bold text-slate-900 dark:text-white hover:text-orange-500 transition-colors line-clamp-2 leading-snug">
+                                className="text-sm font-bold text-white hover:text-orange-500 transition-colors line-clamp-2 leading-snug">
                                 {r.title}
                               </a>
                               <div className="flex items-center gap-2 flex-wrap">
