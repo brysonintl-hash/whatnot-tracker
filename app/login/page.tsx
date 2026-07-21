@@ -45,19 +45,25 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: '#080808' }}>
 
-      {/* ── Ambient glow blobs ── */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -left-32 w-[700px] h-[700px] rounded-full opacity-30"
-          style={{ background: 'radial-gradient(circle, #cc1111 0%, transparent 70%)', filter: 'blur(80px)' }} />
-        <div className="absolute -bottom-48 -right-32 w-[600px] h-[600px] rounded-full opacity-20"
-          style={{ background: 'radial-gradient(circle, #990000 0%, transparent 70%)', filter: 'blur(100px)' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #ff3333 0%, transparent 70%)', filter: 'blur(60px)' }} />
+      {/* ── Background image (blurred) ── */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* Extend -30px on all sides so blur edges are hidden */}
+        <div className="absolute" style={{
+          inset: '-30px',
+          backgroundImage: 'url(/bg.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(7px)',
+        }} />
+        {/* Dark overlay so content stays readable */}
+        <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.68)' }} />
+        {/* Vignette – darkens the edges */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)' }} />
       </div>
 
       {/* ── Grid texture overlay ── */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.4) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
 
       {/* ── Main content ── */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12">
