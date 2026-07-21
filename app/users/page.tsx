@@ -85,7 +85,7 @@ export default function UsersPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">User Management</h1>
+            <h1 className="text-lg font-black text-white">User Management</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-2.5 py-1 rounded-full font-bold">Admin</span>

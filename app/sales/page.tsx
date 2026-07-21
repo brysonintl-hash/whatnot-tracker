@@ -154,7 +154,7 @@ export default function SalesPage() {
         {/* Header */}
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Sales Analytics</h1>
+            <h1 className="text-lg font-black text-white">Sales Analytics</h1>
             <p className="text-xs text-slate-400">{today} Â· {filtered.length} orders</p>
           </div>
           <div className="flex flex-wrap gap-1.5 items-center">

@@ -740,7 +740,7 @@ function ShippingPageInner() {
         {/* Header */}
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Shipments</h1>
+            <h1 className="text-lg font-black text-white">Shipments</h1>
             <p className="text-xs text-slate-400 hidden sm:block">{today}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -760,7 +760,7 @@ function ShippingPageInner() {
                 {editMode ? 'Cancel' : 'Edit'}
               </button>
             )}
-            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
           </div>
         </header>
 
@@ -810,7 +810,7 @@ function ShippingPageInner() {
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                             Prev
                           </button>
-                          <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-900 dark:text-white min-w-[80px] text-center">
+                          <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-white min-w-[80px] text-center">
                             {selectedTab || 'â€”'}
                           </div>
                           <button
@@ -880,7 +880,7 @@ function ShippingPageInner() {
                   {pingTarget && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPingTarget(null)}>
                       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-                        <h3 className="font-black text-slate-900 dark:text-white mb-1">Follow Up / Ping</h3>
+                        <h3 className="font-black text-white mb-1">Follow Up / Ping</h3>
                         <p className="text-xs text-slate-400 mb-4">Send a follow-up message</p>
                         <textarea value={pingMsg} onChange={e => setPingMsg(e.target.value)} placeholder="Type your message..." rows={3}
                           className="w-full text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4" />

@@ -184,11 +184,11 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
 
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Reports</h1>
+            <h1 className="text-lg font-black text-white">Reports</h1>
             <p className="text-xs text-slate-400">Generate and export business reports</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
             <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-black text-sm">{session.name[0]}</div>
           </div>
         </header>
@@ -269,7 +269,7 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
                 ].map(s => (
                   <div key={s.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 text-center">
                     <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">{s.label}</p>
-                    <p className="text-2xl font-black text-slate-900 dark:text-white">{s.value}</p>
+                    <p className="text-2xl font-black text-white">{s.value}</p>
                     <p className="text-[10px] text-slate-400 mt-1">{s.sub}</p>
                   </div>
                 ))}

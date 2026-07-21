@@ -91,7 +91,7 @@ export default function HostPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Host Dashboard</h1>
+            <h1 className="text-lg font-black text-white">Host Dashboard</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold">Host</span>
@@ -151,7 +151,7 @@ export default function HostPage() {
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{tab}</span>
-                            <span className="text-xs font-black text-slate-900 dark:text-white">${fmt(d.sales)}</span>
+                            <span className="text-xs font-black text-white">${fmt(d.sales)}</span>
                           </div>
                           <div className="flex items-center justify-between mt-0.5">
                             <span className="text-[10px] text-slate-400">{d.orders} orders</span>

@@ -163,7 +163,7 @@ export default function HomeDepotPage() {
             </svg>
           </div>
           <div>
-            <h1 className="font-black text-slate-900 dark:text-white text-base leading-tight">Home Depot Search</h1>
+            <h1 className="font-black text-white text-base leading-tight">Home Depot Search</h1>
             <p className="text-[11px] text-slate-400">Search by model number or product name</p>
           </div>
         </header>

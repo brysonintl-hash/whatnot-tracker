@@ -92,7 +92,7 @@ export default function KnowledgePage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Knowledge Base</h1>
+            <h1 className="text-lg font-black text-white">Knowledge Base</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>

@@ -71,7 +71,7 @@ export default function ShipperPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white">Shipper Dashboard</h1>
+            <h1 className="text-lg font-black text-white">Shipper Dashboard</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <div className="flex items-center gap-3">
