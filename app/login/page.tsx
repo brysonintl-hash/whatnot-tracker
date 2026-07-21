@@ -66,7 +66,7 @@ function LoginForm() {
         <div className="mb-8 flex flex-col items-center">
           <div className="w-[148px] h-[148px] rounded-2xl overflow-hidden shadow-2xl"
             style={{ boxShadow: '0 0 60px rgba(204,17,17,0.5), 0 20px 40px rgba(0,0,0,0.6)' }}>
-            <img src="/logo.svg" alt="Stack Bargains" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt="Stack Bargains" className="w-full h-full object-cover" />
           </div>
           <p className="mt-4 text-white/30 text-xs font-medium tracking-[0.2em] uppercase">Logistics Platform</p>
         </div>
@@ -223,7 +223,7 @@ function LoginForm() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
-              <img src="/logo.svg" alt="" className="w-full h-full object-cover" />
+              <img src="/logo.png" alt="" className="w-full h-full object-cover" />
             </div>
             <p className="text-white/20 text-xs">© 2025 Stack Bargains. All rights reserved.</p>
           </div>
