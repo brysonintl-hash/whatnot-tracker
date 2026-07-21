@@ -228,7 +228,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-40 p-2 bg-slate-900 rounded-lg text-white shadow-lg"
+        className="md:hidden fixed top-4 left-4 z-40 p-2 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-lg"
         aria-label="Open menu"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -244,7 +244,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-screen bg-slate-900 flex flex-col border-r border-slate-800
+          fixed top-0 left-0 z-50 h-screen bg-white flex flex-col border-r border-slate-200
           transition-all duration-200 ease-in-out overflow-hidden
           ${open ? 'w-64' : 'w-16'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -253,16 +253,16 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         onMouseLeave={() => setExpanded(false)}
       >
         {/* Logo */}
-        <div className={`h-16 flex items-center border-b border-slate-800 flex-shrink-0 ${open ? 'px-5' : 'justify-center'}`}>
+        <div className={`h-16 flex items-center border-b border-slate-200 flex-shrink-0 ${open ? 'px-5' : 'justify-center'}`}>
           <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-white text-xs shadow flex-shrink-0">SB</div>
           {open && (
             <div className="ml-3 flex-1 min-w-0">
-              <div className="text-white font-black text-sm leading-none whitespace-nowrap">Stack Bargains</div>
-              <div className="text-slate-500 text-[10px] capitalize mt-0.5">{role} Portal</div>
+              <div className="text-slate-900 font-black text-sm leading-none whitespace-nowrap">Stack Bargains</div>
+              <div className="text-slate-400 text-[10px] capitalize mt-0.5">{role} Portal</div>
             </div>
           )}
           {mobileOpen && (
-            <button onClick={() => setMobileOpen(false)} className="ml-auto text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
+            <button onClick={() => setMobileOpen(false)} className="ml-auto text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           )}
@@ -273,9 +273,9 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
           {sections.map(section => (
             <div key={section.title}>
               {open && (
-                <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest px-3 mb-2 whitespace-nowrap">{section.title}</p>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest px-3 mb-2 whitespace-nowrap">{section.title}</p>
               )}
-              {!open && <div className="h-px bg-slate-800 mx-2 mb-2" />}
+              {!open && <div className="h-px bg-slate-200 mx-2 mb-2" />}
 
               {section.items.map(item => {
                 const active = pathname === item.href || (item.href !== '/admin' && item.href !== '/manager' && item.href !== '/employee' && item.href !== '/shipper' && item.href !== '/host' && pathname.startsWith(item.href));
@@ -296,8 +296,8 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                         onClick={() => open ? toggleExpanded(item.href) : null}
                         className={`flex items-center w-full py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all ${open ? 'gap-3 px-3' : 'justify-center px-0'} ${
                           parentActive
-                            ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                         }`}
                       >
                         <span className="relative flex-shrink-0">
@@ -321,10 +321,10 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                         )}
                       </button>
                       {open && isChildExpanded && (
-                        <div className="ml-3 pl-3 border-l border-slate-700 mt-0.5 mb-1 space-y-0.5">
+                        <div className="ml-3 pl-3 border-l border-slate-200 mt-0.5 mb-1 space-y-0.5">
                           {item.children.map(child => (
                             <Link key={child.href} href={child.href} onClick={() => setMobileOpen(false)}
-                              className="flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-200 hover:bg-slate-800">
+                              className="flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                               {child.label}
                             </Link>
                           ))}
@@ -341,8 +341,8 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                     onClick={() => setMobileOpen(false)}
                     className={`flex items-center py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-all ${open ? 'gap-3 px-3' : 'justify-center px-0'} ${
                       active
-                        ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                     }`}
                   >
                     <span className="relative flex-shrink-0">
@@ -364,7 +364,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                             {pendingTaskCount}
                           </span>
                         )}
-                        {active && !hasBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                        {active && !hasBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500" />}
                       </>
                     )}
                   </Link>
@@ -375,14 +375,14 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         </nav>
 
         {/* Footer */}
-        <div className="p-2 border-t border-slate-800 flex-shrink-0">
-          <div className={`flex items-center py-2.5 rounded-lg bg-slate-800 mb-1 ${open ? 'gap-3 px-3' : 'justify-center'}`}>
+        <div className="p-2 border-t border-slate-200 flex-shrink-0">
+          <div className={`flex items-center py-2.5 rounded-lg bg-slate-100 mb-1 ${open ? 'gap-3 px-3' : 'justify-center'}`}>
             <div className={`w-8 h-8 rounded-full ${ROLE_COLOR[role]} flex items-center justify-center text-white font-black text-sm flex-shrink-0`}>
               {userName[0]?.toUpperCase()}
             </div>
             {open && (
               <div className="flex-1 min-w-0">
-                <div className="text-white text-sm font-semibold truncate">{userName}</div>
+                <div className="text-slate-900 text-sm font-semibold truncate">{userName}</div>
                 <div className="text-slate-400 text-[10px] capitalize font-medium">{role}</div>
               </div>
             )}
@@ -391,19 +391,19 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
           {open ? (
             <>
               <button onClick={() => setFeatureOpen(true)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 text-sm font-medium transition-colors">
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 text-sm font-medium transition-colors">
                 {I.idea}
                 <span className="whitespace-nowrap">Request a Feature</span>
               </button>
               <button onClick={logout}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 text-sm font-medium transition-colors">
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 text-sm font-medium transition-colors">
                 {I.logout}
                 <span className="whitespace-nowrap">Sign out</span>
               </button>
             </>
           ) : (
             <button onClick={logout}
-              className="w-full flex items-center justify-center py-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+              className="w-full flex items-center justify-center py-2.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
               {I.logout}
             </button>
           )}
