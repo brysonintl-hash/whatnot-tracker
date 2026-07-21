@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
-import OnlineUsers from '@/components/OnlineUsers';
 import type { Role } from '@/lib/types';
 
 type Session = { username: string; role: Role; name: string };
@@ -119,8 +118,6 @@ export default function AIAssistantPage() {
     <div className="flex h-screen bg-slate-950 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <OnlineUsers />
-
         {/* Header */}
         <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">

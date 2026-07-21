@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
-import OnlineUsers from '@/components/OnlineUsers';
 import type { Role } from '@/lib/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -189,7 +188,6 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
             <p className="text-xs text-slate-400">Generate and export business reports</p>
           </div>
           <div className="flex items-center gap-3">
-            <OnlineUsers />
             <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
             <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-black text-sm">{session.name[0]}</div>
           </div>

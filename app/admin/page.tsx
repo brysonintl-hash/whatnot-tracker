@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
-import OnlineUsers from '@/components/OnlineUsers';
 import type { Role } from '@/lib/types';
 
 const USChoroplethMap = dynamic(() => import('@/components/USChoroplethMap'), { ssr: false });
@@ -528,7 +527,6 @@ export default function AdminPage() {
             <p className="text-xs text-slate-400">Welcome back, {session.name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <OnlineUsers />
             <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
             <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-black text-sm">{session.name[0]}</div>
           </div>
