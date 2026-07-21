@@ -1066,7 +1066,7 @@ export default function PerformancePage() {
                   {/* Summary row */}
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="font-black text-white text-base">
+                      <h2 className="font-black text-slate-900 dark:text-white text-base">
                         {isoToDisplay(selectedDate)}
                       </h2>
                       <p className="text-xs text-slate-400 mt-0.5">
@@ -1146,7 +1146,7 @@ export default function PerformancePage() {
                               {hs.host[0]?.toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-black text-white text-base leading-tight">{hs.host}</p>
+                              <p className="font-black text-slate-900 dark:text-white text-base leading-tight">{hs.host}</p>
                               <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
                                 Livestream {idx + 1}
                               </p>
@@ -1178,7 +1178,7 @@ export default function PerformancePage() {
                                   <div>
                                     <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show</p>
                                     <p className="text-[10px] text-slate-400 mt-0.5">
-                                      {tier.pay}/hr Ã— {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
+                                      {tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
                                     </p>
                                   </div>
                                   <span className={`text-xl font-black ${tier.text}`}>${fmtMoney(estimatedPay!)}</span>
