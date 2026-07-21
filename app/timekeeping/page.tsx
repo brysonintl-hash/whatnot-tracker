@@ -45,7 +45,7 @@ function weekStartKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// â”€â”€â”€ Admin / Manager View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Admin / Manager View â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function ManagementView({ session }: { session: Session }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -229,7 +229,7 @@ function ManagementView({ session }: { session: Session }) {
                 ))}
               </div>
 
-              {/* â”€â”€ Staff Timekeeping Dashboard â”€â”€ */}
+              {/* â"€â"€ Staff Timekeeping Dashboard â"€â"€ */}
               {staffSummary.length > 0 && (
                 <div className="mb-6">
                   <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2">
@@ -520,7 +520,7 @@ function ManagementView({ session }: { session: Session }) {
   );
 }
 
-// â”€â”€â”€ Staff Clock-In / Out View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Staff Clock-In / Out View â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function StaffView({ session }: { session: Session }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -687,7 +687,7 @@ function StaffView({ session }: { session: Session }) {
   );
 }
 
-// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Main Page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export default function TimekeepingPage() {
   const router = useRouter();

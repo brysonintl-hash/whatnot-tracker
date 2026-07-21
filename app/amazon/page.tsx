@@ -395,7 +395,7 @@ export default function AmazonPage() {
                         </div>
                       </div>
 
-                      {/* â”€â”€ 3-column profit comparison â”€â”€ */}
+                      {/* â"€â"€ 3-column profit comparison â"€â"€ */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
                         {/* Amazon FBM */}

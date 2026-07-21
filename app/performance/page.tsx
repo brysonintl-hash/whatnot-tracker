@@ -99,7 +99,7 @@ function fmtMoney(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// â”€â”€â”€ Host Pay Rate Tiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Host Pay Rate Tiers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const PAY_TIERS = [
   { min: 500, pay: 30, label: '$30/hr', color: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-700', text: 'text-emerald-700 dark:text-emerald-400' },
   { min: 400, pay: 25, label: '$25/hr', color: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-900/20',   border: 'border-amber-200 dark:border-amber-700',   text: 'text-amber-700 dark:text-amber-400' },
@@ -111,7 +111,7 @@ function getPayTier(profitPerHour: number | null) {
   return PAY_TIERS.find(t => profitPerHour >= t.min) ?? null;
 }
 
-// â”€â”€â”€ PDF Report Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ PDF Report Generator â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function buildPDFHtml(
   date: string,
   hostStats: HostStat[],
@@ -266,7 +266,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
     .sort((a, b) => a.host.localeCompare(b.host) || a.livestream - b.livestream);
 }
 
-// â”€â”€â”€ Pay Tier Board â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Pay Tier Board â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 type TierEntry = HostStat & { pph: number; tierNum: 1 | 2 | 3 };
 
@@ -351,7 +351,7 @@ function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
   );
 }
 
-// â”€â”€â”€ Tier History Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Tier History Dashboard â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName: string | null }) {
   const [open, setOpen] = useState(false);
@@ -479,7 +479,7 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
   );
 }
 
-// â”€â”€â”€ Margin Analyzer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Margin Analyzer â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 const MARGIN_LOW    = 20;
 const MARGIN_TARGET = 30;
@@ -545,7 +545,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
   return (
     <div className="mt-6 space-y-4">
 
-      {/* â”€â”€ Plain-English Summary â”€â”€ */}
+      {/* â"€â"€ Plain-English Summary â"€â"€ */}
       <div className={`rounded-2xl border-2 p-6 ${
         statusColor === 'red'
           ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
@@ -590,7 +590,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
         </div>
       </div>
 
-      {/* â”€â”€ Fix These Items â”€â”€ */}
+      {/* â"€â"€ Fix These Items â"€â"€ */}
       {topDrags.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
           <p className="text-base font-black text-white mb-1">Raise these prices on Whatnot</p>
@@ -628,7 +628,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
         </div>
       )}
 
-      {/* â”€â”€ See All Bad Orders (collapsed) â”€â”€ */}
+      {/* â"€â"€ See All Bad Orders (collapsed) â"€â"€ */}
       {belowTarget.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <button
@@ -684,7 +684,7 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
   );
 }
 
-// â”€â”€â”€ Timekeeping types for Team Calendar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Timekeeping types for Team Calendar â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 type TKEntry = {
   id: string; userId: string; username: string; name: string;
@@ -889,7 +889,7 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
   );
 }
 
-// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Main Page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export default function PerformancePage() {
   const router = useRouter();

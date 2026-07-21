@@ -249,7 +249,7 @@ var t=setInterval(function(){
 
   return (
     <div className="space-y-4 mb-6">
-      {/* â”€â”€ Console Script (Primary) â”€â”€ */}
+      {/* â"€â"€ Console Script (Primary) â"€â"€ */}
       <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-5">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center flex-shrink-0 text-base">💻</div>
@@ -275,7 +275,7 @@ var t=setInterval(function(){
         <CopyScriptButton script={consoleScript} />
       </div>
 
-      {/* â”€â”€ Bookmarklet (Alternative) â”€â”€ */}
+      {/* â"€â"€ Bookmarklet (Alternative) â"€â"€ */}
       <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-slate-700 dark:text-slate-300">Alternative: Bookmarklet</p>

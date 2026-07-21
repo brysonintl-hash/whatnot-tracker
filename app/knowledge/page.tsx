@@ -19,11 +19,11 @@ const CAT_STYLE: Record<string, string> = {
 };
 
 const CAT_ICON: Record<string, string> = {
-  ‘Google Sheets’: ‘📊’,
-  ‘Google Docs’: ‘📄’,
-  ‘USPS’: ‘📦’,
-  ‘WhatNot’: ‘🛒’,
-  ‘Other’: ‘🔗’,
+  'Google Sheets': '📊',
+  'Google Docs': '📄',
+  'USPS': '📦',
+  'WhatNot': '🛒',
+  'Other': '🔗',
 };
 
 export default function KnowledgePage() {
@@ -183,7 +183,7 @@ export default function KnowledgePage() {
             <div className="flex items-center justify-center h-32 text-slate-400">Loading...</div>
           ) : displayed.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center">
-              <div className=”text-4xl mb-3”>📚</div>
+              <div className="text-4xl mb-3">📚</div>
               <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No links yet</p>
               <p className="text-slate-400 text-xs mt-1">Add Google Docs, Sheets, or any useful links above</p>
             </div>
