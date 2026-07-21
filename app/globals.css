@@ -54,14 +54,52 @@ tr:hover td {
 .dark ::-webkit-scrollbar-track { background: #0d1117; }
 .dark ::-webkit-scrollbar-thumb { background: #30363d; }
 
+/* ── Glass theme ───────────────────────────────────────────── */
+
+/* Body transparent so fixed bg shows through */
+body { background: transparent !important; }
+
+/* Page outer wrapper - almost fully transparent */
+.dark .dark\:bg-slate-900 { background-color: rgba(0,0,0,0.08) !important; }
+
+/* Header bars - dark glass */
+.dark .dark\:bg-slate-800 {
+  background-color: rgba(0,0,0,0.45) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Card borders */
+.dark .dark\:border-slate-700 { border-color: rgba(255,255,255,0.07) !important; }
+.dark .dark\:border-slate-700\/50 { border-color: rgba(255,255,255,0.04) !important; }
+
+/* Table rows hover */
+.dark .dark\:hover\:bg-slate-700\/30:hover { background-color: rgba(255,255,255,0.04) !important; }
+
 /* Enterprise layout dark mode */
-.sb-page { @apply bg-slate-50 dark:bg-slate-900; }
-.sb-header { @apply bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm; }
-.sb-card { @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm; }
-.sb-title { @apply text-slate-900 dark:text-white; }
-.sb-sub { @apply text-slate-500 dark:text-slate-400; }
-.sb-muted { @apply text-slate-400 dark:text-slate-500; }
-.sb-border { @apply border-slate-200 dark:border-slate-700; }
-.sb-surface { @apply bg-slate-50 dark:bg-slate-900/50; }
-.sb-row { @apply border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors; }
-.sb-th { @apply text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide py-3 px-4 border-b border-slate-100 dark:border-slate-700 bg-transparent; }
+.sb-page { background: transparent !important; }
+
+.sb-header {
+  background: rgba(0,0,0,0.45) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+  box-shadow: none !important;
+}
+
+.sb-card {
+  background: rgba(255,255,255,0.04) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 0.75rem;
+}
+
+.sb-title { @apply text-white; }
+.sb-sub { @apply text-slate-400; }
+.sb-muted { @apply text-slate-500; }
+.sb-border { border-color: rgba(255,255,255,0.07) !important; }
+.sb-surface { background: rgba(0,0,0,0.15) !important; }
+.sb-row { @apply border-b transition-colors; border-color: rgba(255,255,255,0.04) !important; }
+.sb-row:hover { background-color: rgba(255,255,255,0.04) !important; }
+.sb-th { @apply text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4 bg-transparent; border-bottom: 1px solid rgba(255,255,255,0.06) !important; }
