@@ -52,7 +52,7 @@ export default function ChangePasswordPage() {
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-6 flex-shrink-0 shadow-sm">
-          <h1 className="text-lg font-black text-white">Change Password</h1>
+          <h1 className="text-lg font-black text-slate-900 dark:text-white">Change Password</h1>
         </header>
         <main className="flex-1 overflow-y-auto p-6 flex items-start justify-center">
           <div className="w-full max-w-md mt-8">
@@ -62,7 +62,7 @@ export default function ChangePasswordPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-black text-white mb-1">Change Password</h2>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Change Password</h2>
               <p className="text-slate-500 text-sm mb-6">Enter your current password and choose a new one.</p>
 
               {success && (

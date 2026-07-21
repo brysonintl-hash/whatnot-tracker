@@ -205,7 +205,7 @@ function ManagementView({ session }: { session: Session }) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-white">Timekeeping</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Timekeeping</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
@@ -224,7 +224,7 @@ function ManagementView({ session }: { session: Session }) {
                 ].map(k => (
                   <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.color} shadow-sm p-5`}>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
-                    <p className="text-2xl font-black text-white">{k.value}</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{k.value}</p>
                   </div>
                 ))}
               </div>
@@ -232,7 +232,7 @@ function ManagementView({ session }: { session: Session }) {
               {/* â”€â”€ Staff Timekeeping Dashboard â”€â”€ */}
               {staffSummary.length > 0 && (
                 <div className="mb-6">
-                  <h2 className="font-bold text-white text-sm mb-3 flex items-center gap-2">
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
                     Staff Dashboard
                     <span className="text-xs font-normal text-slate-400">{staffSummary.length} active this week</span>
@@ -257,7 +257,7 @@ function ManagementView({ session }: { session: Session }) {
                               {member.name[0]?.toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-white truncate">{member.name}</p>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{member.name}</p>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] capitalize text-slate-400">{member.role}</span>
                                 {isActive && <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-500"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Active</span>}
@@ -269,11 +269,11 @@ function ManagementView({ session }: { session: Session }) {
                           <div className="grid grid-cols-3 gap-x-3 gap-y-2 text-xs mb-3">
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Today</p>
-                              <p className="font-bold text-white">{fmtHours(todayHours)}</p>
+                              <p className="font-bold text-slate-900 dark:text-white">{fmtHours(todayHours)}</p>
                             </div>
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">This Week</p>
-                              <p className="font-bold text-white">{fmtHours(member.totalHours)}</p>
+                              <p className="font-bold text-slate-900 dark:text-white">{fmtHours(member.totalHours)}</p>
                             </div>
                             <div>
                               <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Earnings</p>
@@ -300,7 +300,7 @@ function ManagementView({ session }: { session: Session }) {
               {/* Staff Summary */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                  <h2 className="font-bold text-white text-sm">Weekly Staff Summary</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Weekly Staff Summary</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} â€“{' '}
                     {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -331,7 +331,7 @@ function ManagementView({ session }: { session: Session }) {
                                 </div>
                               </td>
                               <td className="py-3 px-5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 capitalize">{m.role}</span></td>
-                              <td className="py-3 px-5 text-xs font-bold text-white">{fmtHours(m.totalHours)}</td>
+                              <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{fmtHours(m.totalHours)}</td>
                               <td className="py-3 px-5">
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-slate-400">$</span>
@@ -383,7 +383,7 @@ function ManagementView({ session }: { session: Session }) {
               {/* Detailed time log */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center gap-3">
-                  <h2 className="font-bold text-white text-sm">Time Log â€” This Week</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Time Log â€” This Week</h2>
                   <span className="text-xs text-slate-400">{weekEntries.length} entries</span>
                   <div className="ml-auto flex items-center gap-2">
                     <button
@@ -434,7 +434,7 @@ function ManagementView({ session }: { session: Session }) {
                                     className="text-xs border border-blue-300 rounded px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-36" />
                                 ) : e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">â— Active</span>}
                               </td>
-                              <td className="py-3 px-3 text-xs font-bold text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : 'â€”'}</td>
+                              <td className="py-3 px-3 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : 'â€”'}</td>
                               <td className="py-3 px-3 text-xs text-slate-500 dark:text-slate-400 max-w-[120px] truncate">{e.note || 'â€”'}</td>
                               <td className="py-2 px-3">
                                 <div className="flex items-center gap-1">
@@ -491,7 +491,7 @@ function ManagementView({ session }: { session: Session }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.999L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16.001c-.77 1.332.192 2.999 1.732 2.999z" />
               </svg>
             </div>
-            <h3 className="text-base font-black text-white text-center mb-1">
+            <h3 className="text-base font-black text-slate-900 dark:text-white text-center mb-1">
               {confirmModal.scope === 'all' ? 'Clear All History?' : 'Clear This Week?'}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
@@ -577,7 +577,7 @@ function StaffView({ session }: { session: Session }) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-white">Time Clock</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Time Clock</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
@@ -589,7 +589,7 @@ function StaffView({ session }: { session: Session }) {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Clock card */}
                 <div className="lg:col-span-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 flex flex-col items-center text-center">
-                  <div className="text-4xl font-black font-mono text-white mb-1">
+                  <div className="text-4xl font-black font-mono text-slate-900 dark:text-white mb-1">
                     {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </div>
                   <p className="text-slate-400 text-xs mb-6">{now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
@@ -648,7 +648,7 @@ function StaffView({ session }: { session: Session }) {
               {/* My time log */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                  <h2 className="font-bold text-white text-sm">My Time Log â€” This Week</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">My Time Log â€” This Week</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {sun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} â€“{' '}
                     {sat.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -670,7 +670,7 @@ function StaffView({ session }: { session: Session }) {
                             <td className="py-3 px-5 text-xs text-slate-400">{new Date(e.clockIn).toLocaleDateString('en-US')}</td>
                             <td className="py-3 px-5 text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
                             <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">â— Active</span>}</td>
-                            <td className="py-3 px-5 text-xs font-bold text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : 'â€”'}</td>
+                            <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : 'â€”'}</td>
                             <td className="py-3 px-5 text-xs text-slate-500 dark:text-slate-400">{e.note || 'â€”'}</td>
                           </tr>
                         ))

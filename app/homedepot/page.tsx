@@ -80,7 +80,7 @@ function ProductCard({ p }: { p: HDProduct }) {
         </div>
 
         {/* Name */}
-        <p className="text-sm font-bold text-white leading-snug line-clamp-3 flex-1">
+        <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-3 flex-1">
           {p.name}
         </p>
 
@@ -163,7 +163,7 @@ export default function HomeDepotPage() {
             </svg>
           </div>
           <div>
-            <h1 className="font-black text-white text-base leading-tight">Home Depot Search</h1>
+            <h1 className="font-black text-slate-900 dark:text-white text-base leading-tight">Home Depot Search</h1>
             <p className="text-[11px] text-slate-400">Search by model number or product name</p>
           </div>
         </header>
@@ -184,7 +184,7 @@ export default function HomeDepotPage() {
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Enter model # or product nameâ€¦ e.g. DCB609"
-                  className="w-full pl-12 pr-4 py-4 text-base bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-orange-400 dark:focus:border-orange-500 text-white placeholder-slate-400 transition-colors shadow-sm"
+                  className="w-full pl-12 pr-4 py-4 text-base bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-orange-400 dark:focus:border-orange-500 text-slate-900 dark:text-white placeholder-slate-400 transition-colors shadow-sm"
                   autoFocus
                 />
               </div>

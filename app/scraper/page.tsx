@@ -391,7 +391,7 @@ function ScraperPageInner() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-white">Seller Scraper</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Seller Scraper</h1>
             <p className="text-xs text-slate-400">Scrape any Whatnot seller â†’ download CSV</p>
           </div>
           <span className="text-xs bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
@@ -434,7 +434,7 @@ function ScraperPageInner() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-black text-white">{result.displayName}</p>
+                    <p className="text-base font-black text-slate-900 dark:text-white">{result.displayName}</p>
                     <p className="text-xs text-violet-500 font-mono">@{result.username}</p>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {result.totalSold != null && <span className="text-[10px] text-slate-400">{fmtNum(result.totalSold)} sold</span>}

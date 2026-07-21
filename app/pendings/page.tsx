@@ -193,11 +193,11 @@ export default function PendingsPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-white">Pendings</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Pendings</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
             <button onClick={() => showForm && !editingId ? setShowForm(false) : openCreate()}
               className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors">
               {showForm && !editingId ? 'Cancel' : '+ Add Task'}
@@ -209,7 +209,7 @@ export default function PendingsPage() {
           {/* Form (create or edit) */}
           {showForm && (
             <div ref={formRef} className={`bg-white dark:bg-slate-800 rounded-xl border shadow-sm p-6 mb-6 transition-all duration-300 ${highlighted ? 'border-blue-400 ring-2 ring-blue-300 ring-offset-2 dark:ring-offset-slate-900' : 'border-slate-200 dark:border-slate-700'}`}>
-              <h2 className="font-bold text-white text-sm mb-4">
+              <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">
                 {editingId ? 'Edit Task' : 'New Pending Task'}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -317,8 +317,8 @@ export default function PendingsPage() {
 
                           <div className="flex items-center gap-2 mb-1">
                             {task.customerLink
-                              ? <a href={task.customerLink} target="_blank" rel="noopener noreferrer" className="font-bold text-white text-sm hover:text-red-600 dark:hover:text-red-400 underline underline-offset-2">{task.customerName}</a>
-                              : <p className="font-bold text-white text-sm">{task.customerName}</p>}
+                              ? <a href={task.customerLink} target="_blank" rel="noopener noreferrer" className="font-bold text-slate-900 dark:text-white text-sm hover:text-red-600 dark:hover:text-red-400 underline underline-offset-2">{task.customerName}</a>
+                              : <p className="font-bold text-slate-900 dark:text-white text-sm">{task.customerName}</p>}
                           </div>
 
                           <div className="flex items-center gap-3 flex-wrap text-xs text-slate-400 mb-2">

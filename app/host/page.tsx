@@ -91,7 +91,7 @@ export default function HostPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
           <div>
-            <h1 className="text-lg font-black text-white">Host Dashboard</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white">Host Dashboard</h1>
             <p className="text-xs text-slate-400">{today}</p>
           </div>
           <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold">Host</span>
@@ -126,10 +126,10 @@ export default function HostPage() {
               {/* KPIs */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {[
-                  { label: 'My Revenue',   value: `$${fmt(revenue)}`, border: 'border-l-amber-400',  text: 'text-white' },
+                  { label: 'My Revenue',   value: `$${fmt(revenue)}`, border: 'border-l-amber-400',  text: 'text-slate-900 dark:text-white' },
                   { label: 'My Profit',    value: `$${fmt(profit)}`,  border: 'border-l-emerald-400', text: profit >= 0 ? 'text-emerald-600' : 'text-red-500' },
                   { label: 'Avg Margin',   value: `${margin.toFixed(1)}%`, border: 'border-l-blue-400', text: 'text-blue-600' },
-                  { label: 'Total Orders', value: myOrders.length.toLocaleString(), border: 'border-l-violet-400', text: 'text-white' },
+                  { label: 'Total Orders', value: myOrders.length.toLocaleString(), border: 'border-l-violet-400', text: 'text-slate-900 dark:text-white' },
                 ].map(k => (
                   <div key={k.label} className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 border-l-4 ${k.border} shadow-sm p-5`}>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide mb-2">{k.label}</p>
@@ -141,7 +141,7 @@ export default function HostPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 {/* Show breakdown */}
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                  <h2 className="font-bold text-white text-sm mb-4">Recent Shows</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Recent Shows</h2>
                   <div className="space-y-2">
                     {showBreakdown.map(([tab, d]) => (
                       <div key={tab} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
@@ -151,7 +151,7 @@ export default function HostPage() {
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{tab}</span>
-                            <span className="text-xs font-black text-white">${fmt(d.sales)}</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white">${fmt(d.sales)}</span>
                           </div>
                           <div className="flex items-center justify-between mt-0.5">
                             <span className="text-[10px] text-slate-400">{d.orders} orders</span>
@@ -166,13 +166,13 @@ export default function HostPage() {
                 <div className="space-y-4">
                   {/* Top items */}
                   <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-                    <h2 className="font-bold text-white text-sm mb-3">Top Selling Items</h2>
+                    <h2 className="font-bold text-slate-900 dark:text-white text-sm mb-3">Top Selling Items</h2>
                     <div className="space-y-2">
                       {topItems.map(([name, d], i) => (
                         <div key={name} className="flex items-center gap-3">
                           <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black flex items-center justify-center flex-shrink-0">{i + 1}</span>
                           <span className="text-xs text-slate-600 dark:text-slate-400 flex-1 truncate">{name}</span>
-                          <span className="text-xs font-bold text-white">${fmt(d.revenue)}</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">${fmt(d.revenue)}</span>
                         </div>
                       ))}
                     </div>
@@ -199,7 +199,7 @@ export default function HostPage() {
               {/* Recent orders */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                  <h2 className="font-bold text-white text-sm">Recent Orders</h2>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">Recent Orders</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -216,7 +216,7 @@ export default function HostPage() {
                           <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300 font-medium max-w-[180px] truncate">{o.productName || o.modelNum}</td>
                           <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400">{o.buyer}</td>
                           <td className="py-3 px-4 text-xs text-slate-400">{o.tab}</td>
-                          <td className="py-3 px-5 text-right text-xs font-semibold text-white">${o.sold.toFixed(2)}</td>
+                          <td className="py-3 px-5 text-right text-xs font-semibold text-slate-900 dark:text-white">${o.sold.toFixed(2)}</td>
                           <td className={`py-3 px-5 text-right text-xs font-bold ${o.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${o.profit.toFixed(2)}</td>
                         </tr>
                       ))}
