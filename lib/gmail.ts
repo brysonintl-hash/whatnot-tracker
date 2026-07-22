@@ -55,3 +55,24 @@ export function extractBody(payload: any): string {
   }
   return '';
 }
+
+export function buildRawEmail({
+  to, from, subject, inReplyTo, references, body, threadId,
+}: {
+  to: string; from: string; subject: string;
+  inReplyTo?: string; references?: string;
+  body: string; threadId?: string;
+}): string {
+  const lines = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    inReplyTo ? `In-Reply-To: ${inReplyTo}` : null,
+    references ? `References: ${references}` : null,
+    '',
+    body,
+  ].filter((l): l is string => l !== null);
+  return Buffer.from(lines.join('\r\n')).toString('base64url');
+}
