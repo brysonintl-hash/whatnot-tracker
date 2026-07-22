@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Fetch thread to get last message details for proper threading
     const threadRes = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/threads/${params.id}?format=metadata` +
-      `&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Message-ID&metadataHeaders=References`,
+      `&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Reply-To&metadataHeaders=Message-ID&metadataHeaders=References`,
       { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
     );
     const thread = await threadRes.json();
@@ -35,10 +35,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const subject = getHeader(firstHeaders, 'Subject');
     const lastMsgId = getHeader(lastHeaders, 'Message-ID');
     const existingRefs = getHeader(lastHeaders, 'References');
-    const replyTo = getHeader(firstHeaders, 'From'); // reply to original sender (Zendesk)
+
+    // Reply to whoever sent the first message in the thread (the actual sender)
+    const replyTo = getHeader(firstHeaders, 'Reply-To') || getHeader(firstHeaders, 'From');
 
     const raw = buildRawEmail({
-      to: 'support@whatnot.zendesk.com',
+      to: replyTo,
       from: process.env.GMAIL_USER_EMAIL || 'brysonintl@gmail.com',
       subject: subject.startsWith('Re:') ? subject : `Re: ${subject}`,
       inReplyTo: lastMsgId || undefined,

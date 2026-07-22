@@ -458,9 +458,9 @@ export default function SupportPage() {
                     </div>
                   )}
                   <div className="flex items-center justify-between mt-2">
-                    {replyTab === 'reply'
-                      ? <span className="text-[10px] text-slate-400">Sends from brysonintl@gmail.com → support@whatnot.zendesk.com</span>
-                      : <span className="text-[10px] text-yellow-600 dark:text-yellow-500">Internal only — not sent to customer</span>
+                    {replyTab === 'note'
+                      ? <span className="text-[10px] text-yellow-600 dark:text-yellow-500">Internal only — not sent to customer</span>
+                      : <span />
                     }
                     <button
                       onClick={replyTab === 'reply' ? sendReply : addNote}
