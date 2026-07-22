@@ -64,7 +64,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
-      { href: '/support', label: 'Support Inbox', icon: I.mail },
+      { href: '/support', label: 'Gmail Support', icon: I.mail },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -88,7 +88,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
-      { href: '/support', label: 'Support Inbox', icon: I.mail },
+      { href: '/support', label: 'Gmail Support', icon: I.mail },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -107,7 +107,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
-      { href: '/support', label: 'Support Inbox', icon: I.mail },
+      { href: '/support', label: 'Gmail Support', icon: I.mail },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -126,7 +126,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
-      { href: '/support', label: 'Support Inbox', icon: I.mail },
+      { href: '/support', label: 'Gmail Support', icon: I.mail },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },

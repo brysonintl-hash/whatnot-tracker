@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getGmailToken, getHeader } from '@/lib/gmail';
 import { getAllTicketMeta } from '@/lib/ticketStore';
+import { getGmailFilters, buildGmailQuery } from '@/lib/gmailFilterStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +21,9 @@ export async function GET() {
     const token = await getGmailToken();
     const ticketMeta = getAllTicketMeta();
 
+    const q = buildGmailQuery(getGmailFilters());
     const searchRes = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/threads?q=from:support@whatnot.zendesk.com&maxResults=50',
+      `https://gmail.googleapis.com/gmail/v1/users/me/threads?q=${encodeURIComponent(q)}&maxResults=50`,
       { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
     );
     const searchData = await searchRes.json();

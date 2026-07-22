@@ -23,6 +23,24 @@ export function getHeader(headers: { name: string; value: string }[], name: stri
   return headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
+export function cleanBody(raw: string): string {
+  let body = raw;
+  // Strip Zendesk/email footers and quoted replies
+  const cutPatterns = [
+    /\n?##-? ?Please type your reply above this line[\s\S]*/i,
+    /\n?\[Conversation ID:[\s\S]*/i,
+    /\n?You are receiving this (email|notification) because[\s\S]*/i,
+    /\n?This email was sent by Whatnot[\s\S]*/i,
+    /\n?On .{5,80}wrote:\s*[\s\S]*/,   // strip quoted reply
+    /\n?_{5,}[\s\S]*/,                  // strip ---- dividers and below
+  ];
+  for (const pat of cutPatterns) {
+    const match = body.search(pat);
+    if (match !== -1) body = body.substring(0, match);
+  }
+  return body.trim();
+}
+
 export function extractBody(payload: any): string {
   let text = '';
   let html = '';
@@ -36,28 +54,27 @@ export function extractBody(payload: any): string {
     if (part.parts) for (const p of part.parts) walk(p);
   }
   walk(payload);
-  if (text) return text;
-  if (html) {
-    return html
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n\n')
-      .replace(/<\/div>/gi, '\n')
-      .replace(/<li>/gi, '\n• ')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-  return '';
+  const raw = text || (html
+    ? html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<li>/gi, '\n• ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    : '');
+  return cleanBody(raw);
 }
 
 export function buildRawEmail({
-  to, from, subject, inReplyTo, references, body, threadId,
+  to, from, subject, inReplyTo, references, body,
 }: {
   to: string; from: string; subject: string;
   inReplyTo?: string; references?: string;
