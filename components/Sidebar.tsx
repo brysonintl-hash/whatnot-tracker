@@ -32,6 +32,7 @@ const I = {
   scraper: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
   hd:     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
   report: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+  mail: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   ai: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   logout: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
   idea: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
@@ -63,6 +64,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
+      { href: '/support', label: 'Support Inbox', icon: I.mail },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -86,6 +88,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
+      { href: '/support', label: 'Support Inbox', icon: I.mail },
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
@@ -104,6 +107,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
+      { href: '/support', label: 'Support Inbox', icon: I.mail },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
@@ -122,6 +126,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
+      { href: '/support', label: 'Support Inbox', icon: I.mail },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
