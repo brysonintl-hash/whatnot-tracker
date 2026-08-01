@@ -713,6 +713,8 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
     const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1);
   });
   const [hovered, setHovered] = useState<{ dateKey: string; x: number; y: number } | null>(null);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
 
   const byDate = useMemo(() => {
     const map: Record<string, TKEntry[]> = {};
@@ -745,25 +747,74 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
 
   const showStats = [7, 30, 60, 90].map(days => {
     const cutoff = Date.now() - days * 86400000;
-    const count = new Set(
-      entries
-        .filter(e => new Date(e.clockIn).getTime() >= cutoff)
-        .map(e => { const d = new Date(e.clockIn); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })
+    const filtered = entries.filter(e => new Date(e.clockIn).getTime() >= cutoff);
+    const shows = new Set(
+      filtered.map(e => { const d = new Date(e.clockIn); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })
     ).size;
-    return { days, count };
+    const hours = Math.round(filtered.reduce((s, e) => {
+      if (!e.clockOut) return s;
+      return s + (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
+    }, 0));
+    return { days, shows, hours };
   });
+
+  const rangeFiltered = useMemo(() => {
+    if (!rangeFrom || !rangeTo || rangeFrom > rangeTo) return null;
+    const from = new Date(rangeFrom).getTime();
+    const to = new Date(rangeTo + 'T23:59:59').getTime();
+    const filtered = entries.filter(e => {
+      const t = new Date(e.clockIn).getTime();
+      return t >= from && t <= to;
+    });
+    const shows = new Set(
+      filtered.map(e => { const d = new Date(e.clockIn); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })
+    ).size;
+    const hours = Math.round(filtered.reduce((s, e) => {
+      if (!e.clockOut) return s;
+      return s + (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
+    }, 0));
+    return { shows, hours };
+  }, [entries, rangeFrom, rangeTo]);
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
-      {/* Show count stats */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        {showStats.map(({ days, count }) => (
+      {/* Show count + hours stats */}
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        {showStats.map(({ days, shows, hours }) => (
           <div key={days} className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-700">
-            <p className="text-2xl font-black text-slate-900 dark:text-white">{count}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{shows}</p>
             <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">shows</p>
-            <p className="text-[10px] text-slate-400">last {days} days</p>
+            <p className="text-[10px] text-slate-400">{hours}h · {days}d</p>
           </div>
         ))}
+      </div>
+
+      {/* Date range filter */}
+      <div className="flex flex-wrap items-center gap-2 mb-5 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-100 dark:border-slate-700">
+        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Range</span>
+        <input type="date" value={rangeFrom} onChange={e => setRangeFrom(e.target.value)}
+          className="text-xs font-semibold border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <span className="text-slate-400 text-xs">→</span>
+        <input type="date" value={rangeTo} onChange={e => setRangeTo(e.target.value)}
+          className="text-xs font-semibold border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        {(rangeFrom || rangeTo) && (
+          <button onClick={() => { setRangeFrom(''); setRangeTo(''); }}
+            className="text-[10px] text-slate-400 hover:text-red-500 font-bold px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            Clear
+          </button>
+        )}
+        {rangeFiltered && (
+          <>
+            <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <span className="text-sm font-black text-blue-600 dark:text-blue-400">{rangeFiltered.shows}</span>
+              <span className="text-[10px] text-blue-500 ml-1">shows</span>
+            </div>
+            <div className="px-3 py-1 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
+              <span className="text-sm font-black text-violet-600 dark:text-violet-400">{rangeFiltered.hours}h</span>
+              <span className="text-[10px] text-violet-500 ml-1">worked</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Month nav */}
@@ -801,6 +852,7 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
           const isToday = dateKey === todayKey;
           const hasStaff = dayEntries.length > 0;
           const uniqueStaff = Array.from(new Map(dayEntries.map(e => [e.userId, e])).values());
+          const inRange = !!(rangeFrom && rangeTo && dateKey >= rangeFrom && dateKey <= rangeTo);
 
           return (
             <div
@@ -808,6 +860,10 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
               className={`rounded-xl p-2 border transition-all ${
                 isToday
                   ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
+                  : inRange && hasStaff
+                  ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:shadow-md cursor-pointer'
+                  : inRange
+                  ? 'border-blue-200 dark:border-blue-800/50 bg-blue-50/40 dark:bg-blue-900/10'
                   : hasStaff
                   ? 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-400 hover:shadow-md cursor-pointer'
                   : 'border-slate-100 dark:border-slate-700/40 bg-slate-50/50 dark:bg-slate-800/40'

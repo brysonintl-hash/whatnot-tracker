@@ -36,6 +36,7 @@ const I = {
   calc: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M9 7h6M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01M15 17h.01" /></svg>,
   ai: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   logout: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+  eye: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
   idea: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
 };
 
@@ -148,7 +149,12 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const router = useRouter();
   useTheme();
   useIdleLogout(60);
-  const sections = NAV[role] ?? [];
+  const [viewAs, setViewAs] = useState<'host' | 'shipper' | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return sessionStorage.getItem('viewAs') as 'host' | 'shipper' | null;
+  });
+  const effectiveRole = viewAs ?? role;
+  const sections = NAV[effectiveRole] ?? [];
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [shipmentCount, setShipmentCount] = useState(0);
@@ -264,7 +270,10 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
           {open && (
             <div className="ml-3 flex-1 min-w-0">
               <div className="text-white font-black text-sm leading-none whitespace-nowrap">Stack Bargains</div>
-              <div className="text-slate-500 text-[10px] capitalize mt-0.5">{role} Portal</div>
+              {viewAs
+                ? <div className="text-amber-400 text-[10px] font-bold mt-0.5 capitalize">Viewing as {viewAs}</div>
+                : <div className="text-slate-500 text-[10px] capitalize mt-0.5">{role} Portal</div>
+              }
             </div>
           )}
           {mobileOpen && (
@@ -273,6 +282,17 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
             </button>
           )}
         </div>
+
+        {/* View As banner */}
+        {viewAs && open && (
+          <div className="mx-2 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-shrink-0">
+            <span className="text-[11px] text-amber-400 font-bold capitalize">{viewAs} view</span>
+            <button onClick={() => { setViewAs(null); sessionStorage.removeItem('viewAs'); }}
+              className="text-[10px] bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 px-1.5 py-0.5 rounded font-bold transition-colors">
+              Exit
+            </button>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-5">
@@ -396,6 +416,27 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
 
           {open ? (
             <>
+              {(role === 'admin' || role === 'manager') && (
+                viewAs ? (
+                  <button onClick={() => { setViewAs(null); sessionStorage.removeItem('viewAs'); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 text-sm font-medium transition-colors mb-1">
+                    {I.eye}
+                    <span className="whitespace-nowrap capitalize">Exit {viewAs} view</span>
+                  </button>
+                ) : (
+                  <div className="mb-1">
+                    <p className="text-[10px] text-slate-600 uppercase tracking-widest px-3 mb-1.5">View As</p>
+                    <div className="flex gap-1 px-1">
+                      {(['host', 'shipper'] as const).map(r => (
+                        <button key={r} onClick={() => { setViewAs(r); sessionStorage.setItem('viewAs', r); }}
+                          className="flex-1 text-[11px] font-bold px-2 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 capitalize transition-colors border border-slate-700">
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
               <button onClick={() => setFeatureOpen(true)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 text-sm font-medium transition-colors">
                 {I.idea}
