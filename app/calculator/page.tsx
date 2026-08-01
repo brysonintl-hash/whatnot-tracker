@@ -140,7 +140,11 @@ function TimePicker({ value, onChange }: { value: string; onChange: (v: string) 
         {MINUTES.map(m => <option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}
       </select>
       <button type="button" onClick={() => set(h12, mm, !isPM)}
-        className="ml-1 text-[11px] font-black px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 transition-colors select-none">
+        className={`ml-1 text-[11px] font-black px-1.5 py-0.5 rounded transition-colors select-none ${
+          isPM
+            ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/60'
+            : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-900/60'
+        }`}>
         {isPM ? 'PM' : 'AM'}
       </button>
     </div>
