@@ -6,13 +6,11 @@ import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 
 type Session = { username: string; role: Role; name: string };
-type Host = { name: string; tierRate: number };
+type ScheduleHost = { name: string; tierRate: number; profitPerHour: number | null };
 
-// ── helpers ─────────────────────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-function roundHours(totalMin: number) {
-  return Math.round(totalMin / 60);
-}
+function roundHours(totalMin: number) { return Math.round(totalMin / 60); }
 
 function parseShiftHours(timeIn: string, timeOut: string): number {
   if (!timeIn || !timeOut) return 0;
@@ -50,12 +48,8 @@ function fmtMoney(n: number): string {
 }
 
 type CalcResult = {
-  shiftHours: number;
-  lsHours: number;
-  nonLsHours: number;
-  nonStreamPay: number;
-  streamPay: number;
-  total: number;
+  shiftHours: number; lsHours: number; nonLsHours: number;
+  nonStreamPay: number; streamPay: number; total: number;
 };
 
 function calcRow(row: Row): CalcResult {
@@ -68,7 +62,42 @@ function calcRow(row: Row): CalcResult {
   return { shiftHours, lsHours, nonLsHours, nonStreamPay, streamPay, total };
 }
 
-// ── types ────────────────────────────────────────────────────────────────────
+// ── 12-hour time picker ───────────────────────────────────────────────────────
+
+const HOURS = [1,2,3,4,5,6,7,8,9,10,11,12];
+const MINUTES = [0,5,10,15,20,25,30,35,40,45,50,55];
+
+function TimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [hh, mm] = (value || '09:00').split(':').map(Number);
+  const isPM = hh >= 12;
+  const h12 = hh % 12 || 12;
+
+  function set(newH12: number, newM: number, newIsPM: boolean) {
+    let h24 = newH12 % 12;
+    if (newIsPM) h24 += 12;
+    onChange(`${String(h24).padStart(2, '0')}:${String(newM).padStart(2, '0')}`);
+  }
+
+  const sel = "appearance-none bg-transparent border-0 outline-none text-sm font-semibold text-slate-900 dark:text-white cursor-pointer focus:ring-0";
+
+  return (
+    <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg">
+      <select value={h12} onChange={e => set(+e.target.value, mm, isPM)} className={sel} style={{ width: 'auto' }}>
+        {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <span className="text-slate-400 font-bold text-sm select-none">:</span>
+      <select value={mm} onChange={e => set(h12, +e.target.value, isPM)} className={sel} style={{ width: 'auto' }}>
+        {MINUTES.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
+      </select>
+      <button type="button" onClick={() => set(h12, mm, !isPM)}
+        className="ml-1 text-[11px] font-black px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors select-none">
+        {isPM ? 'PM' : 'AM'}
+      </button>
+    </div>
+  );
+}
+
+// ── types ─────────────────────────────────────────────────────────────────────
 
 type Row = {
   id: string;
@@ -79,7 +108,7 @@ type Row = {
   lsInput: string;
   tierRate: number;
   tip: number;
-  scheduleHosts: Host[];
+  scheduleHosts: ScheduleHost[];
   loadingSchedule: boolean;
 };
 
@@ -99,12 +128,12 @@ function newRow(defaults?: Partial<Row>): Row {
   };
 }
 
-// ── component ────────────────────────────────────────────────────────────────
+// ── component ─────────────────────────────────────────────────────────────────
 
 export default function CalculatorPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
-  const [allHosts, setAllHosts] = useState<Host[]>([]);
+  const [allHosts, setAllHosts] = useState<ScheduleHost[]>([]);
   const [tiers, setTiers] = useState<Record<string, number>>({});
   const [rows, setRows] = useState<Row[]>([newRow()]);
   const [results, setResults] = useState<{ row: Row; calc: CalcResult }[] | null>(null);
@@ -116,12 +145,13 @@ export default function CalculatorPage() {
       if (!s) { router.push('/login'); return; }
       setSession(s);
     });
+    // Load stored tiers + all hosts from the no-date schedule endpoint
     Promise.all([
       fetch('/api/hosts').then(r => r.json()),
       fetch('/api/calculator/tiers').then(r => r.json()),
     ]).then(([hosts, tierMap]: [{ name: string }[], Record<string, number>]) => {
       setTiers(tierMap);
-      setAllHosts(hosts.map(h => ({ name: h.name, tierRate: tierMap[h.name] ?? 20 })));
+      setAllHosts(hosts.map(h => ({ name: h.name, tierRate: tierMap[h.name] ?? 20, profitPerHour: null })));
     });
   }, []);
 
@@ -133,20 +163,25 @@ export default function CalculatorPage() {
     updateRow(id, { date, loadingSchedule: true, scheduleHosts: [] });
     try {
       const res = await fetch(`/api/calculator/schedule?date=${date}`);
-      const data: { hosts: Host[] } = await res.json();
+      const data: { hosts: ScheduleHost[] } = await res.json();
       const scheduleHosts = data.hosts ?? [];
       updateRow(id, { loadingSchedule: false, scheduleHosts });
+      // Auto-select if only one host found for that date
       if (scheduleHosts.length === 1) {
         const h = scheduleHosts[0];
-        updateRow(id, { hostName: h.name, tierRate: tiers[h.name] ?? h.tierRate });
+        const tier = tiers[h.name] ?? h.tierRate;
+        updateRow(id, { hostName: h.name, tierRate: tier });
+        setTiers(prev => ({ ...prev, [h.name]: tier }));
       }
     } catch {
       updateRow(id, { loadingSchedule: false });
     }
   }
 
-  function onHostChange(id: string, hostName: string) {
-    const tier = tiers[hostName] ?? allHosts.find(h => h.name === hostName)?.tierRate ?? 20;
+  function onHostChange(id: string, hostName: string, row: Row) {
+    // Prefer tier from schedule data for this date (real profit/hr), then stored tier, then default
+    const schedH = row.scheduleHosts.find(h => h.name === hostName);
+    const tier = schedH?.tierRate ?? tiers[hostName] ?? allHosts.find(h => h.name === hostName)?.tierRate ?? 20;
     updateRow(id, { hostName, tierRate: tier });
   }
 
@@ -158,16 +193,13 @@ export default function CalculatorPage() {
       body: JSON.stringify({ hostName, tierRate }),
     });
     setTiers(prev => ({ ...prev, [hostName]: tierRate }));
-    setAllHosts(prev => prev.map(h => h.name === hostName ? { ...h, tierRate } : h));
   }
 
   function addRow() {
     const last = rows[rows.length - 1];
     setRows(prev => [...prev, newRow({
-      date: last.date,
-      hostName: last.hostName,
-      tierRate: last.tierRate,
-      scheduleHosts: last.scheduleHosts,
+      date: last.date, hostName: last.hostName,
+      tierRate: last.tierRate, scheduleHosts: last.scheduleHosts,
     })]);
   }
 
@@ -175,10 +207,13 @@ export default function CalculatorPage() {
     setRows(prev => prev.length === 1 ? prev : prev.filter(r => r.id !== id));
   }
 
+  function resetAll() {
+    setRows([newRow()]);
+    setResults(null);
+  }
+
   function calculate() {
-    const computed = rows
-      .filter(r => r.timeIn && r.timeOut)
-      .map(r => ({ row: r, calc: calcRow(r) }));
+    const computed = rows.filter(r => r.timeIn && r.timeOut).map(r => ({ row: r, calc: calcRow(r) }));
     setResults(computed);
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
@@ -192,21 +227,27 @@ export default function CalculatorPage() {
       const tip = row.tip > 0 ? ` (${fmtMoney(row.tip)} tip)` : '';
       return `${date}: ${row.hostName}: ${shift}: ${stream}${tip} → ${fmtMoney(calc.total)}`;
     });
-    const grandTotal = results.reduce((s, r) => s + r.calc.total, 0);
-    lines.push(`Total: ${fmtMoney(grandTotal)}`);
+    const grand = results.reduce((s, r) => s + r.calc.total, 0);
+    lines.push(`Total: ${fmtMoney(grand)}`);
     navigator.clipboard.writeText(lines.join('\n'));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function hostOptions(row: Row): { name: string; inSchedule: boolean }[] {
+  function hostOptions(row: Row) {
     const seen = new Set<string>();
-    const opts: { name: string; inSchedule: boolean }[] = [];
+    const opts: { name: string; tierRate: number; fromSchedule: boolean; pph: number | null }[] = [];
     for (const h of row.scheduleHosts) {
-      if (!seen.has(h.name)) { seen.add(h.name); opts.push({ name: h.name, inSchedule: true }); }
+      if (!seen.has(h.name)) {
+        seen.add(h.name);
+        opts.push({ name: h.name, tierRate: h.tierRate, fromSchedule: true, pph: h.profitPerHour });
+      }
     }
     for (const h of allHosts) {
-      if (!seen.has(h.name)) { seen.add(h.name); opts.push({ name: h.name, inSchedule: false }); }
+      if (!seen.has(h.name)) {
+        seen.add(h.name);
+        opts.push({ name: h.name, tierRate: tiers[h.name] ?? h.tierRate, fromSchedule: false, pph: null });
+      }
     }
     return opts;
   }
@@ -219,29 +260,36 @@ export default function CalculatorPage() {
 
   const grandTotal = results?.reduce((s, r) => s + r.calc.total, 0) ?? 0;
   const byHost: Record<string, number> = {};
-  results?.forEach(({ row, calc }) => {
-    byHost[row.hostName] = (byHost[row.hostName] ?? 0) + calc.total;
-  });
+  results?.forEach(({ row, calc }) => { byHost[row.hostName] = (byHost[row.hostName] ?? 0) + calc.total; });
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-6 flex-shrink-0">
-          <h1 className="text-lg font-black text-white">Pay Calculator</h1>
-          <span className="ml-3 text-slate-500 text-sm">Host salary breakdown</span>
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-6 gap-4 flex-shrink-0">
+          <div className="flex-1">
+            <h1 className="text-lg font-black text-white">Pay Calculator</h1>
+          </div>
+          {/* Refresh / new calc */}
+          <button onClick={resetAll}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-semibold transition-colors border border-slate-700">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            New Calculation
+          </button>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-6xl mx-auto space-y-6">
 
-            {/* ── Input table ─────────────────────────────────────────── */}
+            {/* ── Input table ───────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
                 <h2 className="text-base font-black text-slate-900 dark:text-white">Enter Shifts</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Pick a date — hosts who clocked in that day appear first. Tier rate saves automatically per host.
+                  Select a date to load hosts from performance data — tier rate auto-fills from their profit/hr that day.
                 </p>
               </div>
 
@@ -256,11 +304,13 @@ export default function CalculatorPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {rows.map(row => {
-                      const shiftH = parseShiftHours(row.timeIn, row.timeOut);
                       const opts = hostOptions(row);
-                      const scheduleNames = new Set(row.scheduleHosts.map(h => h.name));
+                      const schedNames = new Set(row.scheduleHosts.map(h => h.name));
+                      const selectedSchedHost = row.scheduleHosts.find(h => h.name === row.hostName);
+
                       return (
                         <tr key={row.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-700/20">
+
                           {/* Date */}
                           <td className="px-3 py-2.5">
                             <input type="date" value={row.date}
@@ -272,52 +322,50 @@ export default function CalculatorPage() {
                           <td className="px-3 py-2.5">
                             <div className="relative">
                               <select value={row.hostName}
-                                onChange={e => onHostChange(row.id, e.target.value)}
-                                className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[130px]">
+                                onChange={e => onHostChange(row.id, e.target.value, row)}
+                                className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[140px]">
                                 <option value="">{row.loadingSchedule ? 'Loading…' : 'Select host'}</option>
-                                {scheduleNames.size > 0 && (
-                                  <optgroup label="Worked this day">
-                                    {opts.filter(o => o.inSchedule).map(o => (
-                                      <option key={o.name} value={o.name}>{o.name}</option>
+                                {schedNames.size > 0 && (
+                                  <optgroup label="Performed this day">
+                                    {opts.filter(o => o.fromSchedule).map(o => (
+                                      <option key={o.name} value={o.name}>
+                                        {o.name} — ${o.tierRate}/hr
+                                      </option>
                                     ))}
                                   </optgroup>
                                 )}
-                                <optgroup label={scheduleNames.size > 0 ? 'All hosts' : 'All hosts'}>
-                                  {opts.filter(o => !o.inSchedule).map(o => (
+                                <optgroup label={schedNames.size > 0 ? 'Other hosts' : 'All hosts'}>
+                                  {opts.filter(o => !o.fromSchedule).map(o => (
                                     <option key={o.name} value={o.name}>{o.name}</option>
                                   ))}
                                 </optgroup>
                               </select>
                               <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
                             </div>
-                            {row.hostName && scheduleNames.has(row.hostName) && (
-                              <div className="text-[10px] text-amber-500 font-semibold mt-0.5 ml-1">✓ clocked in</div>
+                            {/* Show profit/hr badge when host selected from schedule */}
+                            {selectedSchedHost?.profitPerHour && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 ml-1">
+                                ${selectedSchedHost.profitPerHour}/hr profit
+                              </div>
                             )}
                           </td>
 
                           {/* Time In */}
                           <td className="px-3 py-2.5">
-                            <input type="time" value={row.timeIn}
-                              onChange={e => updateRow(row.id, { timeIn: e.target.value })}
-                              className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[108px]" />
+                            <TimePicker value={row.timeIn} onChange={v => updateRow(row.id, { timeIn: v })} />
                           </td>
 
                           {/* Time Out */}
                           <td className="px-3 py-2.5">
-                            <input type="time" value={row.timeOut}
-                              onChange={e => updateRow(row.id, { timeOut: e.target.value })}
-                              className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[108px]" />
-                            {shiftH > 0 && (
-                              <div className="text-[10px] text-slate-400 mt-0.5 text-center">{shiftH}h shift</div>
-                            )}
+                            <TimePicker value={row.timeOut} onChange={v => updateRow(row.id, { timeOut: v })} />
                           </td>
 
                           {/* Stream hours */}
                           <td className="px-3 py-2.5">
                             <input type="text" value={row.lsInput}
                               onChange={e => updateRow(row.id, { lsInput: e.target.value })}
-                              placeholder="e.g. 3 or 1:30"
-                              className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[100px]" />
+                              placeholder=""
+                              className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[90px]" />
                           </td>
 
                           {/* Tier rate */}
@@ -370,7 +418,7 @@ export default function CalculatorPage() {
               </div>
             </div>
 
-            {/* ── Results ──────────────────────────────────────────────── */}
+            {/* ── Results ────────────────────────────────────────────── */}
             {results && (
               <div ref={resultsRef} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-4">
@@ -386,23 +434,23 @@ export default function CalculatorPage() {
                   </button>
                 </div>
 
-                {/* Compact line-per-shift output (image 1 style but cleaner) */}
+                {/* One compact line per shift */}
                 <div className="divide-y divide-slate-100 dark:divide-slate-700">
                   {results.map(({ row, calc }) => (
-                    <div key={row.id} className="px-6 py-3.5 flex items-center gap-1 flex-wrap">
+                    <div key={row.id} className="px-6 py-3.5 flex items-center flex-wrap gap-1">
                       <span className="text-sm font-black text-slate-900 dark:text-white w-12 flex-shrink-0 font-mono">
                         {fmtDateShort(row.date)}
                       </span>
-                      <span className="text-slate-300 dark:text-slate-600 mx-1 text-xs">·</span>
+                      <span className="text-slate-300 dark:text-slate-600 text-xs mx-1">·</span>
                       <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 w-[88px] flex-shrink-0">
-                        {row.hostName || '(no host)'}
+                        {row.hostName || '—'}
                       </span>
-                      <span className="text-slate-300 dark:text-slate-600 mx-1 text-xs">·</span>
+                      <span className="text-slate-300 dark:text-slate-600 text-xs mx-1">·</span>
                       <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap font-mono">
                         {fmtTime12(row.timeIn)}–{fmtTime12(row.timeOut)}
                       </span>
                       <span className="text-[11px] text-slate-400 ml-1">({calc.shiftHours}h)</span>
-                      <span className="text-slate-300 dark:text-slate-600 mx-1 text-xs">·</span>
+                      <span className="text-slate-300 dark:text-slate-600 text-xs mx-1">·</span>
                       {calc.lsHours > 0 ? (
                         <span className="text-sm whitespace-nowrap">
                           <span className="font-semibold text-amber-600 dark:text-amber-400">streamed {calc.lsHours}h</span>
@@ -413,7 +461,7 @@ export default function CalculatorPage() {
                       )}
                       {row.tip > 0 && (
                         <>
-                          <span className="text-slate-300 dark:text-slate-600 mx-1 text-xs">·</span>
+                          <span className="text-slate-300 dark:text-slate-600 text-xs mx-1">·</span>
                           <span className="text-sm text-slate-500">{fmtMoney(row.tip)} tip</span>
                         </>
                       )}
@@ -425,11 +473,11 @@ export default function CalculatorPage() {
                   ))}
                 </div>
 
-                {/* Breakdown (compact, below the lines) */}
+                {/* Compact breakdown */}
                 <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-700 space-y-1">
                   {results.map(({ row, calc }) => (
                     <div key={row.id} className="text-xs text-slate-400 flex items-center gap-3 flex-wrap">
-                      <span className="font-semibold text-slate-500 dark:text-slate-400 w-[88px] flex-shrink-0">
+                      <span className="font-semibold text-slate-500 dark:text-slate-400 w-[100px] flex-shrink-0">
                         {fmtDateShort(row.date)} {row.hostName}
                       </span>
                       {calc.nonLsHours > 0 && <span>{calc.nonLsHours}h × $20 = {fmtMoney(calc.nonStreamPay)}</span>}
@@ -439,7 +487,7 @@ export default function CalculatorPage() {
                   ))}
                 </div>
 
-                {/* Grand total + per-host */}
+                {/* Grand total */}
                 <div className="px-6 py-5 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-200 dark:border-amber-800 flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-6 flex-wrap">
                     {Object.entries(byHost).map(([name, pay]) => (
