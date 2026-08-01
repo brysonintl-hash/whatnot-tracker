@@ -708,7 +708,38 @@ function fmtWorked(clockIn: string, clockOut: string | null): string {
   return `${hh}h ${String(mm).padStart(2, '0')}m`;
 }
 
-function TeamCalendar({ entries }: { entries: TKEntry[] }) {
+const MAX_STREAM_GAP_MS = 2 * 3600000;
+
+function streamStats(orders: Order[], from: number, to: number) {
+  const relevant = orders.filter(o => {
+    if (!o.host) return false;
+    const ts = parseTimestamp(o.timestamp);
+    return ts !== null && ts >= from && ts <= to;
+  });
+  const groups: Record<string, number[]> = {};
+  relevant.forEach(o => {
+    const ts = parseTimestamp(o.timestamp);
+    if (ts === null) return;
+    const d = new Date(ts);
+    const key = `${o.host}|${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(ts);
+  });
+  let totalMs = 0;
+  for (const tss of Object.values(groups)) {
+    const sorted = [...tss].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      const gap = sorted[i] - sorted[i - 1];
+      if (gap <= MAX_STREAM_GAP_MS) totalMs += gap;
+    }
+  }
+  const totalH = totalMs / 3600000;
+  const hh = Math.floor(totalH);
+  const mm = Math.round((totalH - hh) * 60);
+  return { streams: Object.keys(groups).length, hh, mm };
+}
+
+function TeamCalendar({ entries, orders }: { entries: TKEntry[]; orders: Order[] }) {
   const [calMonth, setCalMonth] = useState(() => {
     const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1);
   });
@@ -745,46 +776,28 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
   const hoveredEntries = hovered ? (byDate[hovered.dateKey] ?? []) : [];
   const totalDays = Object.keys(byDate).filter(k => k.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length;
 
-  const showStats = [7, 30, 60, 90].map(days => {
-    const cutoff = Date.now() - days * 86400000;
-    const filtered = entries.filter(e => new Date(e.clockIn).getTime() >= cutoff);
-    const shows = new Set(
-      filtered.map(e => { const d = new Date(e.clockIn); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })
-    ).size;
-    const hours = Math.round(filtered.reduce((s, e) => {
-      if (!e.clockOut) return s;
-      return s + (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
-    }, 0));
-    return { days, shows, hours };
-  });
+  const showStats = useMemo(() => [7, 30, 60, 90].map(days => {
+    const from = Date.now() - days * 86400000;
+    const { streams, hh, mm } = streamStats(orders, from, Date.now());
+    return { days, streams, hh, mm };
+  }), [orders]);
 
   const rangeFiltered = useMemo(() => {
     if (!rangeFrom || !rangeTo || rangeFrom > rangeTo) return null;
     const from = new Date(rangeFrom).getTime();
     const to = new Date(rangeTo + 'T23:59:59').getTime();
-    const filtered = entries.filter(e => {
-      const t = new Date(e.clockIn).getTime();
-      return t >= from && t <= to;
-    });
-    const shows = new Set(
-      filtered.map(e => { const d = new Date(e.clockIn); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })
-    ).size;
-    const hours = Math.round(filtered.reduce((s, e) => {
-      if (!e.clockOut) return s;
-      return s + (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
-    }, 0));
-    return { shows, hours };
-  }, [entries, rangeFrom, rangeTo]);
+    return streamStats(orders, from, to);
+  }, [orders, rangeFrom, rangeTo]);
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
-      {/* Show count + hours stats */}
+      {/* Stream stats */}
       <div className="grid grid-cols-4 gap-3 mb-4">
-        {showStats.map(({ days, shows, hours }) => (
+        {showStats.map(({ days, streams, hh, mm }) => (
           <div key={days} className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-700">
-            <p className="text-2xl font-black text-slate-900 dark:text-white">{shows}</p>
-            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">shows</p>
-            <p className="text-[10px] text-slate-400">{hours}h · {days}d</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{streams}</p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">streams</p>
+            <p className="text-[10px] text-slate-400">{hh}h {mm}m · {days}d</p>
           </div>
         ))}
       </div>
@@ -806,12 +819,12 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
         {rangeFiltered && (
           <>
             <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <span className="text-sm font-black text-blue-600 dark:text-blue-400">{rangeFiltered.shows}</span>
-              <span className="text-[10px] text-blue-500 ml-1">shows</span>
+              <span className="text-sm font-black text-blue-600 dark:text-blue-400">{rangeFiltered.streams}</span>
+              <span className="text-[10px] text-blue-500 ml-1">streams</span>
             </div>
             <div className="px-3 py-1 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
-              <span className="text-sm font-black text-violet-600 dark:text-violet-400">{rangeFiltered.hours}h</span>
-              <span className="text-[10px] text-violet-500 ml-1">worked</span>
+              <span className="text-sm font-black text-violet-600 dark:text-violet-400">{rangeFiltered.hh}h {rangeFiltered.mm}m</span>
+              <span className="text-[10px] text-violet-500 ml-1">streamed</span>
             </div>
           </>
         )}
@@ -1092,7 +1105,7 @@ export default function PerformancePage() {
               <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">{error}</p>
             </div>
           ) : view === 'calendar' ? (
-            <TeamCalendar entries={tkEntries} />
+            <TeamCalendar entries={tkEntries} orders={orders} />
           ) : (
             <>
               {/* Date picker bar */}
