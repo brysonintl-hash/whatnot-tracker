@@ -743,8 +743,29 @@ function TeamCalendar({ entries }: { entries: TKEntry[] }) {
   const hoveredEntries = hovered ? (byDate[hovered.dateKey] ?? []) : [];
   const totalDays = Object.keys(byDate).filter(k => k.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length;
 
+  const showStats = [7, 30, 60, 90].map(days => {
+    const cutoff = Date.now() - days * 86400000;
+    const count = new Set(
+      entries
+        .filter(e => new Date(e.clockIn).getTime() >= cutoff)
+        .map(e => { const d = new Date(e.clockIn); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })
+    ).size;
+    return { days, count };
+  });
+
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
+      {/* Show count stats */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {showStats.map(({ days, count }) => (
+          <div key={days} className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-700">
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{count}</p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">shows</p>
+            <p className="text-[10px] text-slate-400">last {days} days</p>
+          </div>
+        ))}
+      </div>
+
       {/* Month nav */}
       <div className="flex items-center justify-between mb-5">
         <button onClick={() => setCalMonth(new Date(year, month - 1, 1))}
