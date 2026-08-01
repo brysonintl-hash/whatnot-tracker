@@ -260,8 +260,7 @@ function ManagementView({ session }: { session: Session }) {
                               <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{member.name}</p>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] capitalize text-slate-400">{member.role}</span>
-                                {isActive && <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-500"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Active</span>}
-                                {!isActive && <span className="text-[10px] text-slate-400">Clocked out</span>}
+                                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />}
                               </div>
                             </div>
                           </div>

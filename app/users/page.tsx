@@ -98,7 +98,7 @@ export default function UsersPage() {
               { label: 'Total Accounts', value: users.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
               { label: 'Pending Approval', value: users.filter(u => u.status === 'pending').length, cls: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', textCls: 'text-amber-600 dark:text-amber-400', labelCls: 'text-amber-600 dark:text-amber-400' },
               { label: 'Active Users', value: users.filter(u => u.status === 'active').length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
-              { label: 'Roles Assigned', value: ROLES.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Online Now', value: users.filter(u => u.lastSeen && Date.now() - new Date(u.lastSeen).getTime() < 30_000).length, cls: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', textCls: 'text-emerald-600 dark:text-emerald-400', labelCls: 'text-emerald-600 dark:text-emerald-400' },
             ].map(k => (
               <div key={k.label} className={`${k.cls} rounded-xl border shadow-sm p-5`}>
                 <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${k.labelCls}`}>{k.label}</p>

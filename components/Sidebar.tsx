@@ -131,7 +131,6 @@ const NAV: Record<Role, Section[]> = {
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
-      { href: '/calculator', label: 'Pay Calculator', icon: I.calc },
     ]},
     { title: 'Account', items: [
       { href: '/settings', label: 'Settings', icon: I.settings },
