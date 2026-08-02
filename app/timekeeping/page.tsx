@@ -691,16 +691,23 @@ function StaffView({ session }: { session: Session }) {
 export default function TimekeepingPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+  const [viewAs, setViewAs] = useState<Role | null>(null);
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
       if (!s) { router.push('/login'); return; }
       setSession(s);
     });
+    const va = sessionStorage.getItem('viewAs') as Role | null;
+    setViewAs(va);
   }, []);
 
   if (!session) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
 
-  if (session.role === 'admin' || session.role === 'manager') return <ManagementView session={session} />;
-  return <StaffView session={session} />;
+  const isPrivileged = session.role === 'admin' || session.role === 'manager';
+  const effectiveRole = (isPrivileged && viewAs) ? viewAs : session.role;
+  const effectiveSession = { ...session, role: effectiveRole };
+
+  if (effectiveRole === 'admin' || effectiveRole === 'manager') return <ManagementView session={effectiveSession} />;
+  return <StaffView session={effectiveSession} />;
 }
