@@ -278,6 +278,141 @@ function QuickCalc() {
   );
 }
 
+function StandardCalc() {
+  const [display, setDisplay] = useState('0');
+  const [prev, setPrev] = useState<number | null>(null);
+  const [op, setOp] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
+  const [mem, setMem] = useState(0);
+  const [expr, setExpr] = useState('');
+
+  function num(d: string) {
+    if (display.length >= 15 && !waiting) return;
+    setDisplay(waiting ? d : display === '0' ? d : display + d);
+    setWaiting(false);
+  }
+  function dot() {
+    if (waiting) { setDisplay('0.'); setWaiting(false); return; }
+    if (!display.includes('.')) setDisplay(display + '.');
+  }
+  function ce() { setDisplay('0'); }
+  function clr() { setDisplay('0'); setPrev(null); setOp(null); setWaiting(false); setExpr(''); }
+  function bk() {
+    if (waiting) return;
+    setDisplay(display.length > 1 ? display.slice(0, -1) : '0');
+  }
+  function neg() { const v = parseFloat(display); if (!isNaN(v)) setDisplay(String(-v)); }
+  function pct() { const v = parseFloat(display); setDisplay(prev != null ? String(prev * v / 100) : String(v / 100)); }
+  function inv() { const v = parseFloat(display); setDisplay(v ? String(parseFloat((1 / v).toPrecision(12))) : 'Error'); }
+  function sq() { const v = parseFloat(display); setDisplay(String(parseFloat((v * v).toPrecision(12)))); }
+  function sqr() { const v = parseFloat(display); setDisplay(v >= 0 ? String(parseFloat(Math.sqrt(v).toPrecision(12))) : 'Error'); }
+
+  function compute(a: number, b: number, o: string): number {
+    if (o === '+') return a + b;
+    if (o === '−') return a - b;
+    if (o === '×') return a * b;
+    if (o === '÷') return b ? a / b : 0;
+    return b;
+  }
+
+  function setOperator(o: string) {
+    const v = parseFloat(display);
+    if (prev != null && op && !waiting) {
+      const r = parseFloat(compute(prev, v, op).toPrecision(12));
+      setDisplay(String(r)); setPrev(r); setExpr(`${r} ${o}`);
+    } else {
+      setPrev(v); setExpr(`${display} ${o}`);
+    }
+    setOp(o); setWaiting(true);
+  }
+
+  function eq() {
+    if (prev == null || !op) return;
+    const r = parseFloat(compute(prev, parseFloat(display), op).toPrecision(12));
+    setDisplay(String(r)); setExpr(''); setPrev(null); setOp(null); setWaiting(true);
+  }
+
+  const BG: Record<string, string> = {
+    fn:  'bg-slate-700/50 hover:bg-slate-600 text-slate-200',
+    num: 'bg-slate-700 hover:bg-slate-600 text-white',
+    op:  'bg-slate-500 hover:bg-slate-400 text-white font-black text-base',
+    eq:  'bg-orange-500 hover:bg-orange-400 text-white font-black text-base',
+  };
+
+  type Btn = { l: string; a: () => void; t: 'fn'|'op'|'eq'|'num' };
+  const rows: Btn[][] = [
+    [{l:'%',a:pct,t:'fn'},{l:'CE',a:ce,t:'fn'},{l:'C',a:clr,t:'fn'},{l:'⌫',a:bk,t:'fn'}],
+    [{l:'1/x',a:inv,t:'fn'},{l:'x²',a:sq,t:'fn'},{l:'√x',a:sqr,t:'fn'},{l:'÷',a:()=>setOperator('÷'),t:'op'}],
+    [{l:'7',a:()=>num('7'),t:'num'},{l:'8',a:()=>num('8'),t:'num'},{l:'9',a:()=>num('9'),t:'num'},{l:'×',a:()=>setOperator('×'),t:'op'}],
+    [{l:'4',a:()=>num('4'),t:'num'},{l:'5',a:()=>num('5'),t:'num'},{l:'6',a:()=>num('6'),t:'num'},{l:'−',a:()=>setOperator('−'),t:'op'}],
+    [{l:'1',a:()=>num('1'),t:'num'},{l:'2',a:()=>num('2'),t:'num'},{l:'3',a:()=>num('3'),t:'num'},{l:'+',a:()=>setOperator('+'),t:'op'}],
+    [{l:'+/−',a:neg,t:'fn'},{l:'0',a:()=>num('0'),t:'num'},{l:'.',a:dot,t:'num'},{l:'=',a:eq,t:'eq'}],
+  ];
+
+  const memBtns = [
+    { l: 'MC', a: () => setMem(0) },
+    { l: 'MR', a: () => { setDisplay(String(mem)); setWaiting(false); } },
+    { l: 'M+', a: () => setMem(parseFloat((mem + parseFloat(display)).toPrecision(12))) },
+    { l: 'M−', a: () => setMem(parseFloat((mem - parseFloat(display)).toPrecision(12))) },
+    { l: 'MS', a: () => setMem(parseFloat(display)) },
+  ];
+
+  const dispStr = display === 'Error' ? display : (() => {
+    const n = parseFloat(display);
+    if (isNaN(n)) return display;
+    if (display.endsWith('.') || display.endsWith('.0')) return display;
+    return display;
+  })();
+
+  return (
+    <div className="bg-slate-800 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-700 dark:border-slate-800 select-none">
+      <div className="px-4 pt-3 pb-2 text-right min-h-[70px] flex flex-col justify-end">
+        <p className="text-[10px] text-slate-500 truncate h-4">{expr}</p>
+        <p className={`font-light text-white truncate leading-tight mt-0.5 ${dispStr.length > 12 ? 'text-xl' : 'text-3xl'}`}>{dispStr}</p>
+      </div>
+      <div className="grid grid-cols-5 px-1 mb-0.5">
+        {memBtns.map(b => (
+          <button key={b.l} onClick={b.a}
+            className="py-1.5 text-[11px] font-bold text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors">
+            {b.l}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-4 gap-0.5 p-1">
+        {rows.flatMap((row, ri) =>
+          row.map(b => (
+            <button key={`${ri}-${b.l}`} onClick={b.a}
+              className={`py-3 text-sm rounded transition-colors font-bold ${BG[b.t]}`}>
+              {b.l}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RightPanel() {
+  const [tab, setTab] = useState<'profit' | 'calc'>('profit');
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex bg-slate-100 dark:bg-slate-700/40 p-1 rounded-xl">
+        {(['profit', 'calc'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+              tab === t
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}>
+            {t === 'profit' ? 'Profit Calc' : 'Calculator'}
+          </button>
+        ))}
+      </div>
+      {tab === 'profit' ? <QuickCalc /> : <StandardCalc />}
+    </div>
+  );
+}
+
 export default function AmazonPage() {
   const router = useRouter();
   useTheme();
@@ -375,7 +510,7 @@ export default function AmazonPage() {
               Analyze
             </button>
           </div>
-          <QuickCalc />
+          <RightPanel />
           </div>
 
           {/* Results */}

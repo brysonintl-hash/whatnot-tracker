@@ -431,7 +431,7 @@ function ManagementView({ session }: { session: Session }) {
                                 {isEditing ? (
                                   <input type="datetime-local" value={editForm.clockOut} onChange={ev => setEditForm(f => ({ ...f, clockOut: ev.target.value }))}
                                     className="text-xs border border-blue-300 rounded px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-36" />
-                                ) : e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">â— Active</span>}
+                                ) : e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block mr-1 align-middle" /> Active</span>}
                               </td>
                               <td className="py-3 px-3 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
                               <td className="py-3 px-3 text-xs text-slate-500 dark:text-slate-400 max-w-[120px] truncate">{e.note || '—'}</td>
@@ -686,7 +686,7 @@ function StaffView({ session }: { session: Session }) {
                           <tr key={e.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                             <td className="py-3 px-5 text-xs text-slate-400">{new Date(e.clockIn).toLocaleDateString('en-US')}</td>
                             <td className="py-3 px-5 text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtTime(e.clockIn)}</td>
-                            <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold">â— Active</span>}</td>
+                            <td className="py-3 px-5 text-xs text-slate-700 dark:text-slate-300">{e.clockOut ? fmtTime(e.clockOut) : <span className="text-emerald-500 font-bold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block mr-1 align-middle" /> Active</span>}</td>
                             <td className="py-3 px-5 text-xs font-bold text-slate-900 dark:text-white">{e.clockOut ? fmtHours(hoursFromEntry(e)) : '—'}</td>
                             <td className="py-3 px-5 text-xs text-slate-500 dark:text-slate-400">{e.note || '—'}</td>
                           </tr>
