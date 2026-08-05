@@ -521,6 +521,8 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
       count:          items.length,
       avgSold:        items.reduce((s, i) => s + i.sold, 0) / items.length,
       avgSuggested:   Math.ceil(items.reduce((s, i) => s + i.suggestedPrice, 0) / items.length),
+      avgCost:        items.reduce((s, i) => s + i.cost, 0) / items.length,
+      avgProfit:      items.reduce((s, i) => s + i.profit, 0) / items.length,
       losing:         items.some(i => i.profit < 0),
     }))
     .sort((a, b) => b.totalProfitGap - a.totalProfitGap)
@@ -560,10 +562,13 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
                 : `${belowTarget.length} sales were below your profit goal`}
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Out of <strong>{orders.length} total sales</strong>, {belowTarget.length} were sold without making enough profit.
+              Out of <strong>{orders.length} total sales</strong>, {belowTarget.length} were priced too low to hit the 30% profit goal.
               {totalProfitGap > 0 && (
-                <> If you raise prices on those items, you could earn an extra <strong className="text-emerald-600">${fmtMoney(totalProfitGap)}</strong>.</>
+                <> You could have earned an extra <strong className="text-emerald-600">${fmtMoney(totalProfitGap)}</strong> today if those items were priced higher.</>
               )}
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1.5">
+              <strong>What to do:</strong> See the items below — next time those items come up in a show, start the bidding at the &ldquo;Minimum price&rdquo; shown.
             </p>
           </div>
         </div>
@@ -593,32 +598,69 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
       {/* â"€â"€ Fix These Items â"€â"€ */}
       {topDrags.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-          <p className="text-base font-black text-slate-900 dark:text-white mb-1">Raise these prices on Whatnot</p>
-          <p className="text-xs text-slate-400 mb-4">These {topDrags.length} items are costing you the most money. Fix them first.</p>
-          <div className="space-y-3">
+          <p className="text-base font-black text-slate-900 dark:text-white mb-0.5">Items that need a higher price</p>
+          <p className="text-xs text-slate-400 mb-1">These {topDrags.length} items are hurting your margin the most.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+            For each item below: look at <span className="font-bold text-slate-700 dark:text-slate-200">what you sold it for</span> vs <span className="font-bold text-slate-700 dark:text-slate-200">what you lost or earned</span>. Then use the <span className="font-bold text-emerald-600">green minimum price</span> as your starting bid next time.
+          </p>
+          <div className="space-y-4">
             {topDrags.map((d, i) => (
               <div key={i} className={`rounded-xl border-2 p-4 ${d.losing ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10'}`}>
-                <div className="flex items-start gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${d.losing ? 'bg-red-500' : 'bg-amber-500'}`}>
+                {/* Item header */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0 mt-0.5 ${d.losing ? 'bg-red-500' : 'bg-amber-500'}`}>
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-black text-slate-900 dark:text-white leading-snug">{d.shortName}</p>
-                    {d.count > 1 && <p className="text-[11px] text-slate-400 mt-0.5">Sold {d.count} times</p>}
-                    {/* Simple 3-column action row */}
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-white dark:bg-slate-700 rounded-lg p-2.5 border border-slate-100 dark:border-slate-600">
-                        <p className="text-[10px] text-slate-400 mb-0.5">Sold for</p>
-                        <p className="text-sm font-black text-slate-700 dark:text-slate-200">${fmtMoney(d.avgSold)}</p>
-                      </div>
-                      <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-2.5 border border-emerald-200 dark:border-emerald-700">
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mb-0.5 font-bold">Charge at least</p>
-                        <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">${fmtMoney(d.avgSuggested)}</p>
-                      </div>
-                      <div className="bg-white dark:bg-slate-700 rounded-lg p-2.5 border border-slate-100 dark:border-slate-600">
-                        <p className="text-[10px] text-slate-400 mb-0.5">You&apos;ll gain</p>
-                        <p className="text-sm font-black text-emerald-600">+${fmtMoney(d.totalProfitGap)}</p>
-                      </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {d.count > 1 && <p className="text-[11px] text-slate-400">Sold {d.count} times today</p>}
+                      {d.losing
+                        ? <span className="text-[10px] font-black px-2 py-0.5 bg-red-500 text-white rounded-full">LOSING MONEY</span>
+                        : <span className="text-[10px] font-black px-2 py-0.5 bg-amber-400 text-white rounded-full">BELOW 30% GOAL</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* What happened — the story */}
+                <div className={`grid gap-2 mb-3 ${d.avgCost > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  {d.avgCost > 0 && (
+                    <div className="bg-white dark:bg-slate-700 rounded-lg p-2.5 border border-slate-100 dark:border-slate-600 text-center">
+                      <p className="text-[10px] text-slate-400 mb-0.5">Your cost</p>
+                      <p className="text-sm font-black text-slate-700 dark:text-slate-200">${fmtMoney(d.avgCost)}</p>
+                    </div>
+                  )}
+                  <div className="bg-white dark:bg-slate-700 rounded-lg p-2.5 border border-slate-100 dark:border-slate-600 text-center">
+                    <p className="text-[10px] text-slate-400 mb-0.5">Sold for</p>
+                    <p className="text-sm font-black text-slate-700 dark:text-slate-200">${fmtMoney(d.avgSold)}</p>
+                  </div>
+                  <div className={`rounded-lg p-2.5 border text-center ${
+                    d.avgProfit < 0
+                      ? 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-700'
+                      : 'bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700'
+                  }`}>
+                    <p className={`text-[10px] font-bold mb-0.5 ${d.avgProfit < 0 ? 'text-red-500' : 'text-amber-600'}`}>
+                      {d.avgProfit < 0 ? 'You lost' : 'You earned'}
+                    </p>
+                    <p className={`text-sm font-black ${d.avgProfit < 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                      {d.avgProfit < 0 ? '−' : '+'}${fmtMoney(Math.abs(d.avgProfit))}
+                    </p>
+                  </div>
+                </div>
+
+                {/* What to do next */}
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3.5 border border-emerald-200 dark:border-emerald-700">
+                  <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mb-2.5 uppercase tracking-wide">
+                    Next time this item comes up — start bidding at:
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">${fmtMoney(d.avgSuggested)}</p>
+                      <p className="text-[10px] text-emerald-500 mt-0.5">minimum to hit 30% profit</p>
+                    </div>
+                    <div className="text-right bg-white dark:bg-emerald-900/30 rounded-lg px-3 py-2 border border-emerald-200 dark:border-emerald-700">
+                      <p className="text-[10px] text-slate-400 dark:text-emerald-500">Extra you earn</p>
+                      <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">+${fmtMoney(d.totalProfitGap)}</p>
                     </div>
                   </div>
                 </div>
