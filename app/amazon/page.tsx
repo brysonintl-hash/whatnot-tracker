@@ -194,6 +194,90 @@ function KeepaSection({ keepa }: { keepa: KeepaData }) {
   );
 }
 
+function QuickCalc() {
+  const [qPrice, setQPrice] = useState('');
+  const [qCost, setQCost]   = useState('');
+  const [qWn, setQWn]       = useState('');
+  const [qFbaFee, setQFbaFee] = useState('5.40');
+
+  const price  = parseFloat(qPrice)  || 0;
+  const cost   = parseFloat(qCost)   || 0;
+  const wnP    = parseFloat(qWn)     || 0;
+  const fbaFee = parseFloat(qFbaFee) || 5.40;
+
+  const hasBase = price > 0 && cost > 0;
+  const fbm = hasBase ? price * (1 - AMAZON_FEE_PCT) - FBM_SHIP_LIGHT - cost : null;
+  const fba = hasBase ? price * (1 - AMAZON_FEE_PCT) - fbaFee - cost : null;
+  const wn  = wnP > 0 && cost > 0 ? wnP * (1 - WN_COMMISSION) - WN_TRANSACTION - cost : null;
+
+  const rows = [
+    { label: 'FBM', profit: fbm, base: price, cls: 'text-orange-700 dark:text-orange-400' },
+    { label: 'FBA', profit: fba, base: price, cls: 'text-blue-700 dark:text-blue-400' },
+    { label: 'Whatnot', profit: wn, base: wnP, cls: 'text-red-700 dark:text-red-400' },
+  ];
+  const valid = rows.filter(r => r.profit != null);
+  const best  = valid.length ? valid.reduce((a, b) => (a.profit! > b.profit! ? a : b)) : null;
+
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
+      <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">Quick Profit Calculator</h2>
+      <p className="text-xs text-slate-400 mb-4">Instant estimate — no ASIN needed.</p>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Amazon Price ($)</label>
+          <input type="number" step="0.01" min="0" value={qPrice} onChange={e => setQPrice(e.target.value)}
+            placeholder="91.00" className={`w-full ${inputCls}`} />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Your Cost ($)</label>
+          <input type="number" step="0.01" min="0" value={qCost} onChange={e => setQCost(e.target.value)}
+            placeholder="41.65" className={`w-full ${inputCls}`} />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Whatnot Price ($)</label>
+          <input type="number" step="0.01" min="0" value={qWn} onChange={e => setQWn(e.target.value)}
+            placeholder="47.60" className={`w-full ${inputCls}`} />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">FBA Fee ($) <span className="normal-case font-normal">est.</span></label>
+          <input type="number" step="0.01" min="0" value={qFbaFee} onChange={e => setQFbaFee(e.target.value)}
+            className={`w-full ${inputCls}`} />
+        </div>
+      </div>
+
+      {valid.length > 0 ? (
+        <div className="space-y-2">
+          {rows.map(row => {
+            const isBest = best?.label === row.label && row.profit != null;
+            const margin = row.profit != null && row.base > 0 ? (row.profit / row.base) * 100 : null;
+            return (
+              <div key={row.label} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${
+                isBest ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-slate-50 dark:bg-slate-700/40 border-slate-100 dark:border-slate-700'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${isBest ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{row.label}</span>
+                  {isBest && <span className="text-[9px] font-black px-1.5 py-0.5 bg-emerald-500 text-white rounded-full">BEST</span>}
+                </div>
+                <div className="flex items-center gap-3">
+                  {margin != null && <span className={`text-[10px] font-semibold ${margin >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>{margin.toFixed(1)}%</span>}
+                  <span className={`text-sm font-black ${row.profit == null ? 'text-slate-300' : row.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                    {row.profit != null ? fmt(row.profit) : '—'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-8 text-slate-300 dark:text-slate-600">
+          <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M9 7h6M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01M15 17h.01" /></svg>
+          <p className="text-xs">Enter price and cost to calculate</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AmazonPage() {
   const router = useRouter();
   useTheme();
@@ -261,8 +345,9 @@ export default function AmazonPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {/* Search panel */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 mb-6 max-w-2xl">
+          {/* Top row: ASIN analyzer + Quick Calculator */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">Amazon vs Whatnot Profit Analyzer</h2>
             <p className="text-xs text-slate-400 mb-4">Compares Amazon FBM · FBA · Whatnot to find the most profitable channel.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
@@ -289,6 +374,8 @@ export default function AmazonPage() {
               className="w-full sm:w-auto px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
               Analyze
             </button>
+          </div>
+          <QuickCalc />
           </div>
 
           {/* Results */}
@@ -339,7 +426,7 @@ export default function AmazonPage() {
                         <p className="text-xs font-mono text-slate-400 mb-1">{r.asin}</p>
                         <p className="text-sm text-red-500 font-semibold">{r.error}</p>
                       </div>
-                      <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none">âœ•</button>
+                      <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none">✕</button>
                     </div>
                   ) : (
                     <div className="p-5">
@@ -371,7 +458,7 @@ export default function AmazonPage() {
                                 )}
                               </div>
                             </div>
-                            <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none flex-shrink-0">âœ•</button>
+                            <button onClick={() => remove(r.asin)} className="text-slate-300 hover:text-red-400 text-lg leading-none flex-shrink-0">✕</button>
                           </div>
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                             {r.bsr != null && (
@@ -388,7 +475,7 @@ export default function AmazonPage() {
                             {r.opportunity?.label && (
                               <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${opp.bg} ${opp.text} ${opp.border}`}>
                                 <span className={`w-1 h-1 rounded-full ${opp.dot}`} />
-                                {r.opportunity.label} demand · {r.reviews?.toLocaleString()} reviews · â­{r.rating}
+                                {r.opportunity.label} demand · {r.reviews?.toLocaleString()} reviews · ★ {r.rating}
                               </span>
                             )}
                           </div>

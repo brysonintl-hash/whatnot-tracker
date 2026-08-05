@@ -286,7 +286,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         {/* View As banner */}
         {viewAs && open && (
           <div className="mx-2 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-shrink-0">
-            <span className="text-[11px] text-amber-400 font-bold capitalize">{viewAs} view</span>
+            <span className="text-[11px] text-amber-400 font-bold capitalize">{viewAs} view · Read Only</span>
             <button onClick={() => { setViewAs(null); sessionStorage.removeItem('viewAs'); }}
               className="text-[10px] bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 px-1.5 py-0.5 rounded font-bold transition-colors">
               Exit
