@@ -484,7 +484,7 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
 const MARGIN_LOW    = 20;
 const MARGIN_TARGET = 30;
 
-function MarginAnalyzer({ orders }: { orders: Order[] }) {
+function MarginAnalyzer({ orders, date }: { orders: Order[]; date?: string }) {
   const [showTable, setShowTable] = useState(false);
 
   if (orders.length === 0) return null;
@@ -527,6 +527,77 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
     }))
     .sort((a, b) => b.totalProfitGap - a.totalProfitGap)
     .slice(0, 3);
+
+  const dateLabel = date ? isoToDisplay(date) : new Date().toLocaleDateString('en-US');
+
+  function handleCSV() {
+    const header = 'Item Name,Model #,Previous Selling Price ($),Minimum Starting Bid ($)';
+    const rows = belowTarget.map(o => {
+      const name  = (o.productName || '').replace(/"/g, '""');
+      const model = (o.modelNum    || '').replace(/"/g, '""');
+      return `"${name}","${model}",${o.sold.toFixed(2)},${o.suggestedPrice.toFixed(2)}`;
+    });
+    const csv  = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `pricing-changes-${date || 'today'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handlePDF() {
+    const tableRows = belowTarget.map(o => `
+      <tr>
+        <td>${(o.productName || '—').replace(/</g,'&lt;')}</td>
+        <td>${(o.modelNum    || '—').replace(/</g,'&lt;')}</td>
+        <td class="num">$${o.sold.toFixed(2)}</td>
+        <td class="num green">$${o.suggestedPrice.toFixed(2)}</td>
+        <td class="num ${o.profit < 0 ? 'red' : 'dim'}">${o.profit < 0 ? '−' : '+'}$${Math.abs(o.profit).toFixed(2)}</td>
+        <td class="num dim">${(o.margin).toFixed(1)}%</td>
+      </tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Pricing Action — ${dateLabel}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1e293b;padding:36px;font-size:13px;line-height:1.5}
+h1{font-size:22px;font-weight:900;color:#0f172a;letter-spacing:-0.4px}
+.sub{font-size:11px;color:#64748b;margin-top:4px;margin-bottom:24px}
+.goal{display:inline-block;margin-top:6px;padding:4px 12px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:11px;font-weight:700;color:#92400e}
+h2{font-size:11px;font-weight:700;color:#64748b;margin:0 0 10px;text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid #e2e8f0;padding-bottom:5px}
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
+th.num,td.num{text-align:right}
+td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;vertical-align:middle;max-width:320px;word-break:break-word}
+.green{color:#059669;font-weight:900}
+.red{color:#dc2626;font-weight:700}
+.dim{color:#94a3b8}
+.footer{margin-top:32px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:12px}
+@media print{@page{margin:14mm}body{padding:0}}
+</style></head><body>
+<h1>Stack Bargains — Pricing Action List</h1>
+<p class="sub">${dateLabel} &nbsp;·&nbsp; ${belowTarget.length} items need a higher starting bid &nbsp;·&nbsp; Exported ${new Date().toLocaleString('en-US')}</p>
+<p class="goal">Goal: 30% profit margin per item</p>
+<br/>
+<h2>Items to Reprice</h2>
+<table><thead><tr>
+  <th>Item Name</th><th>Model #</th>
+  <th class="num">Previous Selling Price</th>
+  <th class="num">Minimum Starting Bid</th>
+  <th class="num">Current Profit</th>
+  <th class="num">Margin</th>
+</tr></thead><tbody>${tableRows}</tbody></table>
+<p class="footer">Stack Bargains &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+<script>window.onload=function(){window.print();}</script>
+</body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) { alert('Please allow pop-ups to export PDF.'); return; }
+    win.document.write(html);
+    win.document.close();
+  }
 
   // All good
   if (overallMargin >= MARGIN_TARGET && belowTarget.length === 0) return (
@@ -594,6 +665,32 @@ function MarginAnalyzer({ orders }: { orders: Order[] }) {
           </div>
         </div>
       </div>
+
+      {/* â"€â"€ Export bar â"€â"€ */}
+      {belowTarget.length > 0 && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div>
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+              Export full pricing action list
+            </p>
+            <p className="text-[10px] text-slate-400">{belowTarget.length} items · {dateLabel}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCSV}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              CSV
+            </button>
+            <button
+              onClick={handlePDF}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              PDF / Print
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* â"€â"€ Fix These Items â"€â"€ */}
       {topDrags.length > 0 && (
@@ -1333,7 +1430,7 @@ export default function PerformancePage() {
 
                   {/* Margin Analyzer — admin / manager / host only */}
                   {(session?.role === 'admin' || session?.role === 'manager' || session?.role === 'host') && (
-                    <MarginAnalyzer orders={hostDayOrders} />
+                    <MarginAnalyzer orders={hostDayOrders} date={selectedDate} />
                   )}
 
                   <TierHistorySection
