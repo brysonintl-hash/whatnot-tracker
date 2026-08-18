@@ -47,6 +47,25 @@ const IC = {
   excel:   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
 };
 
+// â"€â"€ P&L helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+
+type MonthOverhead = {
+  rent: number; utilities: number; supplies: number;
+  employee: number; other: number; otherLabel: string; notes: string;
+};
+const OH_DEFAULT: MonthOverhead = { rent: 0, utilities: 0, supplies: 0, employee: 0, other: 0, otherLabel: '', notes: '' };
+
+function tabToMonth(tab: string): string {
+  const [m, , y] = tab.split('/').map(Number);
+  if (!m || !y) return '';
+  return `${2000 + y}-${String(m).padStart(2, '0')}`;
+}
+
+function monthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 // â"€â"€ Reports Page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export default function ReportsPage() {
@@ -54,6 +73,14 @@ export default function ReportsPage() {
   const [session, setSession]   = useState<Session | null>(null);
   const [orders, setOrders]     = useState<Order[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [pageTab, setPageTab]   = useState<'reports' | 'pl'>('reports');
+
+  // P&L state
+  const [plMonth, setPlMonth]       = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; });
+  const [overhead, setOverhead]     = useState<Record<string, MonthOverhead>>({});
+  const [plForm, setPlForm]         = useState<MonthOverhead>(OH_DEFAULT);
+  const [plSaving, setPlSaving]     = useState(false);
+  const [plSaved, setPlSaved]       = useState(false);
 
   const [reportPeriod, setReportPeriod]   = useState<ReportPeriod>('daily');
   const [reportDate, setReportDate]       = useState(() => new Date().toISOString().split('T')[0]);
@@ -68,7 +95,13 @@ export default function ReportsPage() {
       setOrders(Array.isArray(d) ? d : []);
       setLoading(false);
     });
+    fetch('/api/overhead').then(r => r.ok ? r.json() : {}).then(d => setOverhead(d || {}));
   }, []);
+
+  // sync form when month changes
+  useEffect(() => {
+    setPlForm({ ...OH_DEFAULT, ...overhead[plMonth] });
+  }, [plMonth, overhead]);
 
   const reportOrders = useMemo(() => {
     return orders.filter(o => {
@@ -96,6 +129,94 @@ export default function ReportsPage() {
   const rCount  = reportOrders.length;
   const rAvgSale = rCount > 0 ? rRev / rCount : 0;
   const rOpDays  = new Set(reportOrders.map(o => o.tab)).size;
+
+  // P&L computed values
+  const plMonths = useMemo(() => {
+    const s = new Set<string>();
+    orders.forEach(o => { const m = tabToMonth(o.tab); if (m) s.add(m); });
+    return Array.from(s).sort().reverse();
+  }, [orders]);
+
+  const plOrders = useMemo(() => orders.filter(o => tabToMonth(o.tab) === plMonth), [orders, plMonth]);
+
+  const plRev    = plOrders.reduce((s, o) => s + o.sold, 0);
+  const plCOGS   = plOrders.reduce((s, o) => s + (o.sold - o.profit), 0);
+  const plGross  = plOrders.reduce((s, o) => s + o.profit, 0);
+  const plTotalOH = plForm.rent + plForm.utilities + plForm.supplies + plForm.employee + plForm.other;
+  const plNet    = plGross - plTotalOH;
+  const plNetPct = plRev > 0 ? (plNet / plRev) * 100 : 0;
+
+  async function savePL() {
+    setPlSaving(true); setPlSaved(false);
+    await fetch('/api/overhead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month: plMonth, ...plForm }),
+    });
+    const fresh = await fetch('/api/overhead').then(r => r.json());
+    setOverhead(fresh || {});
+    setPlSaving(false); setPlSaved(true);
+    setTimeout(() => setPlSaved(false), 2500);
+  }
+
+  function exportPLCSV() {
+    const rows = [
+      ['Stack Bargains — P&L Statement', monthLabel(plMonth)],
+      [],
+      ['REVENUE'],
+      ['Total Revenue', `$${fmt(plRev)}`],
+      ['Cost of Goods Sold (COGS)', `$${fmt(plCOGS)}`],
+      ['Gross Profit', `$${fmt(plGross)}`],
+      ['Gross Margin', `${plRev > 0 ? ((plGross/plRev)*100).toFixed(1) : '0.0'}%`],
+      [],
+      ['OVERHEAD COSTS'],
+      ['Rent', `$${fmt(plForm.rent)}`],
+      ['Utilities', `$${fmt(plForm.utilities)}`],
+      ['Shipping Supplies', `$${fmt(plForm.supplies)}`],
+      ['Employee Pay', `$${fmt(plForm.employee)}`],
+      [plForm.otherLabel || 'Other', `$${fmt(plForm.other)}`],
+      ['Total Overhead', `$${fmt(plTotalOH)}`],
+      [],
+      ['NET PROFIT', `$${fmt(plNet)}`],
+      ['NET MARGIN', `${plNetPct.toFixed(1)}%`],
+    ];
+    downloadCSV(rows, `pl-${plMonth}.csv`);
+  }
+
+  function exportPLPDF() {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const grossColor = plGross >= 0 ? '#10B981' : '#EF4444';
+    const netColor = plNet >= 0 ? '#10B981' : '#EF4444';
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>P&L — ${monthLabel(plMonth)}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;color:#1e293b;padding:40px;font-size:13px;background:#fff}
+h1{font-size:22px;font-weight:900;margin-bottom:4px}p.sub{font-size:11px;color:#64748b;margin-bottom:28px}
+.section{margin-bottom:24px}.section-title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:12px;border-bottom:2px solid #e2e8f0;padding-bottom:6px}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px}
+.row.total{font-weight:900;font-size:15px;border-top:2px solid #0f172a;border-bottom:none;margin-top:4px;padding-top:12px}
+.row.net{font-weight:900;font-size:20px;color:${netColor};border-bottom:none;border-top:3px double #0f172a;margin-top:8px;padding-top:14px}
+@media print{@page{margin:14mm}body{padding:0}}</style></head><body>
+<h1>Stack Bargains — Profit &amp; Loss</h1>
+<p class="sub">${monthLabel(plMonth)} &nbsp;·&nbsp; Generated ${new Date().toLocaleString('en-US')}</p>
+<div class="section">
+<div class="section-title">Revenue</div>
+<div class="row"><span>Total Revenue (Sales)</span><span>$${fmt(plRev)}</span></div>
+<div class="row"><span>Cost of Goods Sold (COGS)</span><span style="color:#EF4444">($${fmt(plCOGS)})</span></div>
+<div class="row total"><span>Gross Profit</span><span style="color:${grossColor}">$${fmt(plGross)}</span></div>
+</div>
+<div class="section">
+<div class="section-title">Overhead Costs</div>
+<div class="row"><span>Rent</span><span>$${fmt(plForm.rent)}</span></div>
+<div class="row"><span>Utilities</span><span>$${fmt(plForm.utilities)}</span></div>
+<div class="row"><span>Shipping Supplies</span><span>$${fmt(plForm.supplies)}</span></div>
+<div class="row"><span>Employee Pay</span><span>$${fmt(plForm.employee)}</span></div>
+${plForm.other > 0 ? `<div class="row"><span>${plForm.otherLabel || 'Other'}</span><span>$${fmt(plForm.other)}</span></div>` : ''}
+<div class="row total"><span>Total Overhead</span><span style="color:#EF4444">($${fmt(plTotalOH)})</span></div>
+</div>
+<div class="row net"><span>Net Profit</span><span>$${fmt(plNet)} &nbsp; (${plNetPct.toFixed(1)}%)</span></div>
+<script>window.onload=()=>{window.print();}</script></body></html>`);
+    w.document.close();
+  }
 
   const reportByProduct = useMemo(() => {
     const m: Record<string, { name: string; count: number; rev: number; profit: number }> = {};
@@ -193,9 +314,179 @@ td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
           </div>
         </header>
 
+        {/* Page-level tab bar */}
+        <div className="bg-slate-900 border-b border-slate-800 px-6 pb-0 flex gap-1">
+          {[
+            { key: 'reports', label: 'Sales Report' },
+            { key: 'pl',      label: 'P&L Statement' },
+          ].map(t => (
+            <button key={t.key} onClick={() => setPageTab(t.key as 'reports' | 'pl')}
+              className={`px-5 py-3 text-xs font-bold border-b-2 transition-colors ${pageTab === t.key ? 'border-amber-400 text-amber-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <main className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Loading data...</div>
+          ) : pageTab === 'pl' ? (
+            /* ── P&L Statement ─────────────────────────────────────── */
+            <div className="max-w-3xl mx-auto space-y-6">
+              {/* Month selector + export */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex flex-wrap items-center gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Month</label>
+                  <select value={plMonth} onChange={e => setPlMonth(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none">
+                    {plMonths.length === 0 && <option value={plMonth}>{monthLabel(plMonth)}</option>}
+                    {plMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                  </select>
+                </div>
+                <div className="ml-auto flex gap-2">
+                  <button onClick={exportPLPDF} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-lg">{IC.pdf} PDF</button>
+                  <button onClick={exportPLCSV} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-lg">{IC.csv} CSV</button>
+                </div>
+              </div>
+
+              {/* Revenue section */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-700/40 border-b border-slate-200 dark:border-slate-700">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Revenue</p>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {[
+                    { label: 'Total Revenue (Sales)', value: plRev, bold: false },
+                    { label: 'Cost of Goods Sold (COGS)', value: -plCOGS, bold: false },
+                  ].map(r => (
+                    <div key={r.label} className="flex items-center justify-between px-5 py-3">
+                      <span className="text-sm text-slate-600 dark:text-slate-400">{r.label}</span>
+                      <span className={`text-sm font-semibold ${r.value < 0 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {r.value < 0 ? `($${fmt(-r.value)})` : `$${fmt(r.value)}`}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-700/30">
+                    <span className="text-sm font-black text-slate-800 dark:text-slate-100">Gross Profit</span>
+                    <span className={`text-lg font-black ${plGross >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>${fmt(plGross)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overhead costs form */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-700/40 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Overhead Costs</p>
+                  <p className="text-[10px] text-slate-400">Edit values and save</p>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {([
+                    { key: 'rent',      label: 'Rent / Space' },
+                    { key: 'utilities', label: 'Utilities (electric, internet, etc.)' },
+                    { key: 'supplies',  label: 'Shipping Supplies' },
+                    { key: 'employee',  label: 'Employee Pay' },
+                  ] as { key: keyof MonthOverhead; label: string }[]).map(f => (
+                    <div key={f.key} className="flex items-center justify-between px-5 py-3">
+                      <span className="text-sm text-slate-600 dark:text-slate-400">{f.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400 text-sm">$</span>
+                        <input type="number" min="0" step="0.01"
+                          value={plForm[f.key] as number}
+                          onChange={e => setPlForm(p => ({ ...p, [f.key]: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 text-right bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400" />
+                      </div>
+                    </div>
+                  ))}
+                  {/* Other with custom label */}
+                  <div className="flex items-center justify-between px-5 py-3 gap-3">
+                    <input type="text" placeholder="Other (describe...)"
+                      value={plForm.otherLabel}
+                      onChange={e => setPlForm(p => ({ ...p, otherLabel: e.target.value }))}
+                      className="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-amber-400" />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400 text-sm">$</span>
+                      <input type="number" min="0" step="0.01"
+                        value={plForm.other}
+                        onChange={e => setPlForm(p => ({ ...p, other: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 text-right bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-700/30">
+                    <span className="text-sm font-black text-slate-800 dark:text-slate-100">Total Overhead</span>
+                    <span className="text-lg font-black text-red-500">($${fmt(plTotalOH)})</span>
+                  </div>
+                </div>
+                {/* Notes + Save */}
+                <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                  <textarea rows={2} placeholder="Notes (optional)..."
+                    value={plForm.notes}
+                    onChange={e => setPlForm(p => ({ ...p, notes: e.target.value }))}
+                    className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+                  <button onClick={savePL} disabled={plSaving}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold text-sm rounded-lg transition-colors">
+                    {plSaving ? 'Saving...' : plSaved ? '✓ Saved!' : 'Save Overhead Costs'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Net Profit summary */}
+              <div className={`rounded-xl border-2 shadow-sm p-6 ${plNet >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-400' : 'bg-red-50 dark:bg-red-900/10 border-red-400'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Net Profit — {monthLabel(plMonth)}</p>
+                    <p className={`text-4xl font-black ${plNet >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmt(plNet)}</p>
+                    <p className="text-sm text-slate-500 mt-1">Net Margin: <span className={`font-bold ${plNet >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{plNetPct.toFixed(1)}%</span></p>
+                  </div>
+                  <div className="text-right text-xs text-slate-400 space-y-1">
+                    <div>Gross Profit: <span className="font-bold text-slate-600 dark:text-slate-300">${fmt(plGross)}</span></div>
+                    <div>Overhead: <span className="font-bold text-red-400">–${fmt(plTotalOH)}</span></div>
+                    <div>{plOrders.length} orders this month</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Monthly summary table */}
+              {plMonths.length > 1 && (
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 dark:bg-slate-700/40 border-b border-slate-200 dark:border-slate-700">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">All Months Summary</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead><tr className="border-b border-slate-100 dark:border-slate-700">
+                        {['Month','Revenue','COGS','Gross Profit','Overhead','Net Profit','Net Margin'].map(h => (
+                          <th key={h} className="py-2.5 px-4 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {plMonths.map(m => {
+                          const mos = orders.filter(o => tabToMonth(o.tab) === m);
+                          const rev = mos.reduce((s,o) => s+o.sold, 0);
+                          const cogs = mos.reduce((s,o) => s+(o.sold-o.profit), 0);
+                          const gross = mos.reduce((s,o) => s+o.profit, 0);
+                          const oh = overhead[m] || OH_DEFAULT;
+                          const ohTotal = oh.rent + oh.utilities + oh.supplies + oh.employee + oh.other;
+                          const net = gross - ohTotal;
+                          const netPct = rev > 0 ? (net/rev)*100 : 0;
+                          return (
+                            <tr key={m} onClick={() => setPlMonth(m)}
+                              className={`border-b border-slate-50 dark:border-slate-700/50 cursor-pointer transition-colors ${m === plMonth ? 'bg-amber-50 dark:bg-amber-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/20'}`}>
+                              <td className="py-3 px-4 text-xs font-bold text-slate-800 dark:text-slate-200">{monthLabel(m)}</td>
+                              <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">${fmt(rev)}</td>
+                              <td className="py-3 px-4 text-xs text-slate-500">${fmt(cogs)}</td>
+                              <td className={`py-3 px-4 text-xs font-bold ${gross >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmt(gross)}</td>
+                              <td className="py-3 px-4 text-xs text-red-400">{ohTotal > 0 ? `$${fmt(ohTotal)}` : <span className="text-slate-400">—</span>}</td>
+                              <td className={`py-3 px-4 text-xs font-bold ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>${fmt(net)}</td>
+                              <td className={`py-3 px-4 text-xs font-bold ${netPct >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{netPct.toFixed(1)}%</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               {/* Report Configuration */}

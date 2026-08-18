@@ -66,7 +66,6 @@ export default function PendingsPage() {
 
   const canManage = session?.role === 'admin' || session?.role === 'manager';
 
-  // Sort: urgent open first (by orderDate desc), then other open (by orderDate desc), then resolved
   const filtered = useMemo(() => {
     const base = tasks.filter(t => {
       if (filter === 'open') return t.status === 'open';
@@ -76,11 +75,9 @@ export default function PendingsPage() {
       return true;
     });
     return [...base].sort((a, b) => {
-      // Urgent open always first
       const aUrgent = a.urgent && a.status === 'open' ? 2 : a.status === 'open' ? 1 : 0;
       const bUrgent = b.urgent && b.status === 'open' ? 2 : b.status === 'open' ? 1 : 0;
       if (aUrgent !== bUrgent) return bUrgent - aUrgent;
-      // Within same group: sort by orderDate descending (newest first)
       return parseOrderDate(b.orderDate) - parseOrderDate(a.orderDate);
     });
   }, [tasks, filter]);
@@ -103,7 +100,6 @@ export default function PendingsPage() {
     setEditingId(task.id);
     setForm({ name: task.customerName, link: task.customerLink, order: task.orderId, desc: task.description, tracking: task.trackingNumber, date: task.orderDate });
     setShowForm(true);
-    // Scroll to form and highlight it
     setTimeout(() => {
       formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setHighlighted(true);
@@ -116,7 +112,6 @@ export default function PendingsPage() {
     if (!form.name.trim()) return;
     setSaving(true);
     if (editingId) {
-      // Edit existing task
       const res = await fetch(`/api/pendings/${editingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +120,6 @@ export default function PendingsPage() {
       const data = await res.json();
       if (data.task) setTasks(prev => prev.map(t => t.id === editingId ? data.task : t));
     } else {
-      // Create new task
       const res = await fetch('/api/pendings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,7 +147,6 @@ export default function PendingsPage() {
 
   async function handleResolve(task: PendingTask) {
     const toResolve = task.status === 'open';
-    // Confirm for non-admin/manager when resolving
     if (toResolve && !canManage) {
       if (!confirm('Are you sure you want to resolve this task?')) return;
     }
@@ -184,7 +177,6 @@ export default function PendingsPage() {
 
   const fieldCls = "w-full text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400";
 
-  // Find where urgents end to insert a divider
   const urgentCount = filtered.filter(t => t.urgent && t.status === 'open').length;
 
   return (
@@ -268,7 +260,7 @@ export default function PendingsPage() {
             ))}
           </div>
 
-          {/* Task list */}
+          {/* Task grid */}
           {loading ? (
             <div className="flex items-center justify-center h-32 text-slate-400 text-sm">Loading...</div>
           ) : filtered.length === 0 ? (
@@ -278,103 +270,114 @@ export default function PendingsPage() {
               <p className="text-slate-400 text-xs mt-1">{filter === 'open' ? 'All caught up!' : `No ${filter} tasks.`}</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {filtered.map((task, idx) => {
-                // Insert "Urgent" section header before first urgent task
                 const showUrgentHeader = idx === 0 && task.urgent && task.status === 'open' && (filter === 'all' || filter === 'open');
-                // Insert "Other Tasks" divider after urgent section
                 const showOtherHeader = urgentCount > 0 && idx === urgentCount && (filter === 'all' || filter === 'open') && task.status === 'open';
 
                 return (
-                  <div key={task.id}>
+                  <div key={task.id} className="contents">
                     {showUrgentHeader && (
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-black text-red-500 uppercase tracking-widest">🔴 Urgent Tasks</span>
+                      <div className="col-span-full flex items-center gap-2 mb-1">
+                        <span className="text-xs font-black text-red-500 uppercase tracking-widest">Urgent Tasks</span>
                         <div className="flex-1 h-px bg-red-200 dark:bg-red-900" />
                       </div>
                     )}
                     {showOtherHeader && (
-                      <div className="flex items-center gap-2 mb-2 mt-4">
+                      <div className="col-span-full flex items-center gap-2 mt-2 mb-1">
                         <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Other Tasks</span>
                         <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
                       </div>
                     )}
-                    <div className={`bg-white dark:bg-slate-800 rounded-xl border shadow-sm p-5 transition-all ${
-                      task.urgent ? 'border-red-300 dark:border-red-700 border-l-4 border-l-red-500'
-                      : task.followUp ? 'border-amber-300 dark:border-amber-700'
+
+                    {/* Compact card */}
+                    <div className={`bg-white dark:bg-slate-800 rounded-xl border shadow-sm flex flex-col transition-all ${
+                      task.urgent ? 'border-red-300 dark:border-red-700 border-t-4 border-t-red-500'
+                      : task.followUp ? 'border-amber-300 dark:border-amber-700 border-t-4 border-t-amber-400'
+                      : task.status === 'resolved' ? 'border-slate-200 dark:border-slate-700 opacity-70'
                       : 'border-slate-200 dark:border-slate-700'
                     }`}>
-                      <div className="flex items-start justify-between gap-4">
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-2">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${task.status === 'resolved' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}>
-                              {task.status === 'resolved' ? '✓ Resolved' : 'Open'}
-                            </span>
-                            {task.urgent && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800">🔴 Urgent</span>}
-                            {task.followUp && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">🔔 Follow-Up</span>}
-                          </div>
-
-                          <div className="flex items-center gap-2 mb-1">
-                            {task.customerLink
-                              ? <a href={task.customerLink} target="_blank" rel="noopener noreferrer" className="font-bold text-slate-900 dark:text-white text-sm hover:text-red-600 dark:hover:text-red-400 underline underline-offset-2">{task.customerName}</a>
-                              : <p className="font-bold text-slate-900 dark:text-white text-sm">{task.customerName}</p>}
-                          </div>
-
-                          <div className="flex items-center gap-3 flex-wrap text-xs text-slate-400 mb-2">
-                            {task.orderId && <span>Order: <span className="font-semibold text-slate-600 dark:text-slate-300">{task.orderId}</span></span>}
-                            {task.orderDate && <span>Order Date: <span className="font-semibold text-slate-600 dark:text-slate-300">{fmtDate(task.orderDate)}</span></span>}
-                            {task.trackingNumber && (
-                              <a href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${task.trackingNumber}`} target="_blank" rel="noopener noreferrer" className="hover:text-red-500 transition-colors">
-                                Tracking: <span className="font-semibold text-slate-600 dark:text-slate-300 hover:text-red-500">{task.trackingNumber}</span>
-                              </a>
-                            )}
-                          </div>
-
-                          {task.description && <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-2">{task.description}</p>}
-                          <p className="text-[10px] text-slate-400">Added by <span className="font-semibold capitalize">{task.createdBy}</span> ({task.createdByRole}) · {fmtDate(task.createdAt)}</p>
+                      {/* Card body */}
+                      <div className="p-4 flex-1">
+                        {/* Badges */}
+                        <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${task.status === 'resolved' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}>
+                            {task.status === 'resolved' ? '✓ Resolved' : 'Open'}
+                          </span>
+                          {task.urgent && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">Urgent</span>}
+                          {task.followUp && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">Follow-Up</span>}
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex flex-col gap-1.5 flex-shrink-0">
-                          <button onClick={() => handleResolve(task)} disabled={updatingId === task.id}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors disabled:opacity-50 ${
-                              task.status === 'open'
-                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
-                                : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
-                            }`}>
-                            {task.status === 'open' ? '✓ Resolve' : '↩ Reopen'}
+                        {/* Customer name */}
+                        <div className="mb-1.5">
+                          {task.customerLink
+                            ? <a href={task.customerLink} target="_blank" rel="noopener noreferrer"
+                                className="font-bold text-slate-900 dark:text-white text-sm hover:text-red-600 dark:hover:text-red-400 underline underline-offset-2 line-clamp-1">{task.customerName}</a>
+                            : <p className="font-bold text-slate-900 dark:text-white text-sm line-clamp-1">{task.customerName}</p>}
+                        </div>
+
+                        {/* Meta info */}
+                        <div className="space-y-0.5 mb-2">
+                          {task.orderId && (
+                            <p className="text-[11px] text-slate-400">Order: <span className="font-semibold text-slate-600 dark:text-slate-300">{task.orderId}</span></p>
+                          )}
+                          {task.orderDate && (
+                            <p className="text-[11px] text-slate-400">{fmtDate(task.orderDate)}</p>
+                          )}
+                          {task.trackingNumber && (
+                            <a href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${task.trackingNumber}`} target="_blank" rel="noopener noreferrer"
+                              className="text-[11px] text-blue-500 hover:text-blue-600 dark:text-blue-400 block truncate">
+                              Track: {task.trackingNumber}
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Description — clamped to 2 lines */}
+                        {task.description && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{task.description}</p>
+                        )}
+                      </div>
+
+                      {/* Card footer — action buttons */}
+                      <div className="px-4 pb-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-1.5">
+                        <button onClick={() => handleResolve(task)} disabled={updatingId === task.id}
+                          className={`flex-1 min-w-[72px] px-2 py-1.5 text-[11px] font-bold rounded-lg border transition-colors disabled:opacity-50 ${
+                            task.status === 'open'
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
+                              : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                          }`}>
+                          {task.status === 'open' ? '✓ Resolve' : '↩ Reopen'}
+                        </button>
+
+                        {canManage && (
+                          <button onClick={() => openEdit(task)}
+                            className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                            Edit
                           </button>
+                        )}
 
-                          {/* Edit button - admin/manager only */}
-                          {canManage && (
-                            <button onClick={() => openEdit(task)}
-                              className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                              âœ️ Edit
-                            </button>
-                          )}
+                        {canManage && task.status === 'open' && (
+                          <button onClick={() => patch(task.id, { urgent: !task.urgent })} disabled={updatingId === task.id}
+                            title={task.urgent ? 'Remove urgent' : 'Mark urgent'}
+                            className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border transition-colors disabled:opacity-50 ${task.urgent ? 'bg-red-500 border-red-500 text-white' : 'border-slate-200 dark:border-slate-600 text-slate-400 hover:border-red-300 hover:text-red-500'}`}>
+                            !!!
+                          </button>
+                        )}
 
-                          {canManage && task.status === 'open' && (
-                            <button onClick={() => patch(task.id, { urgent: !task.urgent })} disabled={updatingId === task.id}
-                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors disabled:opacity-50 ${task.urgent ? 'bg-red-500 border-red-500 text-white hover:bg-red-600' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-red-300 hover:text-red-600'}`}>
-                              🔴 Urgent
-                            </button>
-                          )}
+                        {canManage && task.status === 'open' && (
+                          <button onClick={() => patch(task.id, { followUp: !task.followUp })} disabled={updatingId === task.id}
+                            title={task.followUp ? 'Remove follow-up' : 'Mark follow-up'}
+                            className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border transition-colors disabled:opacity-50 ${task.followUp ? 'bg-amber-500 border-amber-500 text-white' : 'border-slate-200 dark:border-slate-600 text-slate-400 hover:border-amber-300 hover:text-amber-500'}`}>
+                            FU
+                          </button>
+                        )}
 
-                          {canManage && task.status === 'open' && (
-                            <button onClick={() => patch(task.id, { followUp: !task.followUp })} disabled={updatingId === task.id}
-                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors disabled:opacity-50 ${task.followUp ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-amber-300 hover:text-amber-600'}`}>
-                              🔔 Follow-Up
-                            </button>
-                          )}
-
-                          {canManage && (
-                            <button onClick={() => handleDelete(task.id)} disabled={deletingId === task.id}
-                              className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50">
-                              Delete
-                            </button>
-                          )}
-                        </div>
+                        {canManage && (
+                          <button onClick={() => handleDelete(task.id)} disabled={deletingId === task.id}
+                            className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50">
+                            Del
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
