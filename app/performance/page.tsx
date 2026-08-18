@@ -1130,7 +1130,7 @@ export default function PerformancePage() {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
   const [view, setView] = useState<'stats' | 'calendar'>('stats');
-  const [basePayRate, setBasePayRate] = useState(20);
+  const [basePayRate, setBasePayRate] = useState<string>('');
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -1294,13 +1294,14 @@ export default function PerformancePage() {
                   <div className="flex items-center gap-2 ml-auto">
                     <span className="text-sm font-bold text-slate-500">$</span>
                     <input
-                      type="number" min={0} step={1}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 18"
                       value={basePayRate}
-                      onChange={e => setBasePayRate(Math.max(0, parseFloat(e.target.value) || 0))}
-                      className="w-20 text-center text-sm font-black bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400"
+                      onChange={e => setBasePayRate(e.target.value)}
+                      className="w-24 text-center text-sm font-black bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400 placeholder-slate-300 dark:placeholder-slate-500"
                     />
                     <span className="text-sm font-bold text-slate-500">/hr</span>
-                    <button onClick={() => setBasePayRate(20)} className="text-[10px] px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Reset $20</button>
                   </div>
                 </div>
               )}
@@ -1337,7 +1338,8 @@ export default function PerformancePage() {
                       const ordersPerHour   = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
                       const tier            = getPayTier(profitPerHour);
                       const estimatedPay    = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
-                      const basePay         = !tier && hs.durationHours > 0 ? basePayRate * hs.durationHours : null;
+                      const parsedBase      = parseFloat(basePayRate);
+                      const basePay         = !tier && hs.durationHours > 0 && !isNaN(parsedBase) && parsedBase > 0 ? parsedBase * hs.durationHours : null;
 
                       const stats = [
                         {
@@ -1409,9 +1411,9 @@ export default function PerformancePage() {
                                 <p className={`text-base font-black leading-none ${tier.text}`}>{tier.label}</p>
                                 <p className={`text-[9px] font-bold mt-0.5 ${tier.text} opacity-70`}>streaming rate</p>
                               </div>
-                            ) : hs.durationHours > 0 && (
+                            ) : hs.durationHours > 0 && !isNaN(parsedBase) && parsedBase > 0 && (
                               <div className="flex-shrink-0 rounded-lg border px-3 py-1.5 text-center bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600">
-                                <p className="text-base font-black leading-none text-slate-500 dark:text-slate-300">${basePayRate}/hr</p>
+                                <p className="text-base font-black leading-none text-slate-500 dark:text-slate-300">${parsedBase}/hr</p>
                                 <p className="text-[9px] font-bold mt-0.5 text-slate-400">base rate</p>
                               </div>
                             )}
@@ -1445,7 +1447,7 @@ export default function PerformancePage() {
                                   <div>
                                     <p className="text-xs font-black text-slate-500 dark:text-slate-400">Base Pay (no tier reached)</p>
                                     <p className="text-[10px] text-slate-400 mt-0.5">
-                                      ${basePayRate}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(basePay)}</strong>
+                                      ${parsedBase}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(basePay!)}</strong>
                                       {profitPerHour !== null && <span className="ml-1 opacity-70">· ${fmtMoney(profitPerHour)}/hr profit</span>}
                                     </p>
                                   </div>
