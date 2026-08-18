@@ -1130,6 +1130,7 @@ export default function PerformancePage() {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
   const [view, setView] = useState<'stats' | 'calendar'>('stats');
+  const [basePayRate, setBasePayRate] = useState(20);
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -1283,6 +1284,27 @@ export default function PerformancePage() {
                 </button>
               </div>
 
+              {/* Base pay rate control — admin/manager only */}
+              {(session?.role === 'admin' || session?.role === 'manager') && (
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm px-5 py-3 mb-4 flex items-center gap-4 flex-wrap">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Base Pay Rate</p>
+                    <p className="text-[10px] text-slate-400">Hourly rate when host doesn&apos;t hit a streaming tier</p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-sm font-bold text-slate-500">$</span>
+                    <input
+                      type="number" min={0} step={1}
+                      value={basePayRate}
+                      onChange={e => setBasePayRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-20 text-center text-sm font-black bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span className="text-sm font-bold text-slate-500">/hr</span>
+                    <button onClick={() => setBasePayRate(20)} className="text-[10px] px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Reset $20</button>
+                  </div>
+                </div>
+              )}
+
               {/* Results */}
               {dayOrders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
@@ -1315,6 +1337,7 @@ export default function PerformancePage() {
                       const ordersPerHour   = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
                       const tier            = getPayTier(profitPerHour);
                       const estimatedPay    = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
+                      const basePay         = !tier && hs.durationHours > 0 ? basePayRate * hs.durationHours : null;
 
                       const stats = [
                         {
@@ -1381,10 +1404,15 @@ export default function PerformancePage() {
                               </p>
                             </div>
                             {/* Pay rate badge in header */}
-                            {tier && (
+                            {tier ? (
                               <div className={`flex-shrink-0 rounded-lg border px-3 py-1.5 text-center ${tier.bg} ${tier.border}`}>
                                 <p className={`text-base font-black leading-none ${tier.text}`}>{tier.label}</p>
-                                <p className={`text-[9px] font-bold mt-0.5 ${tier.text} opacity-70`}>pay rate</p>
+                                <p className={`text-[9px] font-bold mt-0.5 ${tier.text} opacity-70`}>streaming rate</p>
+                              </div>
+                            ) : hs.durationHours > 0 && (
+                              <div className="flex-shrink-0 rounded-lg border px-3 py-1.5 text-center bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600">
+                                <p className="text-base font-black leading-none text-slate-500 dark:text-slate-300">${basePayRate}/hr</p>
+                                <p className="text-[9px] font-bold mt-0.5 text-slate-400">base rate</p>
                               </div>
                             )}
                           </div>
@@ -1407,18 +1435,25 @@ export default function PerformancePage() {
                                   <div>
                                     <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show</p>
                                     <p className="text-[10px] text-slate-400 mt-0.5">
-                                      {tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
+                                      ${tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
                                     </p>
                                   </div>
                                   <span className={`text-xl font-black ${tier.text}`}>${fmtMoney(estimatedPay!)}</span>
                                 </div>
+                              ) : basePay !== null ? (
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-xs font-black text-slate-500 dark:text-slate-400">Base Pay (no tier reached)</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                      ${basePayRate}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(basePay)}</strong>
+                                      {profitPerHour !== null && <span className="ml-1 opacity-70">· ${fmtMoney(profitPerHour)}/hr profit</span>}
+                                    </p>
+                                  </div>
+                                  <span className="text-xl font-black text-slate-500 dark:text-slate-300">${fmtMoney(basePay)}</span>
+                                </div>
                               ) : (
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-slate-400">
-                                    {profitPerHour !== null
-                                      ? `$${fmtMoney(profitPerHour)}/hr profit — needs $300+/hr to qualify for pay tier`
-                                      : 'Duration needed to calculate pay rate'}
-                                  </span>
+                                  <span className="text-[10px] text-slate-400">Duration needed to calculate pay</span>
                                 </div>
                               )}
                             </div>
