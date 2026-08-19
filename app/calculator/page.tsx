@@ -10,20 +10,22 @@ type ScheduleHost = { name: string; tierRate: number; profitPerHour: number | nu
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function roundHrs(totalMin: number) { return Math.round(totalMin / 60); }
-
 function parseShiftHours(timeIn: string, timeOut: string): number {
   if (!timeIn || !timeOut) return 0;
   const [inH, inM] = timeIn.split(':').map(Number);
   const [outH, outM] = timeOut.split(':').map(Number);
   const min = (outH * 60 + outM) - (inH * 60 + inM);
-  return min > 0 ? roundHrs(min) : 0;
+  return min > 0 ? min / 60 : 0;
 }
 
 function parseLsHours(raw: string): number {
   if (!raw.trim()) return 0;
-  if (raw.includes(':')) { const [h, m] = raw.split(':').map(Number); return roundHrs(h * 60 + (m || 0)); }
-  return roundHrs((parseFloat(raw) || 0) * 60);
+  if (raw.includes(':')) { const [h, m] = raw.split(':').map(Number); return h + (m || 0) / 60; }
+  return parseFloat(raw) || 0;
+}
+
+function fmtHrs(h: number): string {
+  return `${parseFloat(h.toFixed(2))}h`;
 }
 
 function fmtTime12(t: string): string {
@@ -182,13 +184,14 @@ function buildPayslipHtml(
     const lastDate     = items[items.length - 1]?.row.date ?? '';
     const period       = firstDate === lastDate ? fmtDateLong(firstDate) : `${fmtDateMed(firstDate)} – ${fmtDateLong(lastDate)}`;
 
+    function fmtH(h: number) { return parseFloat(h.toFixed(2)) + 'h'; }
     const shiftRows = items.map(({ row, calc }) => `
       <tr>
         <td>${fmtDateMed(row.date)}</td>
         <td>${fmtTime12(row.timeIn)} – ${fmtTime12(row.timeOut)}</td>
-        <td class="num">${calc.shiftHours}h</td>
-        <td class="num">${calc.nonLsHours > 0 && row.baseRate ? `${calc.nonLsHours}h × $${parseFloat(row.baseRate)}` : calc.nonLsHours > 0 ? `${calc.nonLsHours}h` : '—'}</td>
-        <td class="num">${calc.lsHours > 0 ? `${calc.lsHours}h × $${row.tierRate}` : '—'}</td>
+        <td class="num">${fmtH(calc.shiftHours)}</td>
+        <td class="num">${calc.nonLsHours > 0 && row.baseRate ? `${fmtH(calc.nonLsHours)} × $${parseFloat(row.baseRate)}` : calc.nonLsHours > 0 ? fmtH(calc.nonLsHours) : '—'}</td>
+        <td class="num">${calc.lsHours > 0 ? `${fmtH(calc.lsHours)} × $${row.tierRate}` : '—'}</td>
         <td class="num">${row.tip > 0 ? '$' + fmt(row.tip) : '—'}</td>
         <td class="num bold">${'$' + fmt(calc.total)}</td>
       </tr>`).join('');
@@ -257,9 +260,9 @@ function buildPayslipHtml(
       </div>
 
       <div class="ps-stats">
-        <div class="stat"><span class="stat-label">Total Hours Worked</span><span class="stat-val">${totalHours}h</span></div>
-        <div class="stat"><span class="stat-label">Livestream Hours</span><span class="stat-val">${totalStream}h</span></div>
-        <div class="stat"><span class="stat-label">Non-Livestream Hours</span><span class="stat-val">${totalHours - totalStream}h</span></div>
+        <div class="stat"><span class="stat-label">Total Hours Worked</span><span class="stat-val">${fmtH(totalHours)}</span></div>
+        <div class="stat"><span class="stat-label">Livestream Hours</span><span class="stat-val">${fmtH(totalStream)}</span></div>
+        <div class="stat"><span class="stat-label">Non-Livestream Hours</span><span class="stat-val">${fmtH(totalHours - totalStream)}</span></div>
         <div class="stat"><span class="stat-label">Total Shifts</span><span class="stat-val">${items.length}</span></div>
       </div>
 
@@ -644,11 +647,11 @@ export default function CalculatorPage() {
                       <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 w-[80px] flex-shrink-0">{row.hostName || '—'}</span>
                       <span className="text-slate-300 dark:text-slate-600 text-xs mx-1">·</span>
                       <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap font-mono">{fmtTime12(row.timeIn)}–{fmtTime12(row.timeOut)}</span>
-                      <span className="text-[11px] text-slate-400 ml-1">({calc.shiftHours}h)</span>
+                      <span className="text-[11px] text-slate-400 ml-1">({fmtHrs(calc.shiftHours)})</span>
                       <span className="text-slate-300 dark:text-slate-600 text-xs mx-1">·</span>
                       {calc.lsHours > 0 ? (
                         <span className="text-sm whitespace-nowrap">
-                          <span className="font-semibold text-amber-600 dark:text-amber-400">streamed {calc.lsHours}h</span>
+                          <span className="font-semibold text-amber-600 dark:text-amber-400">streamed {fmtHrs(calc.lsHours)}</span>
                           <span className="text-slate-400 text-xs ml-1">@ ${row.tierRate}/hr</span>
                         </span>
                       ) : <span className="text-sm text-slate-400">no stream</span>}
@@ -686,13 +689,13 @@ export default function CalculatorPage() {
                           <tr key={row.id} className="border-t border-slate-50 dark:border-slate-700/50">
                             <td className="py-2 pr-4 font-mono text-slate-600 dark:text-slate-400 text-xs">{fmtDateShort(row.date)}</td>
                             <td className="py-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">{row.hostName}</td>
-                            <td className="py-2 pr-4 text-right text-slate-500">{calc.shiftHours}h</td>
+                            <td className="py-2 pr-4 text-right text-slate-500">{fmtHrs(calc.shiftHours)}</td>
                             <td className="py-2 pr-4 text-right text-slate-500 whitespace-nowrap">
-                              {calc.nonLsHours > 0 && row.baseRate ? `${calc.nonLsHours}h × $${parseFloat(row.baseRate)}` : calc.nonLsHours > 0 ? `${calc.nonLsHours}h` : '—'}
+                              {calc.nonLsHours > 0 && row.baseRate ? `${fmtHrs(calc.nonLsHours)} × $${parseFloat(row.baseRate)}` : calc.nonLsHours > 0 ? fmtHrs(calc.nonLsHours) : '—'}
                             </td>
                             <td className="py-2 pr-4 text-right text-slate-700 dark:text-slate-300 font-semibold">{fmtMoney(calc.nonStreamPay)}</td>
                             <td className="py-2 pr-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                              {calc.lsHours > 0 ? `${calc.lsHours}h × $${row.tierRate}` : '—'}
+                              {calc.lsHours > 0 ? `${fmtHrs(calc.lsHours)} × $${row.tierRate}` : '—'}
                             </td>
                             <td className="py-2 pr-4 text-right text-amber-700 dark:text-amber-300 font-semibold">{calc.lsHours > 0 ? fmtMoney(calc.streamPay) : '—'}</td>
                             <td className="py-2 pr-4 text-right text-slate-500">{row.tip > 0 ? fmtMoney(row.tip) : '—'}</td>
@@ -703,16 +706,16 @@ export default function CalculatorPage() {
                         <tr className="border-t-2 border-slate-200 dark:border-slate-600">
                           <td colSpan={2} className="pt-2 font-black text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Totals</td>
                           <td className="pt-2 text-right font-bold text-slate-700 dark:text-slate-300">
-                            {results.reduce((s, r) => s + r.calc.shiftHours, 0)}h
+                            {fmtHrs(results.reduce((s, r) => s + r.calc.shiftHours, 0))}
                           </td>
                           <td className="pt-2 text-right font-bold text-slate-700 dark:text-slate-300">
-                            {results.reduce((s, r) => s + r.calc.nonLsHours, 0)}h
+                            {fmtHrs(results.reduce((s, r) => s + r.calc.nonLsHours, 0))}
                           </td>
                           <td className="pt-2 text-right font-bold text-slate-700 dark:text-slate-300">
                             {fmtMoney(results.reduce((s, r) => s + r.calc.nonStreamPay, 0))}
                           </td>
                           <td className="pt-2 text-right font-bold text-amber-600 dark:text-amber-400">
-                            {results.reduce((s, r) => s + r.calc.lsHours, 0)}h
+                            {fmtHrs(results.reduce((s, r) => s + r.calc.lsHours, 0))}
                           </td>
                           <td className="pt-2 text-right font-bold text-amber-600 dark:text-amber-400">
                             {fmtMoney(results.reduce((s, r) => s + r.calc.streamPay, 0))}
