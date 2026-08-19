@@ -99,6 +99,23 @@ function fmtMoney(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function fmtTs(ts: number): string {
+  const d = new Date(ts);
+  const h = d.getHours(); const m = d.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return m === 0 ? `${h12}:00 ${ampm}` : `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function fmtTimeRange(startTs: number | null, endTs: number | null): string {
+  if (!startTs || !endTs) return '';
+  const s = fmtTs(startTs); const e = fmtTs(endTs);
+  // If both end in same AM/PM, drop AM/PM from start
+  const sAmpm = s.slice(-2); const eAmpm = e.slice(-2);
+  const sTime = sAmpm === eAmpm ? s.slice(0, -3) : s;
+  return `${sTime} – ${e}`;
+}
+
 // â"€â"€â"€ Host Pay Rate Tiers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const PAY_TIERS = [
   { min: 500, pay: 30, label: '$30/hr', color: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-700', text: 'text-emerald-700 dark:text-emerald-400' },
@@ -195,6 +212,8 @@ type HostStat = {
   totalUnits: number;
   overallMargin: number;
   durationHours: number;
+  startTs: number | null;
+  endTs: number | null;
 };
 
 // Gaps larger than this between consecutive orders are excluded from show duration
@@ -251,6 +270,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
       }
       const durationHours = durationFromTs > 0 ? durationFromTs : (d.durStr ?? 0);
       const overallMargin = d.sales > 0 ? (d.profit / d.sales) * 100 : 0;
+      const sorted = d.timestamps.length >= 2 ? [...d.timestamps].sort((a, b) => a - b) : d.timestamps;
       return {
         host: d.host,
         livestream: d.livestream,
@@ -261,6 +281,8 @@ function computeHostStats(orders: Order[]): HostStat[] {
         totalUnits: d.units,
         overallMargin,
         durationHours,
+        startTs: sorted.length > 0 ? sorted[0] : null,
+        endTs: sorted.length > 0 ? sorted[sorted.length - 1] : null,
       };
     })
     .sort((a, b) => a.host.localeCompare(b.host) || a.livestream - b.livestream);
@@ -287,6 +309,36 @@ const TIER_DISPLAY_CONFIG = [
     avatarBg: '#F59E0B', avatarRing: '#FDE68A',
   },
 ];
+
+// Gradient + icon config per rank position (1-indexed)
+const RANK_STYLES = [
+  { gradFrom: '#7C1D0A', gradTo: '#C2410C', icon: 'crown' },    // rank 1
+  { gradFrom: '#B45309', gradTo: '#EA580C', icon: 'medal2' },   // rank 2
+  { gradFrom: '#92400E', gradTo: '#D97706', icon: 'medal3' },   // rank 3
+  { gradFrom: '#1E3A5F', gradTo: '#2563EB', icon: null },       // rank 4
+  { gradFrom: '#1E293B', gradTo: '#475569', icon: null },       // rank 5+
+];
+function getRankStyle(rank: number) {
+  return RANK_STYLES[Math.min(rank - 1, RANK_STYLES.length - 1)];
+}
+function RankIcon({ icon, rank }: { icon: string | null; rank: number }) {
+  if (icon === 'crown') return (
+    <svg className="w-6 h-6 text-amber-300/90" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M2.5 19h19v2h-19zm19.57-9.36c-.21-.8-1.04-1.28-1.84-1.06L14 10l-3.45-6.89c-.34-.68-1.15-.95-1.83-.61-.28.14-.51.37-.64.64L4.89 10 .78 8.58A1.5 1.5 0 00.04 10.8l3 9h18l3-9a1.5 1.5 0 00-2-1.16z"/>
+    </svg>
+  );
+  if (icon === 'medal2') return (
+    <svg className="w-6 h-6 text-slate-200/80" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+    </svg>
+  );
+  if (icon === 'medal3') return (
+    <svg className="w-6 h-6 text-orange-200/70" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
+    </svg>
+  );
+  return <span className="text-white/40 font-black text-sm">#{rank}</span>;
+}
 
 function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
   const tieredEntries: TierEntry[] = hostStats
@@ -1131,6 +1183,7 @@ export default function PerformancePage() {
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
   const [view, setView] = useState<'stats' | 'calendar'>('stats');
   const [basePayRate, setBasePayRate] = useState<string>('');
+  const [showTierInfo, setShowTierInfo] = useState(false);
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -1315,151 +1368,134 @@ export default function PerformancePage() {
                 </div>
               ) : (
                 <>
-                  {/* Summary row */}
+                  {/* Daily Tier Performance header */}
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h2 className="font-black text-slate-900 dark:text-white text-base">
                         {isoToDisplay(selectedDate)}
                       </h2>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} · {hostDayOrders.length} orders
+                        Daily Tier Performance · {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} · {hostDayOrders.length} orders
                       </p>
                     </div>
+                    <button
+                      onClick={() => setShowTierInfo(v => !v)}
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                    >
+                      How Tiers Work
+                    </button>
                   </div>
 
-                  <PayTierBoard hostStats={visibleHostStats} />
+                  {showTierInfo && (
+                    <div className="mb-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Pay Tier Thresholds (Profit / hr)</p>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between"><span className="text-slate-500">Tier 1 — Gold</span><span className="font-bold text-amber-500">≥ $500/hr profit → $30/hr pay</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Tier 2 — Silver</span><span className="font-bold text-orange-500">≥ $400/hr profit → $25/hr pay</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Tier 3 — Bronze</span><span className="font-bold text-amber-700">≥ $300/hr profit → $20/hr pay</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Below Tier</span><span className="font-bold text-slate-400">{'<'} $300/hr → base rate applies</span></div>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Host cards */}
+                  {/* Host cards — sorted by Net Revenue (rank 1 = highest) */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                    {visibleHostStats.map((hs, idx) => {
-                      const color           = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
-                      const profitPerHour   = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
-                      const revenuePerHour  = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
-                      const ordersPerHour   = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
-                      const tier            = getPayTier(profitPerHour);
-                      const estimatedPay    = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
-                      const parsedBase      = parseFloat(basePayRate);
-                      const basePay         = !tier && hs.durationHours > 0 && !isNaN(parsedBase) && parsedBase > 0 ? parsedBase * hs.durationHours : null;
+                    {[...visibleHostStats].sort((a, b) => b.totalSales - a.totalSales).map((hs, idx) => {
+                      const rank          = idx + 1;
+                      const rankStyle     = getRankStyle(rank);
+                      const color         = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
+                      const profitPerHour = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
+                      const revenuePerHour = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
+                      const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+                      const tier          = getPayTier(profitPerHour);
+                      const estimatedPay  = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
+                      const parsedBase    = parseFloat(basePayRate);
+                      const basePay       = !tier && hs.durationHours > 0 && !isNaN(parsedBase) && parsedBase > 0 ? parsedBase * hs.durationHours : null;
+                      const timeRange     = fmtTimeRange(hs.startTs, hs.endTs);
 
                       const stats = [
-                        {
-                          label: 'Total Sales',
-                          value: `$${fmtMoney(hs.totalSales)}`,
-                          valueClass: 'text-slate-900 dark:text-white font-black',
-                        },
-                        {
-                          label: 'Orders / Units',
-                          value: hs.totalOrders === hs.totalUnits
-                            ? `${hs.totalOrders}`
-                            : `${hs.totalOrders} / ${hs.totalUnits}`,
-                          valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
-                        },
-                        {
-                          label: 'Show Duration',
-                          value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—',
-                          valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
-                        },
-                        {
-                          label: 'Gross Profit',
-                          value: `$${fmtMoney(hs.totalProfit)}`,
-                          valueClass: `font-black ${hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`,
-                        },
-                        {
-                          label: 'Overall Margin',
-                          value: `${hs.overallMargin.toFixed(1)}%`,
-                          valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}`,
-                        },
-                        {
-                          label: 'Profit per Hour',
-                          value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—',
-                          valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`,
-                        },
-                        {
-                          label: 'Revenue per Hour',
-                          value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—',
-                          valueClass: 'text-slate-500 dark:text-slate-400 font-bold',
-                        },
-                        {
-                          label: 'Orders per Hour',
-                          value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—',
-                          valueClass: 'text-slate-700 dark:text-slate-300 font-bold',
-                        },
+                        { label: 'Total Sales',      value: `$${fmtMoney(hs.totalSales)}`,  valueClass: 'text-slate-900 dark:text-white font-black' },
+                        { label: 'Orders / Units',   value: hs.totalOrders === hs.totalUnits ? `${hs.totalOrders}` : `${hs.totalOrders} / ${hs.totalUnits}`, valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Show Duration',    value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Gross Profit',     value: `$${fmtMoney(hs.totalProfit)}`,  valueClass: `font-black ${hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}` },
+                        { label: 'Overall Margin',   value: `${hs.overallMargin.toFixed(1)}%`, valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}` },
+                        { label: 'Profit per Hour',  value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—', valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}` },
+                        { label: 'Revenue per Hour', value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—', valueClass: 'text-slate-500 dark:text-slate-400 font-bold' },
+                        { label: 'Orders per Hour',  value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                       ];
 
                       return (
-                        <div
-                          key={`${hs.host}|${hs.livestream}`}
-                          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden"
-                        >
-                          {/* Host name bar */}
-                          <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: `3px solid ${color}` }}>
+                        <div key={`${hs.host}|${hs.livestream}`} className="flex flex-col rounded-xl overflow-hidden shadow-sm">
+                          {/* Gradient tier header */}
+                          <div
+                            className="px-4 py-3 flex items-center gap-2.5"
+                            style={{ background: `linear-gradient(135deg, ${rankStyle.gradFrom} 0%, ${rankStyle.gradTo} 100%)` }}
+                          >
+                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                              <RankIcon icon={rankStyle.icon} rank={rank} />
+                            </div>
                             <div
-                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-sm"
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0"
                               style={{ backgroundColor: color }}
                             >
                               {hs.host[0]?.toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-black text-slate-900 dark:text-white text-base leading-tight">{hs.host}</p>
-                              <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
-                                Livestream {idx + 1}
-                              </p>
+                              <p className="font-black text-white text-sm leading-tight truncate">{hs.host}</p>
+                              {timeRange && <p className="text-white/60 text-[10px] leading-tight">{timeRange}</p>}
                             </div>
-                            {/* Pay rate badge in header */}
-                            {tier ? (
-                              <div className={`flex-shrink-0 rounded-lg border px-3 py-1.5 text-center ${tier.bg} ${tier.border}`}>
-                                <p className={`text-base font-black leading-none ${tier.text}`}>{tier.label}</p>
-                                <p className={`text-[9px] font-bold mt-0.5 ${tier.text} opacity-70`}>streaming rate</p>
-                              </div>
-                            ) : hs.durationHours > 0 && !isNaN(parsedBase) && parsedBase > 0 && (
-                              <div className="flex-shrink-0 rounded-lg border px-3 py-1.5 text-center bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600">
-                                <p className="text-base font-black leading-none text-slate-500 dark:text-slate-300">${parsedBase}/hr</p>
-                                <p className="text-[9px] font-bold mt-0.5 text-slate-400">base rate</p>
+                            <div className="flex-shrink-0 bg-black/25 rounded-full px-2.5 py-1">
+                              <span className="text-white font-black text-xs">${fmtMoney(hs.totalSales)}</span>
+                            </div>
+                            <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+
+                          {/* Stats box */}
+                          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-t-0">
+                            {/* Stats list */}
+                            <div className="px-5 py-4 space-y-3">
+                              {stats.map(s => (
+                                <div key={s.label} className="flex items-center justify-between gap-2">
+                                  <span className="text-sm text-slate-500 dark:text-slate-400">{s.label}</span>
+                                  <span className={`text-sm ${s.valueClass}`}>{s.value}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Pay rate footer */}
+                            {hs.durationHours > 0 && (
+                              <div className={`px-5 py-3 border-t border-slate-100 dark:border-slate-700 ${tier ? `${tier.bg} ${tier.border}` : 'bg-slate-50 dark:bg-slate-700/30'}`}>
+                                {tier ? (
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">
+                                        ${tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
+                                      </p>
+                                    </div>
+                                    <span className={`text-xl font-black ${tier.text}`}>${fmtMoney(estimatedPay!)}</span>
+                                  </div>
+                                ) : basePay !== null ? (
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs font-black text-slate-500 dark:text-slate-400">Base Pay (no tier reached)</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">
+                                        ${parsedBase}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(basePay!)}</strong>
+                                        {profitPerHour !== null && <span className="ml-1 opacity-70">· ${fmtMoney(profitPerHour)}/hr profit</span>}
+                                      </p>
+                                    </div>
+                                    <span className="text-xl font-black text-slate-500 dark:text-slate-300">${fmtMoney(basePay)}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-400">Duration needed to calculate pay</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-
-                          {/* Stats list */}
-                          <div className="px-5 py-4 space-y-3">
-                            {stats.map(s => (
-                              <div key={s.label} className="flex items-center justify-between gap-2">
-                                <span className="text-sm text-slate-500 dark:text-slate-400">{s.label}</span>
-                                <span className={`text-sm ${s.valueClass}`}>{s.value}</span>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Pay rate footer */}
-                          {hs.durationHours > 0 && (
-                            <div className={`px-5 py-3 border-t border-slate-100 dark:border-slate-700 ${tier ? `${tier.bg} ${tier.border}` : 'bg-slate-50 dark:bg-slate-700/30'}`}>
-                              {tier ? (
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">
-                                      ${tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
-                                    </p>
-                                  </div>
-                                  <span className={`text-xl font-black ${tier.text}`}>${fmtMoney(estimatedPay!)}</span>
-                                </div>
-                              ) : basePay !== null ? (
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <p className="text-xs font-black text-slate-500 dark:text-slate-400">Base Pay (no tier reached)</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">
-                                      ${parsedBase}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(basePay!)}</strong>
-                                      {profitPerHour !== null && <span className="ml-1 opacity-70">· ${fmtMoney(profitPerHour)}/hr profit</span>}
-                                    </p>
-                                  </div>
-                                  <span className="text-xl font-black text-slate-500 dark:text-slate-300">${fmtMoney(basePay)}</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-slate-400">Duration needed to calculate pay</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
