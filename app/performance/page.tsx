@@ -323,21 +323,21 @@ function getRankStyle(rank: number) {
 }
 function RankIcon({ icon, rank }: { icon: string | null; rank: number }) {
   if (icon === 'crown') return (
-    <svg className="w-6 h-6 text-amber-300/90" fill="currentColor" viewBox="0 0 24 24">
+    <svg className="w-8 h-8 text-amber-300/90" fill="currentColor" viewBox="0 0 24 24">
       <path d="M2.5 19h19v2h-19zm19.57-9.36c-.21-.8-1.04-1.28-1.84-1.06L14 10l-3.45-6.89c-.34-.68-1.15-.95-1.83-.61-.28.14-.51.37-.64.64L4.89 10 .78 8.58A1.5 1.5 0 00.04 10.8l3 9h18l3-9a1.5 1.5 0 00-2-1.16z"/>
     </svg>
   );
   if (icon === 'medal2') return (
-    <svg className="w-6 h-6 text-slate-200/80" fill="currentColor" viewBox="0 0 24 24">
+    <svg className="w-8 h-8 text-slate-200/80" fill="currentColor" viewBox="0 0 24 24">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
     </svg>
   );
   if (icon === 'medal3') return (
-    <svg className="w-6 h-6 text-orange-200/70" fill="currentColor" viewBox="0 0 24 24">
+    <svg className="w-8 h-8 text-orange-200/70" fill="currentColor" viewBox="0 0 24 24">
       <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
     </svg>
   );
-  return <span className="text-white/40 font-black text-sm">#{rank}</span>;
+  return <span className="text-white/50 font-black text-base">#{rank}</span>;
 }
 
 function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
@@ -1337,28 +1337,6 @@ export default function PerformancePage() {
                 </button>
               </div>
 
-              {/* Base pay rate control — admin/manager only */}
-              {(session?.role === 'admin' || session?.role === 'manager') && (
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm px-5 py-3 mb-4 flex items-center gap-4 flex-wrap">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Base Pay Rate</p>
-                    <p className="text-[10px] text-slate-400">Hourly rate when host doesn&apos;t hit a streaming tier</p>
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <span className="text-sm font-bold text-slate-500">$</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="e.g. 18"
-                      value={basePayRate}
-                      onChange={e => setBasePayRate(e.target.value)}
-                      className="w-24 text-center text-sm font-black bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400 placeholder-slate-300 dark:placeholder-slate-500"
-                    />
-                    <span className="text-sm font-bold text-slate-500">/hr</span>
-                  </div>
-                </div>
-              )}
-
               {/* Results */}
               {dayOrders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
@@ -1386,14 +1364,56 @@ export default function PerformancePage() {
                     </button>
                   </div>
 
+                  {/* How Tiers Work — glass modal */}
                   {showTierInfo && (
-                    <div className="mb-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-                      <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Pay Tier Thresholds (Profit / hr)</p>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between"><span className="text-slate-500">Tier 1 — Gold</span><span className="font-bold text-amber-500">≥ $500/hr profit → $30/hr pay</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">Tier 2 — Silver</span><span className="font-bold text-orange-500">≥ $400/hr profit → $25/hr pay</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">Tier 3 — Bronze</span><span className="font-bold text-amber-700">≥ $300/hr profit → $20/hr pay</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">Below Tier</span><span className="font-bold text-slate-400">{'<'} $300/hr → base rate applies</span></div>
+                    <div
+                      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+                      style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+                      onClick={() => setShowTierInfo(false)}
+                    >
+                      <div
+                        className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+                        style={{
+                          background: 'rgba(255,255,255,0.18)',
+                          backdropFilter: 'blur(24px)',
+                          WebkitBackdropFilter: 'blur(24px)',
+                          border: '1px solid rgba(255,255,255,0.3)',
+                        }}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-base font-black text-white">How Tiers Work</p>
+                          <button
+                            onClick={() => setShowTierInfo(false)}
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <p className="text-white/60 text-xs mb-4 leading-relaxed">Tier is based on <strong className="text-white/80">profit per hour</strong> earned during the stream. The host earns the matching hourly rate for the full show duration.</p>
+                        <div className="space-y-2.5">
+                          {[
+                            { label: 'Tier 1 — Gold',   threshold: '≥ $500/hr profit', pay: '$30/hr', from: '#7C1D0A', to: '#C2410C' },
+                            { label: 'Tier 2 — Silver', threshold: '≥ $400/hr profit', pay: '$25/hr', from: '#B45309', to: '#EA580C' },
+                            { label: 'Tier 3 — Bronze', threshold: '≥ $300/hr profit', pay: '$20/hr', from: '#92400E', to: '#D97706' },
+                            { label: 'Base Pay',         threshold: '< $300/hr profit', pay: 'Base rate', from: '#334155', to: '#64748B' },
+                          ].map(t => (
+                            <div
+                              key={t.label}
+                              className="rounded-xl px-4 py-3 flex items-center justify-between"
+                              style={{ background: `linear-gradient(135deg, ${t.from} 0%, ${t.to} 100%)` }}
+                            >
+                              <div>
+                                <p className="text-white font-black text-sm leading-tight">{t.label}</p>
+                                <p className="text-white/60 text-[11px] mt-0.5">{t.threshold}</p>
+                              </div>
+                              <span className="text-white font-black text-base">{t.pay}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-white/40 text-[10px] text-center mt-4">Tap anywhere outside to close</p>
                       </div>
                     </div>
                   )}
@@ -1428,26 +1448,26 @@ export default function PerformancePage() {
                         <div key={`${hs.host}|${hs.livestream}`} className="flex flex-col rounded-xl overflow-hidden shadow-sm">
                           {/* Gradient tier header */}
                           <div
-                            className="px-4 py-3 flex items-center gap-2.5"
+                            className="px-5 py-4 flex items-center gap-3"
                             style={{ background: `linear-gradient(135deg, ${rankStyle.gradFrom} 0%, ${rankStyle.gradTo} 100%)` }}
                           >
-                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
                               <RankIcon icon={rankStyle.icon} rank={rank} />
                             </div>
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm flex-shrink-0"
+                              className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-md"
                               style={{ backgroundColor: color }}
                             >
                               {hs.host[0]?.toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-black text-white text-sm leading-tight truncate">{hs.host}</p>
-                              {timeRange && <p className="text-white/60 text-[10px] leading-tight">{timeRange}</p>}
+                              <p className="font-black text-white text-base leading-tight truncate">{hs.host}</p>
+                              {timeRange && <p className="text-white/65 text-xs leading-tight mt-0.5">{timeRange}</p>}
                             </div>
-                            <div className="flex-shrink-0 bg-black/25 rounded-full px-2.5 py-1">
-                              <span className="text-white font-black text-xs">${fmtMoney(hs.totalSales)}</span>
+                            <div className="flex-shrink-0 bg-black/25 rounded-full px-3.5 py-1.5">
+                              <span className="text-white font-black text-sm">${fmtMoney(hs.totalSales)}</span>
                             </div>
-                            <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                             </svg>
                           </div>
