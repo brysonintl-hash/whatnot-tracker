@@ -68,8 +68,10 @@ function calcRow(row: Row): CalcResult {
   const shiftHours = parseShiftHours(row.timeIn, row.timeOut);
   const lsHours = Math.min(parseLsHours(row.lsInput), shiftHours);
   const nonLsHours = Math.max(shiftHours - lsHours, 0);
-  const nonStreamPay = nonLsHours * 20;
-  const streamPay = lsHours * (row.tierRate || 20);
+  const parsedBase = parseFloat(row.baseRate);
+  const baseRateNum = !isNaN(parsedBase) && parsedBase > 0 ? parsedBase : 0;
+  const nonStreamPay = nonLsHours * baseRateNum;
+  const streamPay = lsHours * (row.tierRate || 0);
   const total = nonStreamPay + streamPay + (row.tip || 0);
   return { shiftHours, lsHours, nonLsHours, nonStreamPay, streamPay, total };
 }
@@ -185,7 +187,7 @@ function buildPayslipHtml(
         <td>${fmtDateMed(row.date)}</td>
         <td>${fmtTime12(row.timeIn)} – ${fmtTime12(row.timeOut)}</td>
         <td class="num">${calc.shiftHours}h</td>
-        <td class="num">${calc.nonLsHours > 0 ? `${calc.nonLsHours}h × $20` : '—'}</td>
+        <td class="num">${calc.nonLsHours > 0 && row.baseRate ? `${calc.nonLsHours}h × $${parseFloat(row.baseRate)}` : calc.nonLsHours > 0 ? `${calc.nonLsHours}h` : '—'}</td>
         <td class="num">${calc.lsHours > 0 ? `${calc.lsHours}h × $${row.tierRate}` : '—'}</td>
         <td class="num">${row.tip > 0 ? '$' + fmt(row.tip) : '—'}</td>
         <td class="num bold">${'$' + fmt(calc.total)}</td>
@@ -236,7 +238,7 @@ function buildPayslipHtml(
       <div class="section-title">Earnings Summary</div>
       <div class="summary">
         <div class="sum-row">
-          <span>Base Pay &nbsp;<small>(non-stream hours × $20/hr)</small></span>
+          <span>Base Pay &nbsp;<small>(non-stream hours × base rate)</small></span>
           <span>$${fmt(totalBase)}</span>
         </div>
         <div class="sum-row">
@@ -314,7 +316,7 @@ ${pages}
 type Row = {
   id: string; date: string; hostName: string;
   timeIn: string; timeOut: string; lsInput: string;
-  tierRate: number; tip: number;
+  baseRate: string; tierRate: number; tip: number;
   scheduleHosts: ScheduleHost[]; loadingSchedule: boolean;
 };
 
@@ -323,7 +325,7 @@ function newRow(defaults?: Partial<Row>): Row {
     id: Math.random().toString(36).slice(2),
     date: new Date().toISOString().split('T')[0],
     hostName: '', timeIn: '09:00', timeOut: '15:00',
-    lsInput: '', tierRate: 20, tip: 0,
+    lsInput: '', baseRate: '', tierRate: 20, tip: 0,
     scheduleHosts: [], loadingSchedule: false,
     ...defaults,
   };
@@ -400,7 +402,7 @@ export default function CalculatorPage() {
 
   function addRow() {
     const last = rows[rows.length - 1];
-    setRows(prev => [...prev, newRow({ date: last.date, hostName: last.hostName, tierRate: last.tierRate, scheduleHosts: last.scheduleHosts })]);
+    setRows(prev => [...prev, newRow({ date: last.date, hostName: last.hostName, baseRate: last.baseRate, tierRate: last.tierRate, scheduleHosts: last.scheduleHosts })]);
   }
 
   function removeRow(id: string) {
@@ -486,7 +488,7 @@ export default function CalculatorPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
-                      {['Date', 'Host', 'Time In', 'Time Out', 'Stream Hrs', 'Tier $/hr', 'Tip', ''].map(h => (
+                      {['Date', 'Host', 'Time In', 'Time Out', 'Stream Hrs', 'Base $/hr', 'Tier $/hr', 'Tip', ''].map(h => (
                         <th key={h} className="px-4 py-2.5 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -549,12 +551,23 @@ export default function CalculatorPage() {
                               className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[80px]" />
                           </td>
 
+                          {/* Base rate */}
+                          <td className="px-3 py-2.5">
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                              <input type="text" inputMode="decimal" placeholder="—"
+                                value={row.baseRate}
+                                onChange={e => updateRow(row.id, { baseRate: e.target.value })}
+                                className="pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[80px] placeholder-slate-300 dark:placeholder-slate-600" />
+                            </div>
+                          </td>
+
                           {/* Tier rate */}
                           <td className="px-3 py-2.5">
                             <div className="relative">
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                               <input type="number" min={0} step={1} value={row.tierRate}
-                                onChange={e => updateRow(row.id, { tierRate: parseFloat(e.target.value) || 20 })}
+                                onChange={e => updateRow(row.id, { tierRate: parseFloat(e.target.value) || 0 })}
                                 onBlur={() => onTierBlur(row.hostName, row.tierRate)}
                                 className="pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-[80px]" />
                             </div>
@@ -674,7 +687,9 @@ export default function CalculatorPage() {
                             <td className="py-2 pr-4 font-mono text-slate-600 dark:text-slate-400 text-xs">{fmtDateShort(row.date)}</td>
                             <td className="py-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">{row.hostName}</td>
                             <td className="py-2 pr-4 text-right text-slate-500">{calc.shiftHours}h</td>
-                            <td className="py-2 pr-4 text-right text-slate-500 whitespace-nowrap">{calc.nonLsHours}h × $20</td>
+                            <td className="py-2 pr-4 text-right text-slate-500 whitespace-nowrap">
+                              {calc.nonLsHours > 0 && row.baseRate ? `${calc.nonLsHours}h × $${parseFloat(row.baseRate)}` : calc.nonLsHours > 0 ? `${calc.nonLsHours}h` : '—'}
+                            </td>
                             <td className="py-2 pr-4 text-right text-slate-700 dark:text-slate-300 font-semibold">{fmtMoney(calc.nonStreamPay)}</td>
                             <td className="py-2 pr-4 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap">
                               {calc.lsHours > 0 ? `${calc.lsHours}h × $${row.tierRate}` : '—'}
