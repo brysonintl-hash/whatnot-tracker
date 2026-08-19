@@ -1445,12 +1445,27 @@ export default function PerformancePage() {
                       ];
 
                       return (
-                        <div key={`${hs.host}|${hs.livestream}`} className="flex flex-col rounded-xl overflow-hidden shadow-sm">
+                        <div key={`${hs.host}|${hs.livestream}`} className="flex flex-col rounded-xl shadow-sm">
                           {/* Gradient tier header */}
                           <div
-                            className="px-5 py-4 flex items-center gap-3"
+                            className="px-5 py-4 flex items-center gap-3 relative group rounded-t-xl"
                             style={{ background: `linear-gradient(135deg, ${rankStyle.gradFrom} 0%, ${rankStyle.gradTo} 100%)` }}
                           >
+                            {/* Tier tooltip on hover */}
+                            <div className="absolute left-4 bottom-full z-30 pointer-events-none invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150 pb-2">
+                              <div className="bg-slate-900 text-white rounded-xl shadow-xl px-3.5 py-2.5 whitespace-nowrap">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-1">Pay Tier</p>
+                                <p className="text-sm font-black leading-tight">
+                                  {tier
+                                    ? (tier.pay === 30 ? 'Tier 1 — Gold' : tier.pay === 25 ? 'Tier 2 — Silver' : 'Tier 3 — Bronze')
+                                    : 'No Tier Reached'}
+                                </p>
+                                <p className="text-xs text-white/60 mt-0.5">
+                                  {tier ? `$${tier.pay}/hr streaming rate` : 'Base pay applies'}
+                                </p>
+                              </div>
+                              <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1.5 ml-4" />
+                            </div>
                             <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
                               <RankIcon icon={rankStyle.icon} rank={rank} />
                             </div>
@@ -1473,7 +1488,7 @@ export default function PerformancePage() {
                           </div>
 
                           {/* Stats box */}
-                          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-t-0">
+                          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-t-0 rounded-b-xl overflow-hidden">
                             {/* Stats list */}
                             <div className="px-5 py-4 space-y-3">
                               {stats.map(s => (
