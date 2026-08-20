@@ -6,9 +6,13 @@ function isAllowed(role: string) {
   return role === 'admin' || role === 'manager';
 }
 
+function canView(role: string) {
+  return isAllowed(role) || role === 'host';
+}
+
 export async function GET() {
   const session = await getSession();
-  if (!session || !isAllowed(session.role)) {
+  if (!session || !canView(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   return NextResponse.json(getLinks());

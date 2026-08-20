@@ -135,6 +135,9 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
     ]},
+    { title: 'System', items: [
+      { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
+    ]},
     { title: 'Account', items: [
       { href: '/settings', label: 'Settings', icon: I.settings },
     ]},
