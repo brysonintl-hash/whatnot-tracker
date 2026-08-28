@@ -45,39 +45,61 @@ function isoToDisplay(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+// The business's operating timezone — livestream show times are always shown in this zone,
+// regardless of what timezone the server or the viewer's own browser happens to be in.
+const BUSINESS_TZ = 'America/Los_Angeles';
+
+// Converts Y-M-D H:M:S wall-clock digits *as read in BUSINESS_TZ* into the correct UTC epoch ms.
+// DST-aware: uses the standard guess-then-correct trick instead of a fixed hour offset, since a
+// fixed offset would be wrong for half the year (PST vs PDT).
+function zonedToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number): number {
+  const utcGuess = Date.UTC(y, mo - 1, d, h, mi, s);
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TZ, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const parts = dtf.formatToParts(new Date(utcGuess));
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10);
+  const shownAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return utcGuess + (utcGuess - shownAsUtc);
+}
+
 function parseTimestamp(ts: string): number | null {
   if (!ts) return null;
   const s = ts.trim();
   if (!s) return null;
 
-  // "YYYY-MM-DD HH:MM:SS" / "YYYY/MM/DD HH:MM:SS" / ISO with T — handles 1 or 2 digit hour
+  // "YYYY-MM-DD HH:MM:SS" / "YYYY/MM/DD HH:MM:SS" / ISO with T — a machine-generated
+  // timestamp (e.g. an export's `created_at`); treated as UTC, per ISO-8601 convention.
   const iso = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[\sT](\d{1,2}):(\d{2}):(\d{2})/);
   if (iso) {
     const [, yr, mo, dy, hr, min, sec] = iso;
-    const d = new Date(`${yr}-${mo}-${dy}T${hr.padStart(2, '0')}:${min}:${sec}`);
-    if (!isNaN(d.getTime())) return d.getTime();
+    return Date.UTC(parseInt(yr), parseInt(mo) - 1, parseInt(dy), parseInt(hr), parseInt(min), parseInt(sec));
   }
 
-  // "M/D/YYYY H:MM:SS" or "M/D/YYYY H:MM:SS AM/PM"
+  // "M/D/YYYY H:MM:SS" or "M/D/YYYY H:MM:SS AM/PM" — a naive wall-clock time with no
+  // timezone marker, meant as the business's own local time (BUSINESS_TZ).
   const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})(\s*[AP]M)?$/i);
   if (us) {
     let h = parseInt(us[4]);
     const ampm = us[7]?.trim().toUpperCase();
     if (ampm === 'PM' && h < 12) h += 12;
     if (ampm === 'AM' && h === 12) h = 0;
-    const d = new Date(parseInt(us[3]), parseInt(us[1]) - 1, parseInt(us[2]), h, parseInt(us[5]), parseInt(us[6]));
-    if (!isNaN(d.getTime())) return d.getTime();
+    return zonedToUtc(parseInt(us[3]), parseInt(us[1]), parseInt(us[2]), h, parseInt(us[5]), parseInt(us[6]));
   }
 
-  // Google Sheets serial date (days since Dec 30, 1899) — returned when cell has no text format
-  // Valid modern dates are serial ~40000–50000 (year 2009–2036)
+  // Google Sheets serial date (days since Dec 30, 1899) — returned when cell has no text format.
+  // Valid modern dates are serial ~40000–50000 (year 2009–2036). Serial numbers carry no
+  // timezone info; the fractional part is wall-clock time in BUSINESS_TZ (the spreadsheet's
+  // own timezone setting), not UTC.
   if (/^\d+(\.\d+)?$/.test(s)) {
     const serial = parseFloat(s);
     if (serial > 40000 && serial < 60000) {
       const MS_PER_DAY = 86400000;
       const EPOCH_DIFF = 25569; // days from Dec 30, 1899 to Jan 1, 1970
-      const d = new Date((serial - EPOCH_DIFF) * MS_PER_DAY);
-      if (!isNaN(d.getTime())) return d.getTime();
+      const naive = new Date((serial - EPOCH_DIFF) * MS_PER_DAY);
+      return zonedToUtc(naive.getUTCFullYear(), naive.getUTCMonth() + 1, naive.getUTCDate(), naive.getUTCHours(), naive.getUTCMinutes(), naive.getUTCSeconds());
     }
   }
 
@@ -100,11 +122,9 @@ function fmtMoney(n: number) {
 }
 
 function fmtTs(ts: number): string {
-  const d = new Date(ts);
-  const h = d.getHours(); const m = d.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return m === 0 ? `${h12}:00 ${ampm}` : `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TZ, hour: 'numeric', minute: '2-digit', hour12: true,
+  }).format(new Date(ts)).replace(/ /g, ' ');
 }
 
 function fmtTimeRange(startTs: number | null, endTs: number | null): string {
