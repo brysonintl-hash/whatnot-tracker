@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/useTheme';
 import { useIdleLogout } from '@/lib/useIdleLogout';
 import type { Role } from '@/lib/types';
-import Chat from '@/components/Chat';
 import FeatureRequestModal from '@/components/FeatureRequestModal';
 
 type NavItem = { href: string; label: string; icon: React.ReactNode; children?: NavItem[] };
@@ -34,6 +33,8 @@ const I = {
   report: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
   mail: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   calc: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M9 7h6M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01M15 17h.01" /></svg>,
+  script: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>,
+  messages: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
   logout: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
   eye: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
   idea: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
@@ -57,6 +58,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Overview', items: [
       { href: '/admin', label: 'Dashboard', icon: I.grid },
       { href: '/reports', label: 'Reports', icon: I.report },
+      { href: '/messages', label: 'Messages', icon: I.messages },
     ]},
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
@@ -81,6 +83,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Overview', items: [
       { href: '/manager', label: 'Dashboard', icon: I.grid },
       { href: '/reports', label: 'Reports', icon: I.report },
+      { href: '/messages', label: 'Messages', icon: I.messages },
     ]},
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
@@ -104,6 +107,7 @@ const NAV: Record<Role, Section[]> = {
   shipper: [
     { title: 'Overview', items: [
       { href: '/shipper', label: 'Dashboard', icon: I.grid },
+      { href: '/messages', label: 'Messages', icon: I.messages },
     ]},
     { title: 'Tasks', items: [
       { href: '/pendings', label: 'Pendings', icon: I.clip },
@@ -120,10 +124,12 @@ const NAV: Record<Role, Section[]> = {
   host: [
     { title: 'Overview', items: [
       { href: '/host', label: 'Dashboard', icon: I.grid },
+      { href: '/messages', label: 'Messages', icon: I.messages },
     ]},
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
+      { href: '/script', label: 'Script Reader', icon: I.script },
       { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
@@ -160,6 +166,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [shipmentCount, setShipmentCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -221,6 +228,21 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
     const t = setInterval(fetchCount, 30000);
     return () => clearInterval(t);
   }, [role]);
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      fetch('/api/messages/direct/unread')
+        .then(r => r.json())
+        .then(d => {
+          const counts: Record<string, number> = d.counts ?? {};
+          setUnreadMessageCount(Object.values(counts).reduce((a, b) => a + b, 0));
+        })
+        .catch(() => {});
+    };
+    fetchUnread();
+    const t = setInterval(fetchUnread, 15000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const ping = () => fetch('/api/presence', { method: 'POST' }).catch(() => {});
@@ -310,10 +332,12 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                 const isUsers = item.href === '/users';
                 const isPendings = item.href === '/pendings';
                 const isShipments = item.href === '/shipping';
+                const isMessages = item.href === '/messages';
                 const usersBadge = isUsers && pendingUserCount > 0;
                 const pendingsBadge = isPendings && pendingTaskCount > 0;
                 const shipmentsBadge = isShipments && (role === 'host' || role === 'shipper') && shipmentCount > 0;
-                const hasBadge = usersBadge || pendingsBadge || shipmentsBadge;
+                const messagesBadge = isMessages && unreadMessageCount > 0;
+                const hasBadge = usersBadge || pendingsBadge || shipmentsBadge || messagesBadge;
 
                 if (item.children) {
                   const isChildExpanded = expandedItems.has(item.href);
@@ -392,6 +416,11 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                             {pendingTaskCount}
                           </span>
                         )}
+                        {messagesBadge && (
+                          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                            {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                          </span>
+                        )}
                         {active && !hasBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
                       </>
                     )}
@@ -459,7 +488,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
         </div>
       </aside>
 
-      <Chat />
       {featureOpen && <FeatureRequestModal userName={userName} onClose={() => setFeatureOpen(false)} />}
     </>
   );
