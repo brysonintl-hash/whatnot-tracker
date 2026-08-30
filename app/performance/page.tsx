@@ -330,34 +330,33 @@ const TIER_DISPLAY_CONFIG = [
   },
 ];
 
-// Gradient + icon config per rank position (1-indexed)
+// Gradient config per rank position (1-indexed) — controls the card header background only
 const RANK_STYLES = [
-  { gradFrom: '#7C1D0A', gradTo: '#C2410C', icon: 'crown' },    // rank 1
-  { gradFrom: '#B45309', gradTo: '#EA580C', icon: 'medal2' },   // rank 2
-  { gradFrom: '#92400E', gradTo: '#D97706', icon: 'medal3' },   // rank 3
-  { gradFrom: '#1E3A5F', gradTo: '#2563EB', icon: null },       // rank 4
-  { gradFrom: '#1E293B', gradTo: '#475569', icon: null },       // rank 5+
+  { gradFrom: '#7C1D0A', gradTo: '#C2410C' },    // rank 1
+  { gradFrom: '#B45309', gradTo: '#EA580C' },    // rank 2
+  { gradFrom: '#92400E', gradTo: '#D97706' },    // rank 3
+  { gradFrom: '#1E3A5F', gradTo: '#2563EB' },    // rank 4
+  { gradFrom: '#1E293B', gradTo: '#475569' },    // rank 5+
 ];
 function getRankStyle(rank: number) {
   return RANK_STYLES[Math.min(rank - 1, RANK_STYLES.length - 1)];
 }
-function RankIcon({ icon, rank }: { icon: string | null; rank: number }) {
-  if (icon === 'crown') return (
-    <svg className="w-8 h-8 text-amber-300/90" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M2.5 19h19v2h-19zm19.57-9.36c-.21-.8-1.04-1.28-1.84-1.06L14 10l-3.45-6.89c-.34-.68-1.15-.95-1.83-.61-.28.14-.51.37-.64.64L4.89 10 .78 8.58A1.5 1.5 0 00.04 10.8l3 9h18l3-9a1.5 1.5 0 00-2-1.16z"/>
+
+const CROWN_PATH = 'M2.5 19h19v2h-19zm19.57-9.36c-.21-.8-1.04-1.28-1.84-1.06L14 10l-3.45-6.89c-.34-.68-1.15-.95-1.83-.61-.28.14-.51.37-.64.64L4.89 10 .78 8.58A1.5 1.5 0 00.04 10.8l3 9h18l3-9a1.5 1.5 0 00-2-1.16z';
+
+// Crown color reflects the host's pay tier for the day (Tier 1 Gold / Tier 2 Silver / Tier 3 Bronze),
+// not their sales-rank position — matches the "Tier 1 — Gold" etc. labels in the hover tooltip.
+function TierCrownIcon({ payRate }: { payRate?: number }) {
+  const colorClass =
+    payRate === 30 ? 'text-yellow-300' :   // Tier 1 — Gold
+    payRate === 25 ? 'text-slate-300' :    // Tier 2 — Silver
+    payRate === 20 ? 'text-orange-400' :   // Tier 3 — Bronze
+    'text-white/30';                       // No tier reached
+  return (
+    <svg className={`w-8 h-8 ${colorClass}`} fill="currentColor" viewBox="0 0 24 24">
+      <path d={CROWN_PATH} />
     </svg>
   );
-  if (icon === 'medal2') return (
-    <svg className="w-8 h-8 text-slate-200/80" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-    </svg>
-  );
-  if (icon === 'medal3') return (
-    <svg className="w-8 h-8 text-orange-200/70" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
-    </svg>
-  );
-  return <span className="text-white/50 font-black text-base">#{rank}</span>;
 }
 
 function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
@@ -1487,7 +1486,7 @@ export default function PerformancePage() {
                               <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1.5 ml-4" />
                             </div>
                             <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
-                              <RankIcon icon={rankStyle.icon} rank={rank} />
+                              <TierCrownIcon payRate={tier?.pay} />
                             </div>
                             <div
                               className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-md"
