@@ -49,7 +49,8 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [preset, setPreset] = useState('all');
-  const [customDate, setCustomDate] = useState('');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [selectedHost, setSelectedHost] = useState('All');
   const [showPage, setShowPage] = useState(1);
   const lineChartRef = useRef<any>(null);
@@ -75,7 +76,7 @@ export default function SalesPage() {
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
-  useEffect(() => { setShowPage(1); }, [preset, customDate, selectedHost]);
+  useEffect(() => { setShowPage(1); }, [preset, customStart, customEnd, selectedHost]);
 
   const chartText = isDark ? '#e2e8f0' : '#374151';
   const chartGrid = isDark ? '#334155' : '#F3F4F6';
@@ -113,10 +114,17 @@ export default function SalesPage() {
       if (preset === '7days') { const w = new Date(today); w.setDate(today.getDate() - 7); return d >= w; }
       if (preset === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       if (preset === 'lastmonth') { const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1); const lme = new Date(now.getFullYear(), now.getMonth(), 0); return d >= lm && d <= lme; }
-      if (preset === 'custom' && customDate) { const [cy, cm, cd] = customDate.split('-').map(Number); const sel = new Date(cy, cm - 1, cd); return d.getTime() === sel.getTime(); }
+      if (preset === 'custom' && customStart) {
+        const [sy, sm, sd] = customStart.split('-').map(Number);
+        const start = new Date(sy, sm - 1, sd);
+        const [ey, em, ed] = (customEnd || customStart).split('-').map(Number);
+        const end = new Date(ey, em - 1, ed);
+        const [rangeStart, rangeEnd] = start <= end ? [start, end] : [end, start];
+        return d >= rangeStart && d <= rangeEnd;
+      }
       return true;
     });
-  }, [orders, preset, customDate]);
+  }, [orders, preset, customStart, customEnd]);
 
   const hosts = useMemo(() => {
     const named = Array.from(new Set(dateFiltered.map(o => o.host).filter(h => h && !/^\d+$/.test(h))));
@@ -165,8 +173,15 @@ export default function SalesPage() {
               </button>
             ))}
             {preset === 'custom' && (
-              <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
-                className="text-xs py-1.5 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={customStart} max={customEnd || undefined} onChange={e => setCustomStart(e.target.value)}
+                  aria-label="Start date"
+                  className="text-xs py-1.5 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                <span className="text-xs text-slate-400">to</span>
+                <input type="date" value={customEnd} min={customStart || undefined} onChange={e => setCustomEnd(e.target.value)}
+                  aria-label="End date"
+                  className="text-xs py-1.5 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
             )}
           </div>
         </header>

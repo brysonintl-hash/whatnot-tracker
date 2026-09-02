@@ -383,7 +383,8 @@ export default function AdminPage() {
 
   const [dashTab, setDashTab]     = useState<DashTab>('historical');
   const [dateRange, setDateRange] = useState<DateRange>('all');
-  const [customDate, setCustomDate] = useState('');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   const [search, setSearch]   = useState('');
   const [perPage, setPerPage] = useState(20);
@@ -408,7 +409,7 @@ export default function AdminPage() {
     });
   }, []);
 
-  useEffect(() => { setPage(0); }, [search, perPage, dateRange, customDate, sortCol, sortDir]);
+  useEffect(() => { setPage(0); }, [search, perPage, dateRange, customStart, customEnd, sortCol, sortDir]);
 
   useEffect(() => {
     function h(e: MouseEvent) { if (tableRef.current && !tableRef.current.contains(e.target as Node)) setFilterOpen(null); }
@@ -423,9 +424,16 @@ export default function AdminPage() {
     if (dateRange === '7d')  { const c = new Date(now); c.setDate(now.getDate() - 7);  if (d < c) return false; }
     if (dateRange === '30d') { const c = new Date(now); c.setDate(now.getDate() - 30); if (d < c) return false; }
     if (dateRange === '90d') { const c = new Date(now); c.setDate(now.getDate() - 90); if (d < c) return false; }
-    if (dateRange === 'custom' && customDate) { const p = new Date(customDate); if (d.toDateString() !== p.toDateString()) return false; }
+    if (dateRange === 'custom' && customStart) {
+      const [sy, sm, sd] = customStart.split('-').map(Number);
+      const start = new Date(sy, sm - 1, sd);
+      const [ey, em, ed] = (customEnd || customStart).split('-').map(Number);
+      const end = new Date(ey, em - 1, ed);
+      const [rangeStart, rangeEnd] = start <= end ? [start, end] : [end, start];
+      if (d < rangeStart || d > rangeEnd) return false;
+    }
     return true;
-  }), [orders, dateRange, customDate]);
+  }), [orders, dateRange, customStart, customEnd]);
 
   const revenue = filteredOrders.reduce((s, o) => s + o.sold, 0);
   const profit  = filteredOrders.reduce((s, o) => s + o.profit, 0);
@@ -562,7 +570,17 @@ export default function AdminPage() {
                         {btn.label}
                       </button>
                     ))}
-                    {dateRange === 'custom' && <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)} className="text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-400 ml-1" />}
+                    {dateRange === 'custom' && (
+                      <div className="flex items-center gap-1.5 ml-1">
+                        <input type="date" value={customStart} max={customEnd || undefined} onChange={e => setCustomStart(e.target.value)}
+                          aria-label="Start date"
+                          className="text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-400" />
+                        <span className="text-xs text-slate-400">to</span>
+                        <input type="date" value={customEnd} min={customStart || undefined} onChange={e => setCustomEnd(e.target.value)}
+                          aria-label="End date"
+                          className="text-xs border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-400" />
+                      </div>
+                    )}
                     <span className="ml-auto text-xs text-slate-400">{filteredOrders.length.toLocaleString()} orders in range</span>
                   </div>
 
