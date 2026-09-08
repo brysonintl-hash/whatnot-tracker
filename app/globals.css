@@ -2,17 +2,207 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Light mode */
-body {
-  background-color: #F3F4F6;
-  color: #111827;
+/* ==========================================================================
+   Design tokens
+   Channel triplets so Tailwind can apply opacity: rgb(var(--x) / 50%)
+   ========================================================================== */
+
+:root {
+  /* Brand */
+  --primary: 183 0 17;
+  --on-primary: 255 255 255;
+  --primary-container: 220 38 38;
+  --on-primary-container: 255 246 245;
+  --primary-fixed: 255 218 214;
+  --primary-fixed-dim: 255 180 171;
+  --on-primary-fixed: 65 0 2;
+  --on-primary-fixed-variant: 147 0 11;
+  --inverse-primary: 255 180 171;
+
+  /* Secondary */
+  --secondary: 86 94 116;
+  --on-secondary: 255 255 255;
+  --secondary-container: 218 226 253;
+  --on-secondary-container: 92 100 122;
+  --secondary-fixed: 218 226 253;
+  --secondary-fixed-dim: 190 198 224;
+  --on-secondary-fixed: 19 27 46;
+  --on-secondary-fixed-variant: 63 70 92;
+
+  /* Tertiary */
+  --tertiary: 181 0 52;
+  --on-tertiary: 255 255 255;
+  --tertiary-container: 222 26 70;
+  --on-tertiary-container: 255 246 245;
+  --tertiary-fixed: 255 218 218;
+  --tertiary-fixed-dim: 255 179 182;
+  --on-tertiary-fixed: 64 0 12;
+  --on-tertiary-fixed-variant: 146 0 40;
+
+  /* Surfaces */
+  --background: 249 249 255;
+  --on-background: 17 28 45;
+  --surface: 249 249 255;
+  --on-surface: 17 28 45;
+  --surface-variant: 216 227 251;
+  --on-surface-variant: 92 100 122;
+  --surface-tint: 191 7 21;
+  --surface-bright: 249 249 255;
+  --surface-dim: 207 218 242;
+  --surface-container-lowest: 255 255 255;
+  --surface-container-low: 240 243 255;
+  --surface-container: 231 238 255;
+  --surface-container-high: 222 232 255;
+  --surface-container-highest: 216 227 251;
+  --inverse-surface: 38 49 67;
+  --inverse-on-surface: 236 241 255;
+
+  /* Lines */
+  --outline: 122 133 152;
+  --outline-variant: 200 211 232;
+
+  /* Status */
+  --error: 186 26 26;
+  --on-error: 255 255 255;
+  --error-container: 255 218 214;
+  --on-error-container: 147 0 10;
+  --success: 21 128 61;
+  --on-success: 255 255 255;
+  --success-container: 220 252 231;
+  --on-success-container: 20 83 45;
+  --warning: 180 83 9;
+  --on-warning: 255 255 255;
+  --warning-container: 254 243 199;
+  --on-warning-container: 69 26 3;
+
+  --shadow: 17 28 45;
 }
 
-/* Dark mode */
-.dark body {
-  background-color: #0d1117;
-  color: #e6edf3;
+.dark {
+  /* Brand — container red holds so buttons stay on-brand; the text-weight
+     primary lifts for legibility on a dark ground. */
+  --primary: 255 107 107;
+  --on-primary: 74 0 6;
+  --primary-container: 220 38 38;
+  --on-primary-container: 255 255 255;
+  --primary-fixed: 255 218 214;
+  --primary-fixed-dim: 255 180 171;
+  --on-primary-fixed: 65 0 2;
+  --on-primary-fixed-variant: 147 0 11;
+  --inverse-primary: 183 0 17;
+
+  --secondary: 169 179 198;
+  --on-secondary: 31 40 54;
+  --secondary-container: 51 60 77;
+  --on-secondary-container: 211 219 234;
+  --secondary-fixed: 218 226 253;
+  --secondary-fixed-dim: 190 198 224;
+  --on-secondary-fixed: 19 27 46;
+  --on-secondary-fixed-variant: 63 70 92;
+
+  --tertiary: 255 143 163;
+  --on-tertiary: 90 0 24;
+  --tertiary-container: 222 26 70;
+  --on-tertiary-container: 255 255 255;
+  --tertiary-fixed: 255 218 218;
+  --tertiary-fixed-dim: 255 179 182;
+  --on-tertiary-fixed: 64 0 12;
+  --on-tertiary-fixed-variant: 146 0 40;
+
+  --background: 14 17 22;
+  --on-background: 227 232 239;
+  --surface: 14 17 22;
+  --on-surface: 227 232 239;
+  --surface-variant: 42 49 59;
+  --on-surface-variant: 179 188 200;
+  --surface-tint: 255 107 107;
+  --surface-bright: 38 45 56;
+  --surface-dim: 10 13 17;
+  --surface-container-lowest: 9 12 16;
+  --surface-container-low: 20 25 32;
+  --surface-container: 25 31 39;
+  --surface-container-high: 35 42 52;
+  --surface-container-highest: 46 54 65;
+  --inverse-surface: 227 232 239;
+  --inverse-on-surface: 27 33 41;
+
+  --outline: 123 132 143;
+  --outline-variant: 57 65 75;
+
+  --error: 255 107 107;
+  --on-error: 74 0 6;
+  --error-container: 127 29 29;
+  --on-error-container: 255 218 214;
+  --success: 74 222 128;
+  --on-success: 5 46 22;
+  --success-container: 20 83 45;
+  --on-success-container: 187 247 208;
+  --warning: 251 191 36;
+  --on-warning: 69 26 3;
+  --warning-container: 120 53 15;
+  --on-warning-container: 254 243 199;
+
+  --shadow: 0 0 0;
 }
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--on-surface));
+    font-family: var(--font-body), 'Hanken Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Keyboard focus is always visible, and always the brand colour. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--primary-container));
+    outline-offset: 2px;
+  }
+}
+
+/* Material Symbols — the icon vocabulary of the imported language.
+   `block` display keeps ligature text (e.g. "shopping_cart") from flashing
+   as words before the font lands. */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+.material-symbols-outlined.is-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgb(var(--surface-container-low)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--outline)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Legacy styles — still in use by pages not yet migrated to the design
+   system. Remove each block as its pages are rolled over.
+   ========================================================================== */
 
 .card {
   @apply bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-[#161b22] dark:border-[#30363d];
@@ -48,13 +238,6 @@ tr:hover td {
   @apply bg-amber-50 dark:bg-[#21262d];
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #F3F4F6; }
-::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
-.dark ::-webkit-scrollbar-track { background: #0d1117; }
-.dark ::-webkit-scrollbar-thumb { background: #30363d; }
-
-/* Enterprise layout dark mode */
 .sb-page { @apply bg-slate-50 dark:bg-slate-900; }
 .sb-header { @apply bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm; }
 .sb-card { @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm; }
