@@ -6,12 +6,16 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  // Condensed uppercase label is the signature of the language; the 1px lift
-  // on press gives physical feedback without a bouncy transform.
-  'inline-flex items-center justify-center gap-unit-xs whitespace-nowrap font-display uppercase tracking-wider ' +
-  'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ' +
+  // Condensed uppercase label is the signature of the language. Rest → hover
+  // lifts a hair with more shadow; press drops it flat below rest — the
+  // combination is what makes a click feel like it landed on something.
+  // `group` lets an icon child (e.g. an arrow) react to the same hover via
+  // group-hover:, so "Shop Deals →" nudges forward as one small gesture.
+  'group inline-flex items-center justify-center gap-unit-xs whitespace-nowrap font-display uppercase tracking-wider ' +
+  'transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out ' +
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-container ' +
-  'disabled:pointer-events-none disabled:opacity-40 active:translate-y-px',
+  'disabled:pointer-events-none disabled:opacity-40 ' +
+  'hover:-translate-y-0.5 active:translate-y-px active:shadow-none active:duration-75',
   {
     variants: {
       variant: {

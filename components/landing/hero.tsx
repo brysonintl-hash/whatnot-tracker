@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Button, Icon } from '@/components/ui';
+import { Reveal } from './reveal';
 
 const SLIDES = [
   { label: 'Verified Pro Stock: Pallet #409B', status: 'In Stock' },
@@ -18,8 +19,8 @@ export function Hero() {
     <section className="relative w-full overflow-hidden bg-inverse-surface text-inverse-on-surface">
       <div className="relative z-10 mx-auto max-w-7xl px-margin-mobile py-unit-xl md:px-margin-tablet lg:px-margin-desktop lg:py-unit-3xl">
         <div className="grid grid-cols-1 items-center gap-unit-xl lg:grid-cols-12">
-          {/* Left: offer */}
-          <div className="flex flex-col gap-unit-md lg:col-span-7">
+          {/* Left: offer — reveals on mount since it's the first thing visible */}
+          <Reveal className="flex flex-col gap-unit-md lg:col-span-7">
             <div className="flex flex-wrap items-center gap-unit-xs">
               <span className="inline-flex items-center gap-unit-2xs rounded bg-primary-container px-unit-sm py-unit-2xs font-display text-label-badge uppercase tracking-wider text-on-primary-container shadow-sm">
                 <Icon name="local_fire_department" size="xs" />
@@ -66,10 +67,10 @@ export function Hero() {
                 </div>
               ))}
             </div>
-          </div>
+          </Reveal>
 
           {/* Right: stock banner + carousel controls */}
-          <div className="relative lg:col-span-5">
+          <Reveal delay={150} className="relative lg:col-span-5">
             <div className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-gradient-to-br from-surface-container-high/20 to-inverse-on-surface/5 shadow-xl">
               <div
                 className="absolute inset-0 opacity-30 transition-opacity duration-500"
@@ -97,7 +98,7 @@ export function Hero() {
                   type="button"
                   aria-label="Previous slide"
                   onClick={() => go(-1)}
-                  className="flex h-8 w-8 items-center justify-center rounded bg-inverse-on-surface/10 text-inverse-on-surface transition-colors hover:bg-inverse-on-surface/20"
+                  className="flex h-8 w-8 items-center justify-center rounded bg-inverse-on-surface/10 text-inverse-on-surface transition-[background-color,transform] duration-150 hover:scale-110 hover:bg-inverse-on-surface/20"
                 >
                   <Icon name="arrow_back" size="sm" />
                 </button>
@@ -105,7 +106,7 @@ export function Hero() {
                   type="button"
                   aria-label="Next slide"
                   onClick={() => go(1)}
-                  className="flex h-8 w-8 items-center justify-center rounded bg-inverse-on-surface/10 text-inverse-on-surface transition-colors hover:bg-inverse-on-surface/20"
+                  className="flex h-8 w-8 items-center justify-center rounded bg-inverse-on-surface/10 text-inverse-on-surface transition-[background-color,transform] duration-150 hover:scale-110 hover:bg-inverse-on-surface/20"
                 >
                   <Icon name="arrow_forward" size="sm" />
                 </button>
@@ -126,7 +127,7 @@ export function Hero() {
                 {String(slide + 1).padStart(2, '0')} / {String(SLIDES.length).padStart(2, '0')}
               </span>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

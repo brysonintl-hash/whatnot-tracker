@@ -4,6 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import { Button, Icon } from '@/components/ui';
 import { useCart } from './cart-context';
+import { Reveal } from './reveal';
 
 type Product = {
   sku: string;
@@ -118,7 +119,7 @@ function ProductCard({ product }: { product: Product }) {
   const added = justAdded === product.sku;
 
   return (
-    <div className="group flex flex-col justify-between rounded-xl bg-surface-container-lowest p-unit-md shadow-sm transition-shadow hover:shadow-md">
+    <div className="group flex flex-col justify-between rounded-xl bg-surface-container-lowest p-unit-md shadow-sm transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-1 hover:shadow-md">
       <div>
         <div className="relative mb-unit-md flex items-center justify-center overflow-hidden rounded-lg bg-surface-container-low p-unit-md">
           <span className="absolute left-unit-xs top-unit-xs rounded bg-primary-container px-unit-xs py-unit-2xs font-display text-label-badge uppercase text-on-primary">
@@ -172,26 +173,30 @@ export function FlashDeals() {
   return (
     <section id="flash-deals" className="w-full bg-surface-container-low py-unit-2xl">
       <div className="mx-auto max-w-7xl px-margin-mobile md:px-margin-tablet lg:px-margin-desktop">
-        <div className="mb-unit-xl flex flex-col items-center justify-between gap-unit-md rounded-xl bg-inverse-surface p-unit-lg text-inverse-on-surface shadow-md md:flex-row">
-          <div className="flex items-center gap-unit-md">
-            <div className="flex h-10 w-10 items-center justify-center rounded bg-primary-container text-on-primary-container">
-              <Icon name="timer" size="lg" />
+        <Reveal>
+          <div className="mb-unit-xl flex flex-col items-center justify-between gap-unit-md rounded-xl bg-inverse-surface p-unit-lg text-inverse-on-surface shadow-md md:flex-row">
+            <div className="flex items-center gap-unit-md">
+              <div className="flex h-10 w-10 items-center justify-center rounded bg-primary-container text-on-primary-container">
+                <Icon name="timer" size="lg" />
+              </div>
+              <div>
+                <span className="block font-display text-label-badge uppercase tracking-widest text-primary-fixed-dim">
+                  Industrial Flash Liquidation
+                </span>
+                <h2 className="text-balance font-display text-headline-xl uppercase leading-none text-inverse-on-surface">
+                  Hot Deals Ending Soon
+                </h2>
+              </div>
             </div>
-            <div>
-              <span className="block font-display text-label-badge uppercase tracking-widest text-primary-fixed-dim">
-                Industrial Flash Liquidation
-              </span>
-              <h2 className="text-balance font-display text-headline-xl uppercase leading-none text-inverse-on-surface">
-                Hot Deals Ending Soon
-              </h2>
-            </div>
+            <Countdown />
           </div>
-          <Countdown />
-        </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 gap-unit-lg sm:grid-cols-2 lg:grid-cols-4">
-          {PRODUCTS.map(p => (
-            <ProductCard key={p.sku} product={p} />
+          {PRODUCTS.map((p, i) => (
+            <Reveal key={p.sku} delay={i * 80}>
+              <ProductCard product={p} />
+            </Reveal>
           ))}
         </div>
       </div>

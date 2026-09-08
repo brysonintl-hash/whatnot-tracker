@@ -1,4 +1,5 @@
 import { Button, Icon } from '@/components/ui';
+import { Reveal } from './reveal';
 
 const PERKS = [
   { icon: 'payments', title: '5% Extra Cashback', sub: 'Applied automatically' },
@@ -10,7 +11,7 @@ export function ProClubBanner() {
   return (
     <section className="w-full bg-surface pb-unit-3xl">
       <div className="mx-auto max-w-7xl px-margin-mobile md:px-margin-tablet lg:px-margin-desktop">
-        <div className="relative overflow-hidden rounded-2xl bg-inverse-surface p-unit-xl text-inverse-on-surface shadow-xl lg:p-unit-2xl">
+        <Reveal as="div" className="relative overflow-hidden rounded-2xl bg-inverse-surface p-unit-xl text-inverse-on-surface shadow-xl lg:p-unit-2xl">
           {/* Subtle grid graphic — echoes the industrial line-drawing motif */}
           <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.08]" aria-hidden="true">
             <defs>
@@ -52,14 +53,14 @@ export function ProClubBanner() {
             <div className="flex flex-col items-start gap-unit-sm lg:col-span-4 lg:items-end">
               <Button size="lg" className="w-full lg:w-auto">
                 Join Pro Club — It's Free
-                <Icon name="arrow_forward" size="md" />
+                <Icon name="arrow_forward" size="md" className="transition-transform duration-200 group-hover:translate-x-1" />
               </Button>
               <Button asChild variant="inverse" size="md" className="w-full bg-inverse-on-surface/10 hover:bg-inverse-on-surface/20 lg:w-auto">
                 <a href="#">See Full Benefits</a>
               </Button>
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

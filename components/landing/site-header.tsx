@@ -80,12 +80,18 @@ export function SiteHeader() {
           <button
             type="button"
             aria-label={`Cart, ${count} item${count === 1 ? '' : 's'}`}
-            className="flex items-center gap-unit-xs rounded-lg bg-surface-container-high px-unit-md py-unit-xs transition-colors hover:bg-surface-container-highest"
+            className="flex items-center gap-unit-xs rounded-lg bg-surface-container-high px-unit-md py-unit-xs transition-[background-color,transform] duration-150 hover:-translate-y-0.5 hover:bg-surface-container-highest active:translate-y-0"
           >
             <span className="relative flex items-center">
               <Icon name="shopping_cart" size="md" className="text-on-surface" />
               {count > 0 && (
-                <span className="absolute -right-unit-xs -top-unit-xs flex h-4 w-4 items-center justify-center rounded-full bg-primary-container font-mono text-[10px] font-bold leading-none text-on-primary-container">
+                // key={count} remounts the badge on every change so the pop
+                // animation replays each time — a CSS class alone won't
+                // retrigger without the DOM node itself being fresh.
+                <span
+                  key={count}
+                  className="absolute -right-unit-xs -top-unit-xs flex h-4 w-4 animate-pop items-center justify-center rounded-full bg-primary-container font-mono text-[10px] font-bold leading-none text-on-primary-container"
+                >
                   {count}
                 </span>
               )}
@@ -112,7 +118,7 @@ export function SiteHeader() {
             <a
               key={l.label}
               href={l.href}
-              className="whitespace-nowrap font-display text-label-badge uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface"
+              className="relative whitespace-nowrap py-unit-2xs font-display text-label-badge uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface after:absolute after:-bottom-px after:left-0 after:h-[1.5px] after:w-0 after:bg-primary-container after:transition-[width] after:duration-200 hover:after:w-full"
             >
               {l.label}
             </a>

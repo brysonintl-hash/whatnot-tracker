@@ -152,10 +152,18 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // One-shot bump for things that just changed — a cart badge
+        // incrementing, a count updating. Not a loop; plays once and settles.
+        pop: {
+          '0%': { transform: 'scale(1)' },
+          '40%': { transform: 'scale(1.35)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 160ms ease-out',
         'slide-up': 'slide-up 200ms cubic-bezier(0.16, 1, 0.3, 1)',
+        pop: 'pop 380ms cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
     },
   },

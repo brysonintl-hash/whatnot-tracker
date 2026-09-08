@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { Icon } from '@/components/ui';
+import { Reveal } from './reveal';
 
 type Category = {
   name: string;
@@ -53,54 +54,55 @@ export function CategoryGrid() {
   return (
     <section id="categories" className="w-full bg-surface py-unit-2xl">
       <div className="mx-auto max-w-7xl px-margin-mobile md:px-margin-tablet lg:px-margin-desktop">
-        <div className="mb-unit-xl flex flex-col justify-between gap-unit-sm md:flex-row md:items-end">
+        <Reveal className="mb-unit-xl flex flex-col justify-between gap-unit-sm md:flex-row md:items-end">
           <div>
             <span className="block font-mono text-spec-code uppercase text-secondary">Direct Equipment Inventory</span>
             <h2 className="font-display text-headline-xl uppercase text-on-surface">Shop By Pro Category</h2>
           </div>
-          <a href="#" className="flex items-center gap-unit-2xs font-display text-label-badge uppercase text-primary-container hover:underline">
+          <a href="#" className="group flex items-center gap-unit-2xs font-display text-label-badge uppercase text-primary-container hover:underline">
             Explore All 24 Heavy Trade Divisions
-            <Icon name="arrow_forward" size="sm" />
+            <Icon name="arrow_forward" size="sm" className="transition-transform duration-200 group-hover:translate-x-1" />
           </a>
-        </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 gap-unit-lg sm:grid-cols-2 lg:grid-cols-3">
-          {CATEGORIES.map(c => (
-            <a
-              key={c.name}
-              href="#"
-              className="group flex flex-col justify-between rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-unit-sm">
-                <div>
-                  <span className="rounded bg-surface-container px-unit-xs py-unit-2xs font-mono text-spec-code uppercase text-secondary">
-                    {c.count} Products
+          {CATEGORIES.map((c, i) => (
+            <Reveal key={c.name} delay={i * 70}>
+              <a
+                href="#"
+                className="group flex h-full flex-col justify-between rounded-xl bg-surface-container-lowest p-unit-lg shadow-sm transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-unit-sm">
+                  <div>
+                    <span className="rounded bg-surface-container px-unit-xs py-unit-2xs font-mono text-spec-code uppercase text-secondary">
+                      {c.count} Products
+                    </span>
+                    <h3 className="mt-unit-xs font-display text-headline-md uppercase text-on-surface transition-colors group-hover:text-primary-container">
+                      {c.name}
+                    </h3>
+                  </div>
+                  <span className="shrink-0 whitespace-nowrap rounded bg-primary-fixed px-unit-xs py-unit-2xs font-display text-label-badge uppercase text-on-primary-fixed">
+                    {c.save}
                   </span>
-                  <h3 className="mt-unit-xs font-display text-headline-md uppercase text-on-surface transition-colors group-hover:text-primary-container">
-                    {c.name}
-                  </h3>
                 </div>
-                <span className="shrink-0 whitespace-nowrap rounded bg-primary-fixed px-unit-xs py-unit-2xs font-display text-label-badge uppercase text-on-primary-fixed">
-                  {c.save}
-                </span>
-              </div>
 
-              <div className="my-unit-md flex h-40 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low">
-                <Image
-                  src={c.image}
-                  alt={c.alt}
-                  width={220}
-                  height={144}
-                  unoptimized
-                  className="h-36 object-contain transition-transform group-hover:scale-105"
-                />
-              </div>
+                <div className="my-unit-md flex h-40 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low">
+                  <Image
+                    src={c.image}
+                    alt={c.alt}
+                    width={220}
+                    height={144}
+                    unoptimized
+                    className="h-36 object-contain transition-transform duration-300 group-hover:scale-105"
+                  />
+                </div>
 
-              <div className="flex items-center justify-between font-display text-label-badge uppercase text-secondary">
-                <span>{c.brands}</span>
-                <Icon name="arrow_forward" size="md" className="text-primary-container" />
-              </div>
-            </a>
+                <div className="flex items-center justify-between font-display text-label-badge uppercase text-secondary">
+                  <span>{c.brands}</span>
+                  <Icon name="arrow_forward" size="md" className="text-primary-container transition-transform duration-200 group-hover:translate-x-1" />
+                </div>
+              </a>
+            </Reveal>
           ))}
         </div>
       </div>

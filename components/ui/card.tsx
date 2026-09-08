@@ -13,7 +13,8 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
       className={cn(
         'bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm',
         interactive &&
-          'transition-shadow duration-200 hover:shadow-md focus-within:shadow-md cursor-pointer',
+          'cursor-pointer transition-[box-shadow,transform] duration-200 ease-out ' +
+          'hover:-translate-y-1 hover:shadow-md focus-within:-translate-y-1 focus-within:shadow-md',
         className,
       )}
       {...props}
