@@ -11,8 +11,11 @@ export async function GET() {
 
   const presence = getAllPresence();
   const now = Date.now();
+  // Direct Messages is for the internal team — customers are a separate
+  // audience entirely and would otherwise flood this list once they start
+  // signing up.
   const users = (await getAllUsers())
-    .filter(u => u.status === 'active' && u.username !== session.username)
+    .filter(u => u.status === 'active' && u.role !== 'customer' && u.username !== session.username)
     .map(u => {
       const lastSeen = presence[u.id]?.lastSeen;
       const online = !!lastSeen && now - new Date(lastSeen).getTime() < 30_000;

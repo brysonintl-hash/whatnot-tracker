@@ -104,6 +104,10 @@ const NAV: Record<Role, Section[]> = {
     ]},
   ],
   employee: [],
+  // Customers never see this sidebar at all — they live entirely on the
+  // public storefront — but Record<Role, Section[]> needs every role
+  // covered, and empty is the correct "no internal access" value anyway.
+  customer: [],
   shipper: [
     { title: 'Overview', items: [
       { href: '/shipper', label: 'Dashboard', icon: I.grid },
@@ -149,7 +153,7 @@ const NAV: Record<Role, Section[]> = {
 
 const ROLE_COLOR: Record<Role, string> = {
   admin: 'bg-red-500', manager: 'bg-blue-500', employee: 'bg-emerald-500',
-  shipper: 'bg-violet-500', host: 'bg-amber-500',
+  shipper: 'bg-violet-500', host: 'bg-amber-500', customer: 'bg-slate-500',
 };
 
 export default function Sidebar({ role, userName }: { role: Role; userName: string }) {

@@ -13,10 +13,11 @@ const ROLE_HOME: Record<string, string> = {
 };
 
 export default async function Home() {
-  // Staff land on their dashboard, same as before. Everyone else — the
-  // storefront's actual audience — gets the public landing page.
+  // Staff land on their dashboard, same as before. Customers (and anyone
+  // signed out) see the storefront itself — this is their home page, not
+  // a waypoint to redirect away from.
   const session = await getSession();
-  if (session) redirect(ROLE_HOME[session.role] ?? '/login');
+  if (session && ROLE_HOME[session.role]) redirect(ROLE_HOME[session.role]);
 
   return (
     <CartProvider>

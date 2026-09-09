@@ -22,7 +22,7 @@ function fmtLastSeen(iso: string | null): { label: string; online: boolean } {
   return { label: new Date(iso).toLocaleDateString(), online: false };
 }
 
-const ROLES: Role[] = ['admin', 'manager', 'shipper', 'host'];
+const ROLES: Role[] = ['admin', 'manager', 'shipper', 'host', 'customer'];
 
 const ROLE_STYLE: Record<string, string> = {
   admin: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
@@ -30,7 +30,15 @@ const ROLE_STYLE: Record<string, string> = {
   shipper: 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800',
   host: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
   employee: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  customer: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600',
 };
+
+const AVATAR_COLOR: Record<string, string> = {
+  admin: 'bg-red-500', manager: 'bg-blue-500', shipper: 'bg-violet-500',
+  host: 'bg-amber-500', customer: 'bg-slate-400', employee: 'bg-emerald-500',
+};
+
+type RoleFilter = 'team' | 'customer' | 'all';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -38,6 +46,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [filter, setFilter] = useState<RoleFilter>('team');
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
@@ -72,6 +81,11 @@ export default function UsersPage() {
   }
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const customerCount = users.filter(u => u.role === 'customer').length;
+  const teamCount = users.length - customerCount;
+  const visibleUsers = users.filter(u =>
+    filter === 'all' ? true : filter === 'customer' ? u.role === 'customer' : u.role !== 'customer'
+  );
 
   if (!session) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
@@ -92,13 +106,13 @@ export default function UsersPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
-          {/* Stats */}
+          {/* Stats — reflect whichever filter is selected below */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Total Accounts', value: users.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
-              { label: 'Pending Approval', value: users.filter(u => u.status === 'pending').length, cls: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', textCls: 'text-amber-600 dark:text-amber-400', labelCls: 'text-amber-600 dark:text-amber-400' },
-              { label: 'Active Users', value: users.filter(u => u.status === 'active').length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
-              { label: 'Online Now', value: users.filter(u => u.lastSeen && Date.now() - new Date(u.lastSeen).getTime() < 30_000).length, cls: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', textCls: 'text-emerald-600 dark:text-emerald-400', labelCls: 'text-emerald-600 dark:text-emerald-400' },
+              { label: 'Total Accounts', value: visibleUsers.length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Pending Approval', value: visibleUsers.filter(u => u.status === 'pending').length, cls: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', textCls: 'text-amber-600 dark:text-amber-400', labelCls: 'text-amber-600 dark:text-amber-400' },
+              { label: 'Active Users', value: visibleUsers.filter(u => u.status === 'active').length, cls: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700', textCls: 'text-slate-900 dark:text-white', labelCls: 'text-slate-500 dark:text-slate-400' },
+              { label: 'Online Now', value: visibleUsers.filter(u => u.lastSeen && Date.now() - new Date(u.lastSeen).getTime() < 30_000).length, cls: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', textCls: 'text-emerald-600 dark:text-emerald-400', labelCls: 'text-emerald-600 dark:text-emerald-400' },
             ].map(k => (
               <div key={k.label} className={`${k.cls} rounded-xl border shadow-sm p-5`}>
                 <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${k.labelCls}`}>{k.label}</p>
@@ -107,11 +121,35 @@ export default function UsersPage() {
             ))}
           </div>
 
+          {/* Team vs. customer filter — customer signups would otherwise
+              bury the team roster this page exists to manage. */}
+          <div className="flex gap-1.5 mb-4">
+            {([
+              { key: 'team', label: `Team (${teamCount})` },
+              { key: 'customer', label: `Customers (${customerCount})` },
+              { key: 'all', label: `All (${users.length})` },
+            ] as { key: RoleFilter; label: string }[]).map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                  filter === f.key
+                    ? 'bg-red-500 border-red-500 text-white'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-red-300 hover:text-red-600'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Users table */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-              <h2 className="font-bold text-slate-900 dark:text-white text-sm">All Accounts</h2>
-              <span className="text-xs text-slate-400">{users.length} total</span>
+              <h2 className="font-bold text-slate-900 dark:text-white text-sm">
+                {filter === 'team' ? 'Team Accounts' : filter === 'customer' ? 'Customer Accounts' : 'All Accounts'}
+              </h2>
+              <span className="text-xs text-slate-400">{visibleUsers.length} shown</span>
             </div>
 
             {loading ? (
@@ -127,13 +165,11 @@ export default function UsersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map(u => (
+                    {visibleUsers.map(u => (
                       <tr key={u.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                         <td className="py-3 px-5">
                           <div className="flex items-center gap-2.5">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-black text-xs flex-shrink-0 ${
-                              u.role === 'admin' ? 'bg-red-500' : u.role === 'manager' ? 'bg-blue-500' : u.role === 'shipper' ? 'bg-violet-500' : 'bg-amber-500'
-                            }`}>{u.name[0]}</div>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-black text-xs flex-shrink-0 ${AVATAR_COLOR[u.role] ?? 'bg-slate-400'}`}>{u.name[0]}</div>
                             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{u.name}</span>
                           </div>
                         </td>

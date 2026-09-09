@@ -13,6 +13,7 @@ export async function GET() {
   const now = Date.now();
   const online = users
     .filter(u => {
+      if (u.role === 'customer') return false; // staff-only presence list
       const p = presence[u.id];
       return p && now - new Date(p.lastSeen).getTime() < 30_000;
     })

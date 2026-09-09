@@ -15,8 +15,15 @@ const NAV_LINKS = [
 const DEPARTMENTS = ['All Depts', 'Power Tools', 'Hand Tools', 'Storage', 'Clearance'];
 
 export function SiteHeader() {
-  const { count, subtotal } = useCart();
+  const { count, subtotal, loggedIn, userName } = useCart();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [signingOut, setSigningOut] = React.useState(false);
+
+  async function signOut() {
+    setSigningOut(true);
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    window.location.href = '/';
+  }
 
   return (
     <header className="fixed left-0 top-0 z-50 w-full bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.06)]">
@@ -70,16 +77,31 @@ export function SiteHeader() {
               <span className="font-display text-label-badge uppercase tracking-wide text-on-surface">1-800-555-STCK</span>
             </div>
           </div>
+          {loggedIn ? (
+            <button
+              type="button"
+              onClick={signOut}
+              disabled={signingOut}
+              className="hidden items-center gap-unit-xs text-on-surface transition-colors hover:text-primary-container disabled:opacity-50 sm:flex"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-container font-display text-[11px] font-bold text-on-primary-container">
+                {userName?.[0]?.toUpperCase() ?? '?'}
+              </span>
+              <span className="font-display text-label-badge uppercase tracking-wider">
+                {signingOut ? 'Signing Out…' : 'Sign Out'}
+              </span>
+            </button>
+          ) : (
+            <a
+              href="/login"
+              className="hidden items-center gap-unit-xs text-on-surface transition-colors hover:text-primary-container sm:flex"
+            >
+              <Icon name="person" size="md" />
+              <span className="font-display text-label-badge uppercase tracking-wider">Account</span>
+            </a>
+          )}
           <a
-            href="/login"
-            className="hidden items-center gap-unit-xs text-on-surface transition-colors hover:text-primary-container sm:flex"
-          >
-            <Icon name="person" size="md" />
-            <span className="font-display text-label-badge uppercase tracking-wider">Account</span>
-          </a>
-          <button
-            type="button"
-            aria-label={`Cart, ${count} item${count === 1 ? '' : 's'}`}
+            href="/cart"
             className="flex items-center gap-unit-xs rounded-lg bg-surface-container-high px-unit-md py-unit-xs transition-[background-color,transform] duration-150 hover:-translate-y-0.5 hover:bg-surface-container-highest active:translate-y-0"
           >
             <span className="relative flex items-center">
@@ -99,7 +121,7 @@ export function SiteHeader() {
             <span className="hidden font-mono text-spec-code font-bold text-on-surface lg:inline">
               ${subtotal.toFixed(2)}
             </span>
-          </button>
+          </a>
           <button
             type="button"
             aria-label="Open menu"
@@ -158,10 +180,19 @@ export function SiteHeader() {
               </a>
             ))}
           </nav>
-          <a href="/login" className="flex items-center gap-unit-xs py-unit-xs text-on-surface">
-            <Icon name="person" size="md" />
-            <span className="font-display text-label-badge uppercase tracking-wider">Account</span>
-          </a>
+          {loggedIn ? (
+            <button type="button" onClick={signOut} disabled={signingOut} className="flex items-center gap-unit-xs py-unit-xs text-on-surface disabled:opacity-50">
+              <Icon name="person" size="md" />
+              <span className="font-display text-label-badge uppercase tracking-wider">
+                {signingOut ? 'Signing Out…' : `Sign Out (${userName ?? ''})`}
+              </span>
+            </button>
+          ) : (
+            <a href="/login" className="flex items-center gap-unit-xs py-unit-xs text-on-surface">
+              <Icon name="person" size="md" />
+              <span className="font-display text-label-badge uppercase tracking-wider">Account</span>
+            </a>
+          )}
         </div>
       )}
     </header>

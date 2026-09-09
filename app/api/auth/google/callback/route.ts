@@ -63,11 +63,13 @@ export async function GET(req: NextRequest) {
       user = await createGoogleUser({ email: profile.email, name: profile.name || profile.email, googleId: profile.sub });
     }
 
-    const res = NextResponse.redirect(
-      user.status === 'pending'
-        ? `${appUrl}/login?registered=1`
-        : `${appUrl}/${user.role}`
-    );
+    // Customers land back on the storefront, not a role-named dashboard
+    // route (there isn't one — the storefront at "/" is their home).
+    const dest =
+      user.status === 'pending' ? '/login?registered=1'
+      : user.role === 'customer' ? '/'
+      : `/${user.role}`;
+    const res = NextResponse.redirect(`${appUrl}${dest}`);
     res.cookies.delete('oauth_state');
 
     if (user.status !== 'pending') {

@@ -37,7 +37,10 @@ export default function RegisterPage() {
     });
     const data = await res.json();
     setLoading(false);
-    if (res.ok) router.push('/login?registered=1');
+    // Registration signs the account in immediately (customers get instant
+    // access), so send them straight into the storefront rather than back
+    // to the login form.
+    if (res.ok) router.push('/');
     else setError(data.error || 'Registration failed');
   }
 

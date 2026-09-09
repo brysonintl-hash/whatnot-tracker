@@ -114,6 +114,11 @@ export async function findByEmail(email: string): Promise<StoredUser | null> {
 
 // Google-authenticated users never use their password (login bypasses
 // findByCredentials entirely), so a random value just satisfies the field.
+//
+// New sign-ups are customers by default — instant access to shop, no
+// admin approval needed, since a customer role has zero internal access
+// anyway. An admin promotes someone to a staff role afterward (Users
+// page) if they turn out to be an employee.
 export async function createGoogleUser(data: { email: string; name: string; googleId: string }): Promise<StoredUser> {
   const users = await getCache();
   const user: StoredUser = {
@@ -122,8 +127,8 @@ export async function createGoogleUser(data: { email: string; name: string; goog
     password: randomBytes(32).toString('hex'),
     name: data.name,
     email: data.email,
-    role: 'host',
-    status: 'pending',
+    role: 'customer',
+    status: 'active',
     authProvider: 'google',
     googleId: data.googleId,
     createdAt: new Date().toISOString(),
@@ -142,9 +147,10 @@ export async function linkGoogleId(id: string, googleId: string): Promise<boolea
   return true;
 }
 
+// Same instant-access reasoning as createGoogleUser — see the comment above it.
 export async function createUser(data: { username: string; password: string; name: string; role: Role }): Promise<StoredUser> {
   const users = await getCache();
-  const user: StoredUser = { ...data, status: 'pending', id: Date.now().toString(), createdAt: new Date().toISOString() };
+  const user: StoredUser = { ...data, status: 'active', id: Date.now().toString(), createdAt: new Date().toISOString() };
   await save([...users, user]);
   return user;
 }
