@@ -1,5 +1,6 @@
 export { CartProvider, useCart } from './cart-context';
 export { SiteHeader } from './site-header';
+export { LegalHeader } from './legal-header';
 export { Hero } from './hero';
 export { BrandStrip } from './brand-strip';
 export { ValueProps } from './value-props';

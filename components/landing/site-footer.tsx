@@ -57,8 +57,8 @@ export function SiteFooter() {
             © {new Date().getFullYear()} Stack Bargains. All rights reserved.
           </span>
           <div className="flex items-center gap-unit-lg">
-            <a href="#" className="font-mono text-spec-code text-inverse-on-surface/50 hover:text-inverse-on-surface">Privacy</a>
-            <a href="#" className="font-mono text-spec-code text-inverse-on-surface/50 hover:text-inverse-on-surface">Terms</a>
+            <a href="/privacy" className="font-mono text-spec-code text-inverse-on-surface/50 hover:text-inverse-on-surface">Privacy</a>
+            <a href="/terms" className="font-mono text-spec-code text-inverse-on-surface/50 hover:text-inverse-on-surface">Terms</a>
           </div>
         </div>
       </div>
