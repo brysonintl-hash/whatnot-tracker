@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { randomBytes } from 'crypto';
 import { join } from 'path';
 import type { Role, StoredUser } from './types';
 import { readUsersFromSheet, writeUsersToSheet } from './sheetsUsers';
@@ -99,6 +100,46 @@ export async function findByUsername(username: string): Promise<StoredUser | nul
 export async function findById(id: string): Promise<StoredUser | null> {
   const users = await getCache();
   return users.find(u => u.id === id) ?? null;
+}
+
+export async function findByGoogleId(googleId: string): Promise<StoredUser | null> {
+  const users = await getCache();
+  return users.find(u => u.googleId === googleId) ?? null;
+}
+
+export async function findByEmail(email: string): Promise<StoredUser | null> {
+  const users = await getCache();
+  return users.find(u => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
+}
+
+// Google-authenticated users never use their password (login bypasses
+// findByCredentials entirely), so a random value just satisfies the field.
+export async function createGoogleUser(data: { email: string; name: string; googleId: string }): Promise<StoredUser> {
+  const users = await getCache();
+  const user: StoredUser = {
+    id: Date.now().toString(),
+    username: data.email,
+    password: randomBytes(32).toString('hex'),
+    name: data.name,
+    email: data.email,
+    role: 'host',
+    status: 'pending',
+    authProvider: 'google',
+    googleId: data.googleId,
+    createdAt: new Date().toISOString(),
+  };
+  await save([...users, user]);
+  return user;
+}
+
+export async function linkGoogleId(id: string, googleId: string): Promise<boolean> {
+  const users = await getCache();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return false;
+  const updated = [...users];
+  updated[idx] = { ...updated[idx], googleId };
+  await save(updated);
+  return true;
 }
 
 export async function createUser(data: { username: string; password: string; name: string; role: Role }): Promise<StoredUser> {

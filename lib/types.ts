@@ -8,4 +8,7 @@ export type StoredUser = {
   role: Role;
   status: 'active' | 'pending';
   createdAt: string;
+  email?: string;
+  authProvider?: 'local' | 'google';
+  googleId?: string;
 };
