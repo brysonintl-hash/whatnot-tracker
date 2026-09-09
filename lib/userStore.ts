@@ -148,7 +148,7 @@ export async function linkGoogleId(id: string, googleId: string): Promise<boolea
 }
 
 // Same instant-access reasoning as createGoogleUser — see the comment above it.
-export async function createUser(data: { username: string; password: string; name: string; role: Role }): Promise<StoredUser> {
+export async function createUser(data: { username: string; password: string; name: string; role: Role; email?: string }): Promise<StoredUser> {
   const users = await getCache();
   const user: StoredUser = { ...data, status: 'active', id: Date.now().toString(), createdAt: new Date().toISOString() };
   await save([...users, user]);

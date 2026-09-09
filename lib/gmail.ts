@@ -93,3 +93,18 @@ export function buildRawEmail({
   ].filter((l): l is string => l !== null);
   return Buffer.from(lines.join('\r\n')).toString('base64url');
 }
+
+/** Sends a raw message (from buildRawEmail) through the same Gmail account
+ *  the support-email reply feature already uses. Throws on failure. */
+export async function sendGmail(raw: string, threadId?: string): Promise<void> {
+  const token = await getGmailToken();
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(threadId ? { raw, threadId } : { raw }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Gmail send failed');
+  }
+}
