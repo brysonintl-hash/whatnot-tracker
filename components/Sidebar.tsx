@@ -76,12 +76,9 @@ const NAV: Record<Role, Section[]> = {
       { href: '/calculator', label: 'Pay Calculator', icon: I.calc },
       { href: '/users', label: 'User Management', icon: I.users },
     ]},
-    { title: 'Storefront', items: [
-      { href: '/deals', label: 'Hot Deals', icon: I.tag },
-      { href: '/storefront', label: 'Banner Image', icon: I.image },
-    ]},
     { title: 'System', items: [
       { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
+      { href: '/storefront', label: 'Storefront', icon: I.image },
       { href: '/settings', label: 'Settings', icon: I.settings },
     ]},
   ],

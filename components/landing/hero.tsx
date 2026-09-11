@@ -3,27 +3,31 @@
 import * as React from 'react';
 import { Button, Icon } from '@/components/ui';
 import { Reveal } from './reveal';
+import type { HeroSlide } from '@/lib/storefrontStore';
 
-const SLIDES = [
-  { label: 'Verified Pro Stock: Pallet #409B', status: 'In Stock' },
-  { label: 'Verified Pro Stock: Pallet #412A', status: 'In Stock' },
-  { label: 'New Arrivals: Milwaukee M18 Line', status: 'Just In' },
-  { label: 'Clearance Yard: Final Markdowns', status: 'Ends Soon' },
+const DEFAULT_SLIDES: HeroSlide[] = [
+  { image: null, label: 'Verified Pro Stock: Pallet #409B', status: 'In Stock' },
+  { image: null, label: 'Verified Pro Stock: Pallet #412A', status: 'In Stock' },
+  { image: null, label: 'New Arrivals: Milwaukee M18 Line', status: 'Just In' },
+  { image: null, label: 'Clearance Yard: Final Markdowns', status: 'Ends Soon' },
 ];
 
 export function Hero() {
   const [slide, setSlide] = React.useState(0);
-  const go = (delta: number) => setSlide(s => (s + delta + SLIDES.length) % SLIDES.length);
 
-  // Staff can swap this in from Storefront Banner settings (/storefront)
-  // without a deploy — falls back to the placeholder art below when unset.
-  const [heroImage, setHeroImage] = React.useState<string | null>(null);
+  // Staff can swap these in (photo per slide, plus label/status) from the
+  // Storefront admin page without a deploy — falls back to the built-in
+  // placeholder art/copy until then.
+  const [slides, setSlides] = React.useState<HeroSlide[]>(DEFAULT_SLIDES);
   React.useEffect(() => {
     fetch('/api/storefront')
       .then(r => (r.ok ? r.json() : null))
-      .then(data => { if (data?.heroImage) setHeroImage(data.heroImage); })
+      .then(data => { if (Array.isArray(data?.heroSlides) && data.heroSlides.length > 0) setSlides(data.heroSlides); })
       .catch(() => {});
   }, []);
+
+  const go = (delta: number) => setSlide(s => (s + delta + slides.length) % slides.length);
+  const current = slides[slide] ?? slides[0];
 
   return (
     <section className="relative w-full overflow-hidden bg-inverse-surface text-inverse-on-surface">
@@ -82,9 +86,9 @@ export function Hero() {
           {/* Right: stock banner + carousel controls */}
           <Reveal delay={150} className="relative lg:col-span-5">
             <div className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-gradient-to-br from-surface-container-high/20 to-inverse-on-surface/5 shadow-xl">
-              {heroImage ? (
+              {current.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={heroImage} alt={SLIDES[slide].label} className="absolute inset-0 h-full w-full object-cover" />
+                <img key={slide} src={current.image} alt={current.label} className="absolute inset-0 h-full w-full object-cover" />
               ) : (
                 <>
                   <div
@@ -103,9 +107,9 @@ export function Hero() {
               <div className="absolute inset-x-unit-md bottom-unit-md flex items-center justify-between rounded bg-inverse-surface/90 p-unit-sm text-inverse-on-surface backdrop-blur">
                 <div className="flex items-center gap-unit-xs">
                   <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary-container" />
-                  <span className="font-mono text-spec-code uppercase">{SLIDES[slide].label}</span>
+                  <span className="font-mono text-spec-code uppercase">{current.label}</span>
                 </div>
-                <span className="font-display text-label-badge uppercase text-primary-fixed-dim">{SLIDES[slide].status}</span>
+                <span className="font-display text-label-badge uppercase text-primary-fixed-dim">{current.status}</span>
               </div>
             </div>
 
@@ -129,9 +133,9 @@ export function Hero() {
                 </button>
               </div>
               <div className="flex items-center gap-unit-xs">
-                {SLIDES.map((s, i) => (
+                {slides.map((s, i) => (
                   <button
-                    key={s.label}
+                    key={i}
                     aria-label={`Go to slide ${i + 1}`}
                     onClick={() => setSlide(i)}
                     className={`h-1.5 rounded-full transition-all ${
@@ -141,7 +145,7 @@ export function Hero() {
                 ))}
               </div>
               <span className="font-mono text-spec-code text-inverse-on-surface/60">
-                {String(slide + 1).padStart(2, '0')} / {String(SLIDES.length).padStart(2, '0')}
+                {String(slide + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
               </span>
             </div>
           </Reveal>
