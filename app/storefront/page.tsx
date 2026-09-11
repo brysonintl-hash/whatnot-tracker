@@ -4,34 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
+import { resizeImage } from '@/lib/clientImage';
 
 type Session = { username: string; role: Role; name: string };
-
-// Downscales + compresses the picked file in the browser before it's ever
-// sent anywhere — keeps a normal phone photo (often 4-8MB) down to a
-// couple hundred KB so it stores cleanly and the page still loads fast.
-function resizeImage(file: File, maxWidth = 1600, quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('That file doesn’t look like an image.'));
-      img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Image processing isn’t supported in this browser.')); return; }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function StorefrontSettingsPage() {
   const router = useRouter();
@@ -63,7 +38,7 @@ export default function StorefrontSettingsPage() {
     setMsg(null);
     setProcessing(true);
     try {
-      const dataUrl = await resizeImage(file);
+      const dataUrl = await resizeImage(file, 1600);
       setPendingImage(dataUrl);
       setLinkInput('');
     } catch (err) {
