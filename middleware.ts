@@ -17,8 +17,11 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // The public storefront landing page, its legal pages (linked from the
-  // Google OAuth consent screen), and auth — everyone reaches these,
-  // logged in or not.
+  // Google OAuth consent screen), auth, and the storefront's own settings
+  // API — everyone reaches these, logged in or not. /api/storefront's GET
+  // is read by the homepage hero for every visitor (most of whom aren't
+  // signed in at all); its POST still requires an admin session, enforced
+  // inside the route handler itself rather than here.
   if (
     pathname === '/' ||
     pathname === '/privacy' ||
@@ -27,7 +30,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/register') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/api/auth')
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/storefront')
   ) {
     return NextResponse.next();
   }

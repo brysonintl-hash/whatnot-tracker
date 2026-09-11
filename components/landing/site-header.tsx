@@ -41,9 +41,6 @@ export function SiteHeader() {
         <a href="/" className="flex shrink-0 items-baseline gap-unit-xs">
           <span className="font-display text-headline-md uppercase tracking-tight text-on-surface">Stack</span>
           <span className="font-display text-headline-md uppercase tracking-tight text-primary-container">Bargains</span>
-          <span className="ml-unit-xs hidden rounded bg-surface-container-high px-unit-xs py-unit-2xs font-mono text-spec-code uppercase text-secondary sm:inline-block">
-            Pro Spec
-          </span>
         </a>
 
         {/* Search — desktop */}

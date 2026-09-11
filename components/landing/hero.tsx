@@ -15,6 +15,16 @@ export function Hero() {
   const [slide, setSlide] = React.useState(0);
   const go = (delta: number) => setSlide(s => (s + delta + SLIDES.length) % SLIDES.length);
 
+  // Staff can swap this in from Storefront Banner settings (/storefront)
+  // without a deploy — falls back to the placeholder art below when unset.
+  const [heroImage, setHeroImage] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    fetch('/api/storefront')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => { if (data?.heroImage) setHeroImage(data.heroImage); })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="relative w-full overflow-hidden bg-inverse-surface text-inverse-on-surface">
       <div className="relative z-10 mx-auto max-w-7xl px-margin-mobile py-unit-xl md:px-margin-tablet lg:px-margin-desktop lg:py-unit-3xl">
@@ -72,17 +82,24 @@ export function Hero() {
           {/* Right: stock banner + carousel controls */}
           <Reveal delay={150} className="relative lg:col-span-5">
             <div className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-gradient-to-br from-surface-container-high/20 to-inverse-on-surface/5 shadow-xl">
-              <div
-                className="absolute inset-0 opacity-30 transition-opacity duration-500"
-                style={{
-                  backgroundImage:
-                    'repeating-linear-gradient(135deg, rgb(var(--primary-container)) 0 2px, transparent 2px 28px)',
-                }}
-                aria-hidden="true"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Icon name="inventory_2" className="text-inverse-on-surface/20" style={{ fontSize: '96px' }} />
-              </div>
+              {heroImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={heroImage} alt={SLIDES[slide].label} className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <>
+                  <div
+                    className="absolute inset-0 opacity-30 transition-opacity duration-500"
+                    style={{
+                      backgroundImage:
+                        'repeating-linear-gradient(135deg, rgb(var(--primary-container)) 0 2px, transparent 2px 28px)',
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Icon name="inventory_2" className="text-inverse-on-surface/20" style={{ fontSize: '96px' }} />
+                  </div>
+                </>
+              )}
               <div className="absolute inset-x-unit-md bottom-unit-md flex items-center justify-between rounded bg-inverse-surface/90 p-unit-sm text-inverse-on-surface backdrop-blur">
                 <div className="flex items-center gap-unit-xs">
                   <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary-container" />

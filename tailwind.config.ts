@@ -159,11 +159,17 @@ const config: Config = {
           '40%': { transform: 'scale(1.35)' },
           '100%': { transform: 'scale(1)' },
         },
+        // Whole-page entrance on first paint, opacity only — deliberately no
+        // translate here, since the storefront header is position:fixed and
+        // an animated transform on an ancestor would pin it to this wrapper
+        // instead of the viewport while scrolling.
+        'page-in': { from: { opacity: '0' }, to: { opacity: '1' } },
       },
       animation: {
         'fade-in': 'fade-in 160ms ease-out',
         'slide-up': 'slide-up 200ms cubic-bezier(0.16, 1, 0.3, 1)',
         pop: 'pop 380ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'page-in': 'page-in 600ms ease-out',
       },
     },
   },

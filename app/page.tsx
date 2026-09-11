@@ -20,17 +20,19 @@ export default async function Home() {
   if (session && ROLE_HOME[session.role]) redirect(ROLE_HOME[session.role]);
 
   return (
-    <CartProvider>
-      <SiteHeader />
-      <main className="w-full min-h-screen bg-background pt-28">
-        <Hero />
-        <BrandStrip />
-        <ValueProps />
-        <FlashDeals />
-        <CategoryGrid />
-        <ProClubBanner />
-      </main>
-      <SiteFooter />
-    </CartProvider>
+    <div className="animate-page-in">
+      <CartProvider>
+        <SiteHeader />
+        <main className="w-full min-h-screen bg-background pt-28">
+          <Hero />
+          <BrandStrip />
+          <ValueProps />
+          <FlashDeals />
+          <CategoryGrid />
+          <ProClubBanner />
+        </main>
+        <SiteFooter />
+      </CartProvider>
+    </div>
   );
 }
