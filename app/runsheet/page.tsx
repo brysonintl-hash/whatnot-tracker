@@ -18,13 +18,14 @@ function localDate(): string {
 }
 
 /**
- * Starting bid that clears a target profit margin: margin is profit over
- * revenue, so price = cost / (1 - margin). Rounded up to the next 50¢ because
- * a starting bid wants to be a clean number on screen.
+ * Starting bid that targets a profit margin: margin is profit over revenue,
+ * so price = cost / (1 - margin). Rounded DOWN to the nearest 50¢ — a
+ * starting bid is a floor for a live auction, not the final sale price, so
+ * it's kept on the friendly side rather than rounded up past the target.
  */
 function startingBid(cost: number, margin: number): number {
   if (!cost || margin <= 0 || margin >= 1) return 0;
-  return Math.ceil((cost / (1 - margin)) * 2) / 2;
+  return Math.floor((cost / (1 - margin)) * 2) / 2;
 }
 
 function money(n: number): string {
@@ -58,6 +59,8 @@ export default function RunSheetPage() {
   const [justAdded, setJustAdded] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const saveTimers = useRef<Record<string, number>>({});
@@ -220,21 +223,91 @@ export default function RunSheetPage() {
     }).catch(() => {});
   }
 
+  useEffect(() => {
+    if (!exportOpen) return;
+    function onClick(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setExportOpen(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [exportOpen]);
+
+  function downloadFile(filename: string, content: string, mime: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportCSV() {
+    const esc = (v: unknown) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ['Model #', 'Description', 'In Stock', 'Run This Stream', 'Left', 'Cost', 'Start Bid', 'Margin'];
+    const body = rows.map(r => [
+      r.entry.modelNum, r.description, r.inStock, r.entry.ran, r.left,
+      r.cost.toFixed(2), r.bid.toFixed(2), `${Math.round(margin * 100)}%`,
+    ]);
+    // Leading BOM so Excel opens the UTF-8 file (₤, ×, etc. in descriptions) without mangling it.
+    const csv = '﻿' + [header, ...body].map(row => row.map(esc).join(',')).join('\r\n');
+    downloadFile(`run-sheet-${date}.csv`, csv, 'text/csv;charset=utf-8;');
+    setExportOpen(false);
+  }
+
+  function exportPDF() {
+    setExportOpen(false);
+    // The print stylesheet (print: classes below) hides everything except
+    // the run list and a print-only header — the browser's own "Save as
+    // PDF" destination in the print dialog produces the actual PDF, so
+    // there's no PDF library to load or maintain here.
+    window.setTimeout(() => window.print(), 50);
+  }
+
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   if (!session) return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center"><div className="text-slate-400 text-sm">Loading...</div></div>;
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-      <Sidebar role={session.role} userName={session.name} />
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
+      <div className="print:hidden contents">
+        <Sidebar role={session.role} userName={session.name} />
+      </div>
+      <div className="flex-1 flex flex-col min-w-0 print:block">
         {/* pl-16 on mobile clears the Sidebar's floating hamburger button. */}
-        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-16 pr-4 md:px-6 flex-shrink-0 shadow-sm gap-4">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-16 pr-4 md:px-6 flex-shrink-0 shadow-sm gap-4 print:hidden">
           <div className="min-w-0">
             <h1 className="text-lg font-black text-white leading-none">Run Sheet</h1>
             <p className="text-xs text-slate-400 mt-1 truncate">{today} · {session.name}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setExportOpen(v => !v)}
+                disabled={!rows.length}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Export
+                <svg className={`w-3 h-3 transition-transform ${exportOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden z-30 animate-slide-up">
+                  <button onClick={exportCSV} className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left">
+                    <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span>CSV <span className="text-slate-400 font-normal">(Excel, Sheets)</span></span>
+                  </button>
+                  <button onClick={exportPDF} className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left border-t border-slate-100 dark:border-slate-700">
+                    <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span>PDF <span className="text-slate-400 font-normal">(print)</span></span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={copySummary}
               disabled={!rows.length}
@@ -252,11 +325,19 @@ export default function RunSheetPage() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="mx-auto max-w-5xl space-y-6">
+        <main className="flex-1 overflow-y-auto p-6 print:overflow-visible print:h-auto print:p-0 print:block">
+          <div className="mx-auto max-w-5xl space-y-6 print:max-w-none print:space-y-0">
+
+            {/* Print-only heading — screen shows this in the header bar instead */}
+            <div className="hidden print:block mb-6">
+              <h1 className="text-2xl font-black text-black">Run Sheet — {today}</h1>
+              <p className="text-sm text-slate-600 mt-1">
+                {session.name} · {totals.lines} items · {totals.units} units · {money(totals.projected)} projected at start bids · {Math.round(margin * 100)}% margin
+              </p>
+            </div>
 
             {sheetInfo?.error && (
-              <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-5">
+              <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-5 print:hidden">
                 <p className="text-sm font-bold text-amber-800 dark:text-amber-300">{sheetInfo.error}</p>
                 {sheetInfo.hint && <p className="text-xs text-amber-700 dark:text-amber-400/80 mt-1.5">{sheetInfo.hint}</p>}
                 {sheetInfo.serviceAccount && (
@@ -268,7 +349,7 @@ export default function RunSheetPage() {
             )}
 
             {sheetInfo?.demo && (
-              <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-3">
+              <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-3 print:hidden">
                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
                   Sample data — Google Sheets isn’t connected in this environment. Live numbers appear once the sheet is linked.
                 </p>
@@ -276,7 +357,7 @@ export default function RunSheetPage() {
             )}
 
             {/* Search */}
-            <div className="relative">
+            <div className="relative print:hidden">
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-2 focus-within:ring-2 focus-within:ring-red-400 focus-within:border-red-400 transition-shadow">
                 <div className="flex items-center gap-3 px-3">
                   <svg className="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -342,7 +423,7 @@ export default function RunSheetPage() {
             </div>
 
             {/* Summary + margin */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 print:hidden">
               <Stat label="Items" value={String(totals.lines)} />
               <Stat label="Units to run" value={String(totals.units)} />
               <Stat label="Projected at start" value={money(totals.projected)} accent />
@@ -367,7 +448,7 @@ export default function RunSheetPage() {
             </div>
 
             {saveFailed && (
-              <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-5 py-3">
+              <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-5 py-3 print:hidden">
                 <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
                   Couldn’t save your last change. What’s on screen is still correct — refresh once you’re back online to re-sync.
                 </p>
@@ -375,7 +456,7 @@ export default function RunSheetPage() {
             )}
 
             {totals.oversold > 0 && (
-              <div className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-5 py-3 flex items-center gap-2">
+              <div className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-5 py-3 flex items-center gap-2 print:hidden">
                 <svg className="w-4 h-4 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
                 <p className="text-sm font-bold text-red-700 dark:text-red-400">
                   {totals.oversold} item{totals.oversold > 1 ? 's are' : ' is'} set to run more than you have in stock.
@@ -405,7 +486,7 @@ export default function RunSheetPage() {
                 {rows.map(row => (
                   <div
                     key={row.entry.modelNum}
-                    className={`grid grid-cols-2 md:grid-cols-12 gap-4 px-5 py-4 items-center border-b border-slate-50 dark:border-slate-700/50 last:border-0 transition-colors ${
+                    className={`grid grid-cols-2 md:grid-cols-12 gap-4 px-5 py-4 items-center border-b border-slate-50 dark:border-slate-700/50 last:border-0 transition-colors print:break-inside-avoid ${
                       justAdded === row.entry.modelNum ? 'bg-red-50/70 dark:bg-red-500/10' : row.left < 0 ? 'bg-red-50/40 dark:bg-red-900/10' : ''
                     }`}
                   >
@@ -430,12 +511,13 @@ export default function RunSheetPage() {
                     </div>
 
                     {/* Stepper */}
-                    <div className="col-span-2 md:col-span-3 flex items-center md:justify-center gap-2">
-                      <span className="md:hidden text-[10px] font-bold uppercase text-slate-400 w-20">Run</span>
+                    <div className="col-span-2 md:col-span-3 flex items-center md:justify-center gap-2 print:justify-center">
+                      <span className="md:hidden text-[10px] font-bold uppercase text-slate-400 w-20 print:hidden">Run</span>
+                      <span className="hidden print:inline text-lg font-black tabular-nums text-black">{row.entry.ran}</span>
                       <button
                         onClick={() => setRan(row.entry.modelNum, row.entry.ran - 1)}
                         aria-label={`Run one fewer ${row.entry.modelNum}`}
-                        className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                        className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors print:hidden"
                       >
                         −
                       </button>
@@ -445,12 +527,12 @@ export default function RunSheetPage() {
                         value={row.entry.ran}
                         onChange={e => setRan(row.entry.modelNum, parseInt(e.target.value) || 0)}
                         aria-label={`Quantity of ${row.entry.modelNum} run this stream`}
-                        className="w-16 h-9 text-center text-lg font-black tabular-nums rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="print:hidden w-16 h-9 text-center text-lg font-black tabular-nums rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button
                         onClick={() => setRan(row.entry.modelNum, row.entry.ran + 1)}
                         aria-label={`Run one more ${row.entry.modelNum}`}
-                        className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                        className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors print:hidden"
                       >
                         +
                       </button>
@@ -476,7 +558,7 @@ export default function RunSheetPage() {
                       <button
                         onClick={() => setRan(row.entry.modelNum, 0)}
                         aria-label={`Remove ${row.entry.modelNum} from the sheet`}
-                        className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors"
+                        className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors print:hidden"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
