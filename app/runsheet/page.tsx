@@ -19,13 +19,13 @@ function localDate(): string {
 
 /**
  * Starting bid that targets a profit margin: margin is profit over revenue,
- * so price = cost / (1 - margin). Rounded DOWN to the nearest 50¢ — a
- * starting bid is a floor for a live auction, not the final sale price, so
- * it's kept on the friendly side rather than rounded up past the target.
+ * so price = cost / (1 - margin). Rounded DOWN to a whole dollar — a
+ * starting bid is a floor for a live auction to climb from, not the final
+ * sale price, so it's kept on the friendly side rather than rounded up.
  */
 function startingBid(cost: number, margin: number): number {
   if (!cost || margin <= 0 || margin >= 1) return 0;
-  return Math.floor((cost / (1 - margin)) * 2) / 2;
+  return Math.floor(cost / (1 - margin));
 }
 
 function money(n: number): string {
