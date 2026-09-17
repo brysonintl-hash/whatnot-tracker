@@ -212,7 +212,7 @@ export default function RunSheetPage() {
     const lines = rows.map(r =>
       `${r.entry.modelNum} — ran ${r.entry.ran} of ${r.inStock}${r.bid ? ` · start ${money(r.bid)}` : ''}${r.description ? ` · ${r.description}` : ''}`);
     const text = [
-      `Run Sheet — ${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`,
+      `Run in Livestream — ${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`,
       ...lines,
       '',
       `${totals.lines} items · ${totals.units} units · ${money(totals.projected)} projected at start bids`,
@@ -256,7 +256,7 @@ export default function RunSheetPage() {
     ]);
     // Leading BOM so Excel opens the UTF-8 file (₤, ×, etc. in descriptions) without mangling it.
     const csv = '﻿' + [header, ...body].map(row => row.map(esc).join(',')).join('\r\n');
-    downloadFile(`run-sheet-${date}.csv`, csv, 'text/csv;charset=utf-8;');
+    downloadFile(`run-in-livestream-${date}.csv`, csv, 'text/csv;charset=utf-8;');
     setExportOpen(false);
   }
 
@@ -282,7 +282,7 @@ export default function RunSheetPage() {
         {/* pl-16 on mobile clears the Sidebar's floating hamburger button. */}
         <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-16 pr-4 md:px-6 flex-shrink-0 shadow-sm gap-4 print:hidden">
           <div className="min-w-0">
-            <h1 className="text-lg font-black text-white leading-none">Run Sheet</h1>
+            <h1 className="text-lg font-black text-white leading-none">Run in Livestream</h1>
             <p className="text-xs text-slate-400 mt-1 truncate">{today} · {session.name}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -330,7 +330,7 @@ export default function RunSheetPage() {
 
             {/* Print-only heading — screen shows this in the header bar instead */}
             <div className="hidden print:block mb-6">
-              <h1 className="text-2xl font-black text-black">Run Sheet — {today}</h1>
+              <h1 className="text-2xl font-black text-black">Run in Livestream — {today}</h1>
               <p className="text-sm text-slate-600 mt-1">
                 {session.name} · {totals.lines} items · {totals.units} units · {money(totals.projected)} projected at start bids · {Math.round(margin * 100)}% margin
               </p>

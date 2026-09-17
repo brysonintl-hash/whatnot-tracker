@@ -65,7 +65,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
-      { href: '/runsheet', label: 'Run Sheet', icon: I.clip },
+      { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
@@ -92,7 +92,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
-      { href: '/runsheet', label: 'Run Sheet', icon: I.clip },
+      { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
@@ -138,7 +138,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
-      { href: '/runsheet', label: 'Run Sheet', icon: I.clip },
+      { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/script', label: 'Script Reader', icon: I.script },
       { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
