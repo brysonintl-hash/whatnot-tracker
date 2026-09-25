@@ -102,9 +102,16 @@ export async function GET(req: NextRequest) {
 
     writeData('host-tiers.json', tiers);
     return NextResponse.json({ hosts });
-  } catch {
-    // Fallback to stored tiers if sales data unavailable
-    const hosts = Object.entries(tiers).map(([name, tierRate]) => ({ name, tierRate, profitPerHour: null }));
-    return NextResponse.json({ hosts });
+  } catch (e) {
+    // Previously this fell back to the stored tier list, which the UI then
+    // labelled "Performed this day" — so a failed read looked like a real
+    // (and wrong) roster, quietly dropping hosts who actually worked that
+    // day. Say nothing rather than say something false; the page shows the
+    // error instead.
+    console.error('calculator/schedule: sales read failed', e);
+    return NextResponse.json({
+      hosts: [],
+      error: 'Could not read the sales sheet, so the hosts for this date are unknown. Pick the host manually, or try again in a moment.',
+    });
   }
 }

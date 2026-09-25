@@ -29,12 +29,40 @@ function parseHost(val: string | undefined): string {
   return v;
 }
 
+// One pull of the sales workbook means a metadata call plus a batchGet of
+// every date tab, so it's slow and counts against the Sheets API quota. The
+// pay calculator fires one per date-picker segment (month, then day), and
+// Performance/Reports pull the same data on load — which is what pushes these
+// calls into timeouts. Nothing in this app writes to the sales sheet, so a
+// short in-process cache is safe, and sharing the in-flight promise collapses
+// a burst of overlapping requests into a single download.
+const SALES_TTL_MS = 60_000;
+let salesCache: { at: number; data: SaleOrder[] } | null = null;
+let salesInFlight: Promise<SaleOrder[]> | null = null;
+
 export async function getSalesData(): Promise<SaleOrder[]> {
   if (isDemo()) return sampleSales;
 
   const auth = getAuth();
   if (!auth) return sampleSales;
 
+  if (salesCache && Date.now() - salesCache.at < SALES_TTL_MS) return salesCache.data;
+  if (salesInFlight) return salesInFlight;
+
+  // Failures are deliberately not cached — the next caller retries.
+  salesInFlight = fetchSalesFromSheets(auth)
+    .then(data => {
+      salesCache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      salesInFlight = null;
+    });
+
+  return salesInFlight;
+}
+
+async function fetchSalesFromSheets(auth: NonNullable<ReturnType<typeof getAuth>>): Promise<SaleOrder[]> {
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.SALES_SHEET_ID;
   if (!spreadsheetId) throw new Error('SALES_SHEET_ID environment variable is not set');

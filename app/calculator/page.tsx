@@ -320,7 +320,7 @@ type Row = {
   id: string; date: string; hostName: string;
   timeIn: string; timeOut: string; lsInput: string;
   baseRate: string; tierRate: number; tip: number;
-  scheduleHosts: ScheduleHost[]; loadingSchedule: boolean;
+  scheduleHosts: ScheduleHost[]; loadingSchedule: boolean; scheduleError: string;
 };
 
 function newRow(defaults?: Partial<Row>): Row {
@@ -329,7 +329,7 @@ function newRow(defaults?: Partial<Row>): Row {
     date: new Date().toISOString().split('T')[0],
     hostName: '', timeIn: '09:00', timeOut: '15:00',
     lsInput: '', baseRate: '', tierRate: 20, tip: 0,
-    scheduleHosts: [], loadingSchedule: false,
+    scheduleHosts: [], loadingSchedule: false, scheduleError: '',
     ...defaults,
   };
 }
@@ -345,6 +345,7 @@ export default function CalculatorPage() {
   const [results, setResults] = useState<{ row: Row; calc: CalcResult }[] | null>(null);
   const [copied, setCopied] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const scheduleSeq = useRef<Record<string, number>>({});
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
@@ -366,12 +367,20 @@ export default function CalculatorPage() {
 
   async function onDateChange(id: string, date: string, currentRows: Row[]) {
     const currentHostName = currentRows.find(r => r.id === id)?.hostName;
-    updateRow(id, { date, loadingSchedule: true, scheduleHosts: [] });
+    // The date picker is three separate selects, so changing month then day
+    // fires two lookups at once. Without this token the slower one can land
+    // last and leave the row showing a different date's hosts.
+    const seq = (scheduleSeq.current[id] ?? 0) + 1;
+    scheduleSeq.current[id] = seq;
+
+    updateRow(id, { date, loadingSchedule: true, scheduleHosts: [], scheduleError: '' });
     try {
       const res = await fetch(`/api/calculator/schedule?date=${date}`);
-      const data: { hosts: ScheduleHost[] } = await res.json();
+      const data: { hosts: ScheduleHost[]; error?: string } = await res.json();
+      if (scheduleSeq.current[id] !== seq) return; // a newer date was picked — this answer is stale
+
       const scheduleHosts = data.hosts ?? [];
-      const updates: Partial<Row> = { loadingSchedule: false, scheduleHosts };
+      const updates: Partial<Row> = { loadingSchedule: false, scheduleHosts, scheduleError: data.error ?? '' };
       // If current host is in the new schedule, auto-update their tier from performance data
       if (currentHostName) {
         const match = scheduleHosts.find(h => h.name === currentHostName);
@@ -384,7 +393,8 @@ export default function CalculatorPage() {
       }
       updateRow(id, updates);
     } catch {
-      updateRow(id, { loadingSchedule: false });
+      if (scheduleSeq.current[id] !== seq) return;
+      updateRow(id, { loadingSchedule: false, scheduleError: 'Could not load hosts for this date. Pick the host manually.' });
     }
   }
 
@@ -530,11 +540,15 @@ export default function CalculatorPage() {
                               </select>
                               <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
                             </div>
-                            {selectedSchedHost?.profitPerHour && (
+                            {row.scheduleError ? (
+                              <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5 ml-1 max-w-[148px] leading-tight">
+                                {row.scheduleError}
+                              </div>
+                            ) : selectedSchedHost?.profitPerHour ? (
                               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 ml-1">
                                 ${selectedSchedHost.profitPerHour}/hr profit
                               </div>
-                            )}
+                            ) : null}
                           </td>
 
                           {/* Time In */}
