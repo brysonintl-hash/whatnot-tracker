@@ -580,6 +580,81 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
 const MARGIN_LOW    = 20;
 const MARGIN_TARGET = 30;
 
+/**
+ * The failed / cancelled rows, listed out.
+ *
+ * They're kept out of sales, profit and margin because the money never
+ * landed — but they still ran in the show, so the team needs to see which
+ * ones they were and what they were worth.
+ */
+function VoidedOrdersSection({ orders }: { orders: Order[] }) {
+  const voided = orders.filter(isVoided);
+  if (voided.length === 0) return null;
+
+  const uncollected = voided.reduce((sum, o) => sum + o.sold, 0);
+  const failedCount = voided.filter(o => (o.status ?? '').toLowerCase().includes('fail')).length;
+  const cancelledCount = voided.length - failedCount;
+
+  const parts = [
+    failedCount > 0 ? `${failedCount} failed` : '',
+    cancelledCount > 0 ? `${cancelledCount} cancelled` : '',
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className="mt-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-base font-black text-slate-900 dark:text-white mb-0.5">Failed &amp; cancelled orders</p>
+          <p className="text-xs text-slate-400">
+            {parts} · these ran in the show but never paid out, so they&apos;re left out of sales, profit and margin.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Not collected</p>
+          <p className="text-lg font-black text-red-500 tabular-nums">${fmtMoney(uncollected)}</p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 dark:border-slate-700">
+              {['Item', 'Model #', 'Buyer', 'Host', 'Amount', 'Status'].map(h => (
+                <th key={h} className={`text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4 bg-slate-50 dark:bg-slate-900/50 ${h === 'Amount' ? 'text-right' : 'text-left'}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {voided.map((o, i) => {
+              const isFail = (o.status ?? '').toLowerCase().includes('fail');
+              return (
+                <tr key={`${o.orderId}-${i}`} className="border-b border-slate-50 dark:border-slate-700/50 last:border-0">
+                  <td className="py-3 px-4 max-w-sm">
+                    <span className="block text-slate-700 dark:text-slate-200 truncate" title={o.productName}>{o.productName || '—'}</span>
+                  </td>
+                  <td className="py-3 px-4 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.modelNum || '—'}</td>
+                  <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.buyer || '—'}</td>
+                  <td className="py-3 px-4 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{o.host || '—'}</td>
+                  <td className="py-3 px-4 text-right font-bold text-slate-700 dark:text-slate-200 tabular-nums whitespace-nowrap">${fmtMoney(o.sold)}</td>
+                  <td className="py-3 px-4">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      isFail
+                        ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                        : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                    }`}>
+                      {isFail ? 'FAILED' : 'CANCELLED'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function MarginAnalyzer({ orders, date }: { orders: Order[]; date?: string }) {
   const [showTable, setShowTable] = useState(false);
 
@@ -1587,6 +1662,8 @@ export default function PerformancePage() {
                       );
                     })}
                   </div>
+
+                  <VoidedOrdersSection orders={hostDayOrders} />
 
                   {/* Margin Analyzer — admin / manager / host only.
                       Failed/cancelled rows have no profit recorded, so they'd
