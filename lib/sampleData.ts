@@ -15,6 +15,8 @@ export type SaleOrder = {
   host: string;
   livestream: number;
   shippingAddress?: string;
+  /** Column P on the WN sheet: blank = good sale, else "failed" / "cancelled". */
+  status?: string;
 };
 
 export type InventoryItem = {

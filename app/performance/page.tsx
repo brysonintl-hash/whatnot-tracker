@@ -10,8 +10,19 @@ type Session = { username: string; role: Role; name: string };
 type Order = {
   tab: string; orderId: string; buyer: string; modelNum: string; productName: string;
   qty: number; sold: number; cost: number; earn: number; profit: number; margin: number;
-  timestamp: string; host: string; livestream: number;
+  timestamp: string; host: string; livestream: number; status?: string;
 };
+
+/**
+ * Column P on the WN sheet. Blank means the sale went through; "failed"
+ * (payment declined) and "cancelled" mean the item ran in the show but the
+ * money never landed — those rows still carry a Sold and Cost figure, so
+ * counting them would overstate revenue and drag margin down.
+ */
+function isVoided(o: { status?: string }): boolean {
+  const s = (o.status ?? '').toLowerCase().trim();
+  return s.includes('fail') || s.includes('cancel');
+}
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
 
@@ -226,6 +237,10 @@ type HostStat = {
   host: string;
   livestream: number;
   colorIdx: number;
+  /** Every item that went up in the show — paid, failed or cancelled. */
+  itemsRan: number;
+  /** How many of those were failed/cancelled, and so excluded from the money figures. */
+  voidedCount: number;
   totalSales: number;
   totalProfit: number;
   totalOrders: number;
@@ -246,6 +261,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
   const map: Record<string, {
     host: string; livestream: number;
     sales: number; profit: number; orders: number; units: number;
+    ran: number; voided: number;
     timestamps: number[];
     durStr: number | null;
     colorIdx: number;
@@ -259,12 +275,19 @@ function computeHostStats(orders: Order[]): HostStat[] {
 
     if (!(h in hostColorMap)) hostColorMap[h] = colorIdx++;
     if (!map[key]) {
-      map[key] = { host: h, livestream: ls, sales: 0, profit: 0, orders: 0, units: 0, timestamps: [], durStr: null, colorIdx: hostColorMap[h] };
+      map[key] = { host: h, livestream: ls, sales: 0, profit: 0, orders: 0, units: 0, ran: 0, voided: 0, timestamps: [], durStr: null, colorIdx: hostColorMap[h] };
     }
-    map[key].sales += o.sold;
-    map[key].profit += o.profit;
-    map[key].orders++;
-    map[key].units += o.qty;
+
+    // Every row is an item that ran in the show, whether or not it paid out.
+    map[key].ran++;
+    if (isVoided(o)) {
+      map[key].voided++;
+    } else {
+      map[key].sales += o.sold;
+      map[key].profit += o.profit;
+      map[key].orders++;
+      map[key].units += o.qty;
+    }
 
     const ts = parseTimestamp(o.timestamp);
     if (ts !== null) {
@@ -295,6 +318,8 @@ function computeHostStats(orders: Order[]): HostStat[] {
         host: d.host,
         livestream: d.livestream,
         colorIdx: d.colorIdx,
+        itemsRan: d.ran,
+        voidedCount: d.voided,
         totalSales: d.sales,
         totalProfit: d.profit,
         totalOrders: d.orders,
@@ -1372,7 +1397,7 @@ export default function PerformancePage() {
                         {isoToDisplay(selectedDate)}
                       </h2>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Daily Tier Performance · {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} · {hostDayOrders.length} orders
+                        Daily Tier Performance · {visibleHostStats.length} livestream{visibleHostStats.length !== 1 ? 's' : ''} · {hostDayOrders.length} items ran
                       </p>
                     </div>
                     <button
@@ -1446,6 +1471,7 @@ export default function PerformancePage() {
                       const profitPerHour = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
                       const revenuePerHour = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
                       const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+                      const itemsRanPerHour = hs.durationHours > 0 ? hs.itemsRan / hs.durationHours : null;
                       const tier          = getPayTier(profitPerHour);
                       const estimatedPay  = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
                       const parsedBase    = parseFloat(basePayRate);
@@ -1454,12 +1480,14 @@ export default function PerformancePage() {
 
                       const stats = [
                         { label: 'Total Sales',      value: `$${fmtMoney(hs.totalSales)}`,  valueClass: 'text-slate-900 dark:text-white font-black' },
+                        { label: 'Items Ran',        value: String(hs.itemsRan), valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Orders / Units',   value: hs.totalOrders === hs.totalUnits ? `${hs.totalOrders}` : `${hs.totalOrders} / ${hs.totalUnits}`, valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Show Duration',    value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Gross Profit',     value: `$${fmtMoney(hs.totalProfit)}`,  valueClass: `font-black ${hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}` },
                         { label: 'Overall Margin',   value: `${hs.overallMargin.toFixed(1)}%`, valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}` },
                         { label: 'Profit per Hour',  value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—', valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}` },
                         { label: 'Revenue per Hour', value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—', valueClass: 'text-slate-500 dark:text-slate-400 font-bold' },
+                        { label: 'Items Ran per Hour', value: itemsRanPerHour !== null ? String(Math.round(itemsRanPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Orders per Hour',  value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                       ];
 
@@ -1516,6 +1544,11 @@ export default function PerformancePage() {
                                   <span className={`text-sm ${s.valueClass}`}>{s.value}</span>
                                 </div>
                               ))}
+                              {hs.voidedCount > 0 && (
+                                <p className="text-[10px] text-slate-400 leading-snug pt-1">
+                                  {hs.voidedCount} failed/cancelled {hs.voidedCount === 1 ? 'item' : 'items'} counted in Items Ran but left out of sales, profit and margin.
+                                </p>
+                              )}
                             </div>
 
                             {/* Pay rate footer */}
@@ -1555,9 +1588,11 @@ export default function PerformancePage() {
                     })}
                   </div>
 
-                  {/* Margin Analyzer — admin / manager / host only */}
+                  {/* Margin Analyzer — admin / manager / host only.
+                      Failed/cancelled rows have no profit recorded, so they'd
+                      otherwise be flagged here as underpriced items. */}
                   {(session?.role === 'admin' || session?.role === 'manager' || session?.role === 'host') && (
-                    <MarginAnalyzer orders={hostDayOrders} date={selectedDate} />
+                    <MarginAnalyzer orders={hostDayOrders.filter(o => !isVoided(o))} date={selectedDate} />
                   )}
 
                   <TierHistorySection

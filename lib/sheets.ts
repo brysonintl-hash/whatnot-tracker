@@ -106,6 +106,7 @@ async function fetchSalesFromSheets(auth: NonNullable<ReturnType<typeof getAuth>
           host: parseHost(row[12]) || '',
           livestream: parseInt(row[13]) || 1,
           shippingAddress: row[14] || '',
+          status: row[15] || '',
         });
       }
     });
