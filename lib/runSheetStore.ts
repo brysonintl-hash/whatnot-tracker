@@ -27,6 +27,26 @@ export function getEntries(date: string, username: string): RunEntry[] {
   return readAll()[date]?.[username] ?? [];
 }
 
+/**
+ * Items run per day, per host — date → username → total units run.
+ *
+ * This is the only record of items that were *run* rather than *sold*: the WN
+ * sales sheet has a row per completed order, so an auction nobody bought
+ * leaves no trace there. Performance reads this to show sell-through.
+ */
+export function getRunTotalsByDate(): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const [date, byUser] of Object.entries(readAll())) {
+    for (const [username, entries] of Object.entries(byUser)) {
+      const total = entries.reduce((sum, e) => sum + (Number(e.ran) || 0), 0);
+      if (total <= 0) continue;
+      if (!out[date]) out[date] = {};
+      out[date][username] = total;
+    }
+  }
+  return out;
+}
+
 function save(date: string, username: string, entries: RunEntry[]): RunEntry[] {
   const all = readAll();
   all[date] = { ...(all[date] ?? {}), [username]: entries };

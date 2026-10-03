@@ -1197,6 +1197,9 @@ export default function PerformancePage() {
   const [session, setSession] = useState<Session | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tkEntries, setTkEntries] = useState<TKEntry[]>([]);
+  // date (YYYY-MM-DD) -> lowercased host name -> items run that day (sold + unsold).
+  // Empty for any show where the host didn't keep a Run in Livestream sheet.
+  const [itemsRan, setItemsRan] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
@@ -1215,10 +1218,12 @@ export default function PerformancePage() {
     Promise.all([
       fetch('/api/sales', { cache: 'no-store' }).then(r => r.json()),
       fetch('/api/timekeeping').then(r => r.json()),
-    ]).then(([salesData, tkData]) => {
+      fetch('/api/performance/items-ran').then(r => r.ok ? r.json() : { byDate: {} }).catch(() => ({ byDate: {} })),
+    ]).then(([salesData, tkData, ranData]) => {
       if (salesData?.error) setError(salesData.error);
       else setOrders(Array.isArray(salesData) ? salesData : []);
       setTkEntries(Array.isArray(tkData) ? tkData : []);
+      setItemsRan(ranData?.byDate ?? {});
       setLoading(false);
     }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
@@ -1262,6 +1267,24 @@ export default function PerformancePage() {
       return h === myName || h.includes(myName) || myName.includes(h);
     });
   }, [hostStats, session]);
+
+  // Items run (sold + unsold) for the selected date, keyed by lowercased host.
+  // The Run in Livestream sheet is kept per day rather than per livestream, so
+  // when a host ran more than one show that day the total can't be attributed
+  // to either one — drop it instead of double-counting it on both cards.
+  const ranByHost = useMemo(() => {
+    const forDate = itemsRan[selectedDate] ?? {};
+    const streams: Record<string, number> = {};
+    for (const hs of hostStats) {
+      const k = hs.host.toLowerCase().trim();
+      streams[k] = (streams[k] ?? 0) + 1;
+    }
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(forDate)) {
+      if (streams[k] === 1 && v > 0) out[k] = v;
+    }
+    return out;
+  }, [itemsRan, selectedDate, hostStats]);
 
   const hostDayOrders = useMemo(() => {
     if (session?.role !== 'host') return dayOrders;
@@ -1446,6 +1469,12 @@ export default function PerformancePage() {
                       const profitPerHour = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
                       const revenuePerHour = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
                       const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+                      // Sold vs run. "Run" only exists where a host kept a Run in
+                      // Livestream sheet — the WN sales sheet has no row for an item
+                      // that went up and didn't sell.
+                      const itemsRanCount   = ranByHost[hs.host.toLowerCase().trim()] ?? null;
+                      const itemsRanPerHour = itemsRanCount !== null && hs.durationHours > 0 ? itemsRanCount / hs.durationHours : null;
+                      const sellThrough     = itemsRanCount !== null && itemsRanCount > 0 ? (hs.totalUnits / itemsRanCount) * 100 : null;
                       const tier          = getPayTier(profitPerHour);
                       const estimatedPay  = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
                       const parsedBase    = parseFloat(basePayRate);
@@ -1454,13 +1483,16 @@ export default function PerformancePage() {
 
                       const stats = [
                         { label: 'Total Sales',      value: `$${fmtMoney(hs.totalSales)}`,  valueClass: 'text-slate-900 dark:text-white font-black' },
-                        { label: 'Orders / Units',   value: hs.totalOrders === hs.totalUnits ? `${hs.totalOrders}` : `${hs.totalOrders} / ${hs.totalUnits}`, valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Items Ran',        value: itemsRanCount !== null ? String(itemsRanCount) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Items Sold',       value: hs.totalOrders === hs.totalUnits ? `${hs.totalOrders}` : `${hs.totalOrders} / ${hs.totalUnits}`, valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Sell-Through %',   value: sellThrough !== null ? `${sellThrough.toFixed(1)}%` : '—', valueClass: sellThrough === null ? 'text-slate-700 dark:text-slate-300 font-bold' : `font-black ${sellThrough >= 60 ? 'text-emerald-600 dark:text-emerald-400' : sellThrough >= 35 ? 'text-amber-500' : 'text-red-500'}` },
                         { label: 'Show Duration',    value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Gross Profit',     value: `$${fmtMoney(hs.totalProfit)}`,  valueClass: `font-black ${hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}` },
                         { label: 'Overall Margin',   value: `${hs.overallMargin.toFixed(1)}%`, valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}` },
                         { label: 'Profit per Hour',  value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—', valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}` },
                         { label: 'Revenue per Hour', value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—', valueClass: 'text-slate-500 dark:text-slate-400 font-bold' },
-                        { label: 'Orders per Hour',  value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Items Ran per Hour',  value: itemsRanPerHour !== null ? String(Math.round(itemsRanPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Items Sold per Hour', value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                       ];
 
                       return (
@@ -1516,6 +1548,11 @@ export default function PerformancePage() {
                                   <span className={`text-sm ${s.valueClass}`}>{s.value}</span>
                                 </div>
                               ))}
+                              {itemsRanCount === null && (
+                                <p className="text-[10px] text-slate-400 leading-snug pt-1">
+                                  Items ran isn’t tracked for this show — it comes from the host’s Run in Livestream sheet, not the sales sheet.
+                                </p>
+                              )}
                             </div>
 
                             {/* Pay rate footer */}
