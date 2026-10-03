@@ -1482,6 +1482,7 @@ export default function PerformancePage() {
                         { label: 'Total Sales',      value: `$${fmtMoney(hs.totalSales)}`,  valueClass: 'text-slate-900 dark:text-white font-black' },
                         { label: 'Items Ran',        value: String(hs.itemsRan), valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Orders / Units',   value: hs.totalOrders === hs.totalUnits ? `${hs.totalOrders}` : `${hs.totalOrders} / ${hs.totalUnits}`, valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        { label: 'Failed / Cancelled', value: String(hs.voidedCount), valueClass: hs.voidedCount > 0 ? 'text-red-500 font-black' : 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Show Duration',    value: hs.durationHours > 0 ? fmtDuration(hs.durationHours) : hs.totalOrders < 2 ? 'N/A (1 order)' : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
                         { label: 'Gross Profit',     value: `$${fmtMoney(hs.totalProfit)}`,  valueClass: `font-black ${hs.totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}` },
                         { label: 'Overall Margin',   value: `${hs.overallMargin.toFixed(1)}%`, valueClass: `font-black ${hs.overallMargin >= 15 ? 'text-emerald-600 dark:text-emerald-400' : hs.overallMargin >= 0 ? 'text-amber-500' : 'text-red-500'}` },
@@ -1546,7 +1547,7 @@ export default function PerformancePage() {
                               ))}
                               {hs.voidedCount > 0 && (
                                 <p className="text-[10px] text-slate-400 leading-snug pt-1">
-                                  {hs.voidedCount} failed/cancelled {hs.voidedCount === 1 ? 'item' : 'items'} counted in Items Ran but left out of sales, profit and margin.
+                                  Failed and cancelled items count toward Items Ran but are left out of sales, profit and margin.
                                 </p>
                               )}
                             </div>
