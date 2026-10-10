@@ -84,6 +84,11 @@ export default function SalesPage() {
 
   const chartOpts = useMemo(() => ({
     responsive: true,
+    // Without this Chart.js keeps a 2:1 ratio, so on a wide screen the chart
+    // grows to roughly half the container width in height and pushes the date
+    // axis below the fold — zooming the browser out only made it wider, and
+    // therefore taller. Height now comes from the wrapper instead.
+    maintainAspectRatio: false,
     plugins: {
       legend: { labels: { color: chartText } },
       zoom: {
@@ -242,13 +247,15 @@ export default function SalesPage() {
                     Reset Zoom
                   </button>
                 </div>
-                <Line ref={lineChartRef} data={{
-                  labels: byTab.map(([tab]) => tab),
-                  datasets: [
-                    { label: 'Sales ($)', data: byTab.map(([, v]) => v.sales), borderColor: '#F59E0B', backgroundColor: isDark ? 'rgba(245,158,11,0.1)' : '#FEF3C7', tension: 0.3, fill: true },
-                    { label: 'Profit ($)', data: byTab.map(([, v]) => v.profit), borderColor: '#EF4444', backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#FEE2E2', tension: 0.3, fill: true },
-                  ],
-                }} options={chartOpts} />
+                <div className="h-[260px] sm:h-[300px] lg:h-[340px]">
+                  <Line ref={lineChartRef} data={{
+                    labels: byTab.map(([tab]) => tab),
+                    datasets: [
+                      { label: 'Sales ($)', data: byTab.map(([, v]) => v.sales), borderColor: '#F59E0B', backgroundColor: isDark ? 'rgba(245,158,11,0.1)' : '#FEF3C7', tension: 0.3, fill: true },
+                      { label: 'Profit ($)', data: byTab.map(([, v]) => v.profit), borderColor: '#EF4444', backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#FEE2E2', tension: 0.3, fill: true },
+                    ],
+                  }} options={chartOpts} />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -309,7 +316,7 @@ export default function SalesPage() {
                       {topBuyers.map(([buyer, d], i) => (
                         <tr key={buyer} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                           <td className="py-2 px-2 text-slate-400 text-xs font-bold">{i + 1}</td>
-                          <td className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-xs">{buyer}</td>
+                          <td className="py-2 px-2 font-black text-slate-900 dark:text-white text-xs">{buyer}</td>
                           <td className="py-2 px-2 text-right text-slate-400 text-xs">{d.orders}</td>
                           <td className="py-2 px-2 text-right font-black text-amber-500 text-xs">${fmt(d.spent)}</td>
                         </tr>
