@@ -19,6 +19,16 @@ export type SaleOrder = {
   status?: string;
 };
 
+/**
+ * "failed" (payment declined) and "cancelled" rows still carry a Sold and Cost
+ * figure, so counting them overstates revenue and drags margin down. The item
+ * did run in the show, but the money never landed.
+ */
+export function isVoided(o: { status?: string }): boolean {
+  const s = (o.status ?? '').toLowerCase().trim();
+  return s.includes('fail') || s.includes('cancel');
+}
+
 export type InventoryItem = {
   rowIndex: number;
   imageUrl: string;

@@ -4,9 +4,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
+import { MARGIN_GATE_PCT } from '@/lib/payTiers';
 
 type Session = { username: string; role: Role; name: string };
-type ScheduleHost = { name: string; tierRate: number; profitPerHour: number | null };
+type ScheduleHost = { name: string; tierRate: number; profitPerHour: number | null; marginPct?: number | null };
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -545,8 +546,17 @@ export default function CalculatorPage() {
                                 {row.scheduleError}
                               </div>
                             ) : selectedSchedHost?.profitPerHour ? (
-                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 ml-1">
-                                ${selectedSchedHost.profitPerHour}/hr profit
+                              <div className="text-[10px] font-semibold mt-0.5 ml-1 leading-tight">
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  ${selectedSchedHost.profitPerHour}/hr profit
+                                </span>
+                                {typeof selectedSchedHost.marginPct === 'number' && (
+                                  <span className={selectedSchedHost.marginPct >= MARGIN_GATE_PCT
+                                    ? 'text-slate-400 dark:text-slate-500'
+                                    : 'text-amber-600 dark:text-amber-400'}>
+                                    {' · '}{selectedSchedHost.marginPct}% margin
+                                  </span>
+                                )}
                               </div>
                             ) : null}
                           </td>

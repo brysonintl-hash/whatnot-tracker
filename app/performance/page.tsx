@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
+import { PAY_TIERS, getPayTier, resolvePayTier, MARGIN_GATE_PCT, MARGIN_GATE_FROM_PROFIT } from '@/lib/payTiers';
+import { isVoided } from '@/lib/sampleData';
+import { BUSINESS_TZ, parseTimestamp, parseDurationStr, MAX_GAP_MS } from '@/lib/hostDay';
 
 type Session = { username: string; role: Role; name: string };
 type Order = {
@@ -12,17 +15,6 @@ type Order = {
   qty: number; sold: number; cost: number; earn: number; profit: number; margin: number;
   timestamp: string; host: string; livestream: number; status?: string;
 };
-
-/**
- * Column P on the WN sheet. Blank means the sale went through; "failed"
- * (payment declined) and "cancelled" mean the item ran in the show but the
- * money never landed — those rows still carry a Sold and Cost figure, so
- * counting them would overstate revenue and drag margin down.
- */
-function isVoided(o: { status?: string }): boolean {
-  const s = (o.status ?? '').toLowerCase().trim();
-  return s.includes('fail') || s.includes('cancel');
-}
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
 
@@ -56,78 +48,6 @@ function isoToDisplay(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-// The business's operating timezone — livestream show times are always shown in this zone,
-// regardless of what timezone the server or the viewer's own browser happens to be in.
-const BUSINESS_TZ = 'America/Los_Angeles';
-
-// Converts Y-M-D H:M:S wall-clock digits *as read in BUSINESS_TZ* into the correct UTC epoch ms.
-// DST-aware: uses the standard guess-then-correct trick instead of a fixed hour offset, since a
-// fixed offset would be wrong for half the year (PST vs PDT).
-function zonedToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number): number {
-  const utcGuess = Date.UTC(y, mo - 1, d, h, mi, s);
-  const dtf = new Intl.DateTimeFormat('en-US', {
-    timeZone: BUSINESS_TZ, hourCycle: 'h23',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
-  const parts = dtf.formatToParts(new Date(utcGuess));
-  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10);
-  const shownAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
-  return utcGuess + (utcGuess - shownAsUtc);
-}
-
-function parseTimestamp(ts: string): number | null {
-  if (!ts) return null;
-  const s = ts.trim();
-  if (!s) return null;
-
-  // "YYYY-MM-DD HH:MM:SS" / "YYYY/MM/DD HH:MM:SS" / ISO with T — a machine-generated
-  // timestamp (e.g. an export's `created_at`); treated as UTC, per ISO-8601 convention.
-  const iso = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[\sT](\d{1,2}):(\d{2}):(\d{2})/);
-  if (iso) {
-    const [, yr, mo, dy, hr, min, sec] = iso;
-    return Date.UTC(parseInt(yr), parseInt(mo) - 1, parseInt(dy), parseInt(hr), parseInt(min), parseInt(sec));
-  }
-
-  // "M/D/YYYY H:MM:SS" or "M/D/YYYY H:MM:SS AM/PM" — a naive wall-clock time with no
-  // timezone marker, meant as the business's own local time (BUSINESS_TZ).
-  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})(\s*[AP]M)?$/i);
-  if (us) {
-    let h = parseInt(us[4]);
-    const ampm = us[7]?.trim().toUpperCase();
-    if (ampm === 'PM' && h < 12) h += 12;
-    if (ampm === 'AM' && h === 12) h = 0;
-    return zonedToUtc(parseInt(us[3]), parseInt(us[1]), parseInt(us[2]), h, parseInt(us[5]), parseInt(us[6]));
-  }
-
-  // Google Sheets serial date (days since Dec 30, 1899) — returned when cell has no text format.
-  // Valid modern dates are serial ~40000–50000 (year 2009–2036). Serial numbers carry no
-  // timezone info; the fractional part is wall-clock time in BUSINESS_TZ (the spreadsheet's
-  // own timezone setting), not UTC.
-  if (/^\d+(\.\d+)?$/.test(s)) {
-    const serial = parseFloat(s);
-    if (serial > 40000 && serial < 60000) {
-      const MS_PER_DAY = 86400000;
-      const EPOCH_DIFF = 25569; // days from Dec 30, 1899 to Jan 1, 1970
-      const naive = new Date((serial - EPOCH_DIFF) * MS_PER_DAY);
-      return zonedToUtc(naive.getUTCFullYear(), naive.getUTCMonth() + 1, naive.getUTCDate(), naive.getUTCHours(), naive.getUTCMinutes(), naive.getUTCSeconds());
-    }
-  }
-
-  // Fallback: let JS Date try to parse it (handles ISO 8601 and other standard formats)
-  const fallback = new Date(s);
-  if (!isNaN(fallback.getTime())) return fallback.getTime();
-
-  return null;
-}
-
-// "02h 14m" or "2h 14m" or "00h 51m" → fractional hours
-function parseDurationStr(ts: string): number | null {
-  const m = ts.match(/^(\d+)h\s*(\d+)m$/);
-  if (m) return parseInt(m[1]) + parseInt(m[2]) / 60;
-  return null;
-}
-
 function fmtMoney(n: number) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -148,16 +68,6 @@ function fmtTimeRange(startTs: number | null, endTs: number | null): string {
 }
 
 // â"€â"€â"€ Host Pay Rate Tiers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-const PAY_TIERS = [
-  { min: 500, pay: 30, label: '$30/hr', color: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-700', text: 'text-emerald-700 dark:text-emerald-400' },
-  { min: 400, pay: 25, label: '$25/hr', color: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-900/20',   border: 'border-amber-200 dark:border-amber-700',   text: 'text-amber-700 dark:text-amber-400' },
-  { min: 300, pay: 20, label: '$20/hr', color: '#3B82F6', bg: 'bg-blue-50 dark:bg-blue-900/20',     border: 'border-blue-200 dark:border-blue-700',     text: 'text-blue-700 dark:text-blue-400' },
-];
-
-function getPayTier(profitPerHour: number | null) {
-  if (profitPerHour === null || profitPerHour <= 0) return null;
-  return PAY_TIERS.find(t => profitPerHour >= t.min) ?? null;
-}
 
 // â"€â"€â"€ PDF Report Generator â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function buildPDFHtml(
@@ -171,7 +81,7 @@ function buildPDFHtml(
 
   const hostRows = hostStats.map(hs => {
     const pph      = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
-    const tier     = getPayTier(pph);
+    const tier     = getPayTier(pph, hs.overallMargin);
     const payColor = tier?.color ?? '#94a3b8';
     return `<tr>
       <td><strong>${hs.host}</strong></td>
@@ -180,7 +90,7 @@ function buildPDFHtml(
       <td>${hs.overallMargin.toFixed(1)}%</td>
       <td>${hs.durationHours > 0 ? fmtDuration(hs.durationHours) : '—'}</td>
       <td>${pph !== null ? `$${fmt(pph)}/hr` : '—'}</td>
-      <td style="font-weight:900;color:${payColor}">${tier ? tier.label : '—'}</td>
+      <td style="font-weight:900;color:${payColor}">${tier ? tier.payLabel : '—'}</td>
       <td style="font-weight:900;color:${payColor}">${tier ? `$${fmt(tier.pay * hs.durationHours)}` : '—'}</td>
     </tr>`;
   }).join('');
@@ -250,9 +160,6 @@ type HostStat = {
   startTs: number | null;
   endTs: number | null;
 };
-
-// Gaps larger than this between consecutive orders are excluded from show duration
-const MAX_GAP_MS = 2 * 3600000; // 2 hours
 
 function computeHostStats(orders: Order[]): HostStat[] {
   let colorIdx = 0;
@@ -335,25 +242,9 @@ function computeHostStats(orders: Order[]): HostStat[] {
 
 // â"€â"€â"€ Pay Tier Board â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-type TierEntry = HostStat & { pph: number; tierNum: 1 | 2 | 3 };
+type TierEntry = HostStat & { pph: number; tierNum: number };
 
-const TIER_DISPLAY_CONFIG = [
-  {
-    num: 1 as const, payRate: 30, payLabel: '$30/hr', threshold: '≥ $500/hr profit',
-    gradFrom: '#78350F', gradTo: '#B45309',
-    avatarBg: '#D97706', avatarRing: '#FDE68A',
-  },
-  {
-    num: 2 as const, payRate: 25, payLabel: '$25/hr', threshold: '$400–499/hr profit',
-    gradFrom: '#1E293B', gradTo: '#64748B',
-    avatarBg: '#94A3B8', avatarRing: '#E2E8F0',
-  },
-  {
-    num: 3 as const, payRate: 20, payLabel: '$20/hr', threshold: '$300–399/hr profit',
-    gradFrom: '#92400E', gradTo: '#F59E0B',
-    avatarBg: '#F59E0B', avatarRing: '#FDE68A',
-  },
-];
+
 
 // Gradient config per rank position (1-indexed) — controls the card header background only
 const RANK_STYLES = [
@@ -369,14 +260,10 @@ function getRankStyle(rank: number) {
 
 const CROWN_PATH = 'M2.5 19h19v2h-19zm19.57-9.36c-.21-.8-1.04-1.28-1.84-1.06L14 10l-3.45-6.89c-.34-.68-1.15-.95-1.83-.61-.28.14-.51.37-.64.64L4.89 10 .78 8.58A1.5 1.5 0 00.04 10.8l3 9h18l3-9a1.5 1.5 0 00-2-1.16z';
 
-// Crown color reflects the host's pay tier for the day (Tier 1 Gold / Tier 2 Silver / Tier 3 Bronze),
-// not their sales-rank position — matches the "Tier 1 — Gold" etc. labels in the hover tooltip.
-function TierCrownIcon({ payRate }: { payRate?: number }) {
-  const colorClass =
-    payRate === 30 ? 'text-yellow-300' :   // Tier 1 — Gold
-    payRate === 25 ? 'text-slate-300' :    // Tier 2 — Silver
-    payRate === 20 ? 'text-orange-400' :   // Tier 3 — Bronze
-    'text-white/30';                       // No tier reached
+// Crown color reflects the host's pay tier for the day, not their sales-rank
+// position — each tier carries its own crown color in lib/payTiers.
+function TierCrownIcon({ tierNum }: { tierNum?: number }) {
+  const colorClass = PAY_TIERS.find(t => t.num === tierNum)?.crown ?? 'text-white/30';
   return (
     <svg className={`w-8 h-8 ${colorClass}`} fill="currentColor" viewBox="0 0 24 24">
       <path d={CROWN_PATH} />
@@ -389,10 +276,9 @@ function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
     .filter(hs => hs.durationHours > 0)
     .flatMap(hs => {
       const pph = hs.totalProfit / hs.durationHours;
-      const tier = getPayTier(pph);
+      const tier = getPayTier(pph, hs.overallMargin);
       if (!tier) return [] as TierEntry[];
-      const tierNum: 1 | 2 | 3 = tier.pay === 30 ? 1 : tier.pay === 25 ? 2 : 3;
-      return [{ ...hs, pph, tierNum }];
+      return [{ ...hs, pph, tierNum: tier.num }];
     });
 
   if (tieredEntries.length === 0) return null;
@@ -401,7 +287,7 @@ function PayTierBoard({ hostStats }: { hostStats: HostStat[] }) {
     <div className="mb-6">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Pay Tier Ranking</p>
       <div className="space-y-2.5">
-        {TIER_DISPLAY_CONFIG.map(cfg => {
+        {PAY_TIERS.map(cfg => {
           const hosts = tieredEntries.filter(e => e.tierNum === cfg.num);
           if (hosts.length === 0) return null;
           return (
@@ -472,16 +358,16 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
   }, [allOrders, myName]);
 
   const historyMap = useMemo(() => {
-    const result: Record<string, Record<string, { tierNum: 1 | 2 | 3; pph: number } | null>> = {};
+    const result: Record<string, Record<string, { tierNum: number; pph: number } | null>> = {};
     showDates.forEach(tab => {
       const dateOrders = allOrders.filter(o => o.tab === tab);
       const stats = computeHostStats(dateOrders);
       result[tab] = {};
       stats.forEach(hs => {
         const pph = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
-        const tier = getPayTier(pph);
+        const tier = getPayTier(pph, hs.overallMargin);
         if (tier && pph !== null) {
-          const tierNum: 1 | 2 | 3 = tier.pay === 30 ? 1 : tier.pay === 25 ? 2 : 3;
+          const tierNum = tier.num;
           const existing = result[tab][hs.host];
           if (!existing || tierNum < existing.tierNum) {
             result[tab][hs.host] = { tierNum, pph };
@@ -496,15 +382,11 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
 
   if (showDates.length < 2 || allHosts.length === 0) return null;
 
-  const tierBadge = (entry: { tierNum: 1 | 2 | 3; pph: number } | null | undefined) => {
+  const tierBadge = (entry: { tierNum: number; pph: number } | null | undefined) => {
     if (!entry) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
-    const clr: Record<1 | 2 | 3, string> = {
-      1: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
-      2: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
-      3: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
-    };
+    const badge = PAY_TIERS.find(t => t.num === entry.tierNum)?.badge ?? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
     return (
-      <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full ${clr[entry.tierNum]}`}>
+      <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full ${badge}`}>
         T{entry.tierNum}
       </span>
     );
@@ -558,14 +440,10 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
             </tbody>
           </table>
           <div className="px-5 py-3 border-t border-slate-50 dark:border-slate-700 flex flex-wrap gap-4 bg-slate-50/50 dark:bg-slate-800/60">
-            {TIER_DISPLAY_CONFIG.map(cfg => (
+            {PAY_TIERS.map(cfg => (
               <div key={cfg.num} className="flex items-center gap-1.5">
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                  cfg.num === 1 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300' :
-                  cfg.num === 2 ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' :
-                                 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-                }`}>T{cfg.num}</span>
-                <span className="text-[10px] text-slate-400">{cfg.payLabel} · {cfg.threshold}</span>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${cfg.badge}`}>T{cfg.num}</span>
+                <span className="text-[10px] text-slate-400">{cfg.payLabel} · {cfg.range}</span>
               </div>
             ))}
           </div>
@@ -1416,7 +1294,10 @@ export default function PerformancePage() {
                       onClick={() => setShowTierInfo(false)}
                     >
                       <div
-                        className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+                        /* 7 tiers plus the margin rule is taller than a short
+                           laptop screen, so the panel scrolls rather than
+                           running off the top and bottom. */
+                        className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto"
                         style={{
                           background: 'rgba(255,255,255,0.18)',
                           backdropFilter: 'blur(24px)',
@@ -1437,25 +1318,31 @@ export default function PerformancePage() {
                           </button>
                         </div>
                         <p className="text-white/60 text-xs mb-4 leading-relaxed">Tier is based on <strong className="text-white/80">profit per hour</strong> earned during the stream. The host earns the matching hourly rate for the full show duration.</p>
-                        <div className="space-y-2.5">
-                          {[
-                            { label: 'Tier 1 — Gold',   threshold: '≥ $500/hr profit', pay: '$30/hr', from: '#7C1D0A', to: '#C2410C' },
-                            { label: 'Tier 2 — Silver', threshold: '≥ $400/hr profit', pay: '$25/hr', from: '#B45309', to: '#EA580C' },
-                            { label: 'Tier 3 — Bronze', threshold: '≥ $300/hr profit', pay: '$20/hr', from: '#92400E', to: '#D97706' },
-                            { label: 'Base Pay',         threshold: '< $300/hr profit', pay: 'Base rate', from: '#334155', to: '#64748B' },
-                          ].map(t => (
+                        <div className="space-y-2">
+                          {PAY_TIERS.map(t => (
                             <div
-                              key={t.label}
-                              className="rounded-xl px-4 py-3 flex items-center justify-between"
-                              style={{ background: `linear-gradient(135deg, ${t.from} 0%, ${t.to} 100%)` }}
+                              key={t.num}
+                              className="rounded-xl px-4 py-2.5 flex items-center justify-between gap-3"
+                              style={{ background: `linear-gradient(135deg, ${t.gradFrom} 0%, ${t.gradTo} 100%)` }}
                             >
-                              <div>
-                                <p className="text-white font-black text-sm leading-tight">{t.label}</p>
-                                <p className="text-white/60 text-[11px] mt-0.5">{t.threshold}</p>
+                              <div className="min-w-0">
+                                <p className="text-white font-black text-sm leading-tight">Tier {t.num}</p>
+                                <p className="text-white/60 text-[11px] mt-0.5">{t.range}</p>
                               </div>
-                              <span className="text-white font-black text-base">{t.pay}</span>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-white font-black text-base">{t.payLabel}</span>
+                                <p className="text-white/50 text-[10px]">${t.pay * 4} for a 4-hour show</p>
+                              </div>
                             </div>
                           ))}
+                        </div>
+                        <div className="mt-4 rounded-xl bg-white/10 px-4 py-3">
+                          <p className="text-white font-black text-xs mb-1">The {MARGIN_GATE_PCT}% margin rule</p>
+                          <p className="text-white/60 text-[11px] leading-relaxed">
+                            Tiers from ${MARGIN_GATE_FROM_PROFIT}/hr profit up also need a {MARGIN_GATE_PCT}%+ overall margin.
+                            Hit the profit but miss the margin and the show pays one tier lower.
+                            Non-streaming hours are paid at the base rate, set on the Pay Calculator.
+                          </p>
                         </div>
                         <p className="text-white/40 text-[10px] text-center mt-4">Tap anywhere outside to close</p>
                       </div>
@@ -1472,7 +1359,8 @@ export default function PerformancePage() {
                       const revenuePerHour = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
                       const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
                       const itemsRanPerHour = hs.durationHours > 0 ? hs.itemsRan / hs.durationHours : null;
-                      const tier          = getPayTier(profitPerHour);
+                      const tierInfo      = resolvePayTier(profitPerHour, hs.overallMargin);
+                      const tier          = tierInfo.tier;
                       const estimatedPay  = tier && hs.durationHours > 0 ? tier.pay * hs.durationHours : null;
                       const parsedBase    = parseFloat(basePayRate);
                       const basePay       = !tier && hs.durationHours > 0 && !isNaN(parsedBase) && parsedBase > 0 ? parsedBase * hs.durationHours : null;
@@ -1504,18 +1392,21 @@ export default function PerformancePage() {
                               <div className="bg-slate-900 text-white rounded-xl shadow-xl px-3.5 py-2.5 whitespace-nowrap">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-1">Pay Tier</p>
                                 <p className="text-sm font-black leading-tight">
-                                  {tier
-                                    ? (tier.pay === 30 ? 'Tier 1 — Gold' : tier.pay === 25 ? 'Tier 2 — Silver' : 'Tier 3 — Bronze')
-                                    : 'No Tier Reached'}
+                                  {tier ? `Tier ${tier.num} — ${tier.range}` : 'No Tier Reached'}
                                 </p>
                                 <p className="text-xs text-white/60 mt-0.5">
                                   {tier ? `$${tier.pay}/hr streaming rate` : 'Base pay applies'}
                                 </p>
+                                {tierInfo.tieredDown && tierInfo.earned && (
+                                  <p className="text-xs text-amber-300 mt-1">
+                                    Dropped from Tier {tierInfo.earned.num} ({tierInfo.earned.payLabel}) — margin under {MARGIN_GATE_PCT}%
+                                  </p>
+                                )}
                               </div>
                               <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1.5 ml-4" />
                             </div>
                             <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
-                              <TierCrownIcon payRate={tier?.pay} />
+                              <TierCrownIcon tierNum={tier?.num} />
                             </div>
                             <div
                               className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-md"
@@ -1558,10 +1449,15 @@ export default function PerformancePage() {
                                 {tier ? (
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show</p>
+                                      <p className={`text-xs font-black ${tier.text}`}>Estimated Pay This Show · Tier {tier.num}</p>
                                       <p className="text-[10px] text-slate-400 mt-0.5">
                                         ${tier.pay}/hr × {fmtDuration(hs.durationHours)} = <strong>${fmtMoney(estimatedPay!)}</strong>
                                       </p>
+                                      {tierInfo.tieredDown && tierInfo.earned && (
+                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                                          Tiered down from {tierInfo.earned.payLabel} — margin {hs.overallMargin.toFixed(1)}% is under {MARGIN_GATE_PCT}%
+                                        </p>
+                                      )}
                                     </div>
                                     <span className={`text-xl font-black ${tier.text}`}>${fmtMoney(estimatedPay!)}</span>
                                   </div>
