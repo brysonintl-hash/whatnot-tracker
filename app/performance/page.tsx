@@ -228,8 +228,8 @@ function PaceDelta({ value, baseline }: { value: number | null; baseline: number
   );
 }
 
-function PaceTile({ label, tip, value, delta }: {
-  label: string; tip: string; value: string; delta: ReactNode;
+function PaceTile({ label, tip, value, delta, valueClass }: {
+  label: string; tip: string; value: string; delta?: ReactNode; valueClass?: string;
 }) {
   return (
     <div className="relative min-w-0 px-4 py-3">
@@ -237,14 +237,17 @@ function PaceTile({ label, tip, value, delta }: {
         <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{label}</span>
         <InfoTip text={tip} />
       </div>
-      <p className="text-xl font-black text-slate-900 dark:text-white leading-tight mt-0.5 truncate">{value}</p>
+      <p className={`text-xl font-black leading-tight mt-0.5 truncate ${valueClass ?? 'text-slate-900 dark:text-white'}`}>
+        {value}
+      </p>
       {delta}
     </div>
   );
 }
 
 /**
- * The four headline pace numbers, mirroring what Whatnot shows hosts in-app.
+ * The headline numbers, mirroring what Whatnot shows hosts in-app: the show's
+ * running totals, then the pace numbers underneath.
  *
  * "Estimated" is Whatnot's own framing: these extrapolate the show's pace so
  * far out to a full hour, so a 20-minute show reports what it would do if it
@@ -257,7 +260,23 @@ function ShowPaceGrid({ hs, baseline }: { hs: HostStat; baseline?: HostBaseline 
 
   return (
     <div className="border-b border-slate-100 dark:border-slate-700">
-      <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700">
+      {/* Show totals */}
+      <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 bg-slate-50/60 dark:bg-slate-700/20">
+        <PaceTile
+          label="Sales"
+          tip="Total sales in this show. Failed and cancelled orders are left out."
+          value={`$${Math.round(hs.totalSales).toLocaleString('en-US')}`}
+          valueClass="text-emerald-600 dark:text-emerald-400"
+        />
+        <PaceTile
+          label="Orders"
+          tip="Orders placed in this show. Failed and cancelled orders are left out."
+          value={hs.totalOrders.toLocaleString('en-US')}
+        />
+      </div>
+
+      {/* Pace */}
+      <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 border-t border-slate-100 dark:border-slate-700">
         <PaceTile
           label="Est. Sales/hr"
           tip="Estimated sales for a full hour, based on your show's average sales pace so far."
@@ -1524,18 +1543,23 @@ export default function PerformancePage() {
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 shadow-sm">
-          <div>
-            <h1 className="text-lg font-black text-white">Performance</h1>
-            <p className="text-xs text-slate-400">{today}</p>
+        {/* pl-16 below md keeps the title clear of the sidebar's floating
+            hamburger, which is fixed at top-4 left-4 on small screens. */}
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 pl-16 pr-4 md:px-6 flex-shrink-0 shadow-sm">
+          {/* Three tabs plus a title don't fit a phone, and a half-clipped
+              "Perfor…" is worse than none — the sidebar already says which
+              page this is. Both come back as soon as there's room. */}
+          <div className="hidden sm:block min-w-0">
+            <h1 className="text-lg font-black text-white truncate">Performance</h1>
+            <p className="text-xs text-slate-400 truncate">{today}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 gap-0.5">
               <button
                 onClick={() => setView('stats')}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${view === 'stats' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
               >
-                Show Stats
+                <span className="hidden sm:inline">Show </span>Stats
               </button>
               <button
                 onClick={() => setView('trends')}
@@ -1549,10 +1573,13 @@ export default function PerformancePage() {
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'calendar' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                Team Calendar
+                {/* One flex item, or the button's gap-1.5 lands between
+                    "Team" and "Calendar" as a second word space. */}
+                <span><span className="hidden sm:inline">Team </span>Calendar</span>
               </button>
             </div>
-            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+            {/* Decorative — dropped first when the header runs out of room. */}
+            <span className="hidden md:inline-block text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
           </div>
         </header>
 
