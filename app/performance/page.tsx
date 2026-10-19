@@ -8,6 +8,11 @@ import type { Role } from '@/lib/types';
 import { PAY_TIERS, getPayTier, resolvePayTier, MARGIN_GATE_PCT, MARGIN_GATE_FROM_PROFIT } from '@/lib/payTiers';
 import { isVoided } from '@/lib/sampleData';
 import { BUSINESS_TZ, parseTimestamp, parseDurationStr, MAX_GAP_MS } from '@/lib/hostDay';
+import { buildOrdersPerHourSeries, TREND_WINDOWS } from '@/lib/trends';
+import { Line } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend);
 
 type Session = { username: string; role: Role; name: string };
 type Order = {
@@ -17,6 +22,149 @@ type Order = {
 };
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
+
+// ─── Trends ─────────────────────────────────────────────────────────────────
+
+/** A metric Whatnot charts but the WN sheet has no columns for. */
+function MissingTrendCard({ title, needs }: { title: string; needs: string }) {
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+      <p className="text-sm font-black text-slate-900 dark:text-white">{title}</p>
+      <div className="mt-3 h-[160px] rounded-xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center px-6">
+        <svg className="w-7 h-7 text-slate-300 dark:text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 3v18h18M7 15l4-4 3 3 5-6" />
+        </svg>
+        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Not tracked yet</p>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-snug">{needs}</p>
+      </div>
+    </div>
+  );
+}
+
+function OrdersTrendCard({ hs, dayOrders }: { hs: HostStat; dayOrders: Order[] }) {
+  const [windowKey, setWindowKey] = useState('show');
+  const isDark = useTheme();
+
+  const timestamps = useMemo(() => {
+    return dayOrders
+      .filter(o => o.host === hs.host && (o.livestream || 1) === hs.livestream && !isVoided(o))
+      .map(o => parseTimestamp(o.timestamp))
+      .filter((t): t is number => t !== null);
+  }, [dayOrders, hs.host, hs.livestream]);
+
+  const minutes = TREND_WINDOWS.find(w => w.key === windowKey)?.minutes ?? null;
+  const series = useMemo(() => buildOrdersPerHourSeries(timestamps, minutes), [timestamps, minutes]);
+
+  const grid = isDark ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)';
+  const tick = isDark ? '#94A3B8' : '#64748B';
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <p className="text-sm font-black text-slate-900 dark:text-white truncate">{hs.host}</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            Est. Orders/hr · {fmtTimeRange(hs.startTs, hs.endTs) || 'no times recorded'}
+          </p>
+        </div>
+        <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 gap-0.5 flex-shrink-0">
+          {TREND_WINDOWS.map(w => (
+            <button
+              key={w.key}
+              onClick={() => setWindowKey(w.key)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                windowKey === w.key
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {series.length < 2 ? (
+        <div className="h-[200px] flex items-center justify-center text-xs text-slate-400">
+          Needs at least two orders with times to chart a pace.
+        </div>
+      ) : (
+        <div className="h-[200px]">
+          <Line
+            data={{
+              labels: series.map(pt => fmtTs(pt.ts)),
+              datasets: [{
+                data: series.map(pt => Math.round(pt.value * 10) / 10),
+                borderColor: '#34D399',
+                backgroundColor: 'rgba(52,211,153,0.14)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+              }],
+            }}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: c => `${c.parsed.y ?? 0} orders/hr`,
+                  },
+                },
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  grid: { color: grid },
+                  ticks: { color: tick, font: { size: 10 } },
+                },
+                x: {
+                  grid: { color: grid },
+                  ticks: {
+                    color: tick, font: { size: 10 },
+                    maxTicksLimit: 6, maxRotation: 0, autoSkip: true,
+                  },
+                },
+              },
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendsView({ hostStats, dayOrders, date }: { hostStats: HostStat[]; dayOrders: Order[]; date: string }) {
+  if (hostStats.length === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center">
+        <p className="text-sm text-slate-400">No shows on {isoToDisplay(date) || 'this date'}.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {[...hostStats].sort((a, b) => b.totalSales - a.totalSales).map(hs => (
+        <OrdersTrendCard key={`${hs.host}|${hs.livestream}`} hs={hs} dayOrders={dayOrders} />
+      ))}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <MissingTrendCard
+          title="Viewers"
+          needs="Viewer counts live in Whatnot's own analytics. The WN sheet only records orders, so there's nothing to chart here yet."
+        />
+        <MissingTrendCard
+          title="Followers"
+          needs="Followers gained during a show aren't in the WN sheet either — the scraper can read a seller's total follower count, but not when each follow happened."
+        />
+      </div>
+    </div>
+  );
+}
 
 // ─── Show pace tiles ────────────────────────────────────────────────────────
 
@@ -51,10 +199,19 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
-/** "-61% vs your average", or nothing when there's no history to compare against. */
+/** How far back the "vs your average" benchmark looks — Whatnot uses 28 days. */
+const BENCHMARK_DAYS = 28;
+
+const BENCHMARK_TIP = `Benchmark with your recent shows: how this show compares to your own average across your last ${BENCHMARK_DAYS} days of shows.`;
+
+/** "-61% vs your average", or a plain note when there's no history to compare against. */
 function PaceDelta({ value, baseline }: { value: number | null; baseline: number | null }) {
   if (value === null || baseline === null || baseline <= 0) {
-    return <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">No past shows yet</p>;
+    return (
+      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+        No shows in the last {BENCHMARK_DAYS} days
+      </p>
+    );
   }
   const pct = Math.round(((value - baseline) / baseline) * 100);
   const tone = pct > 0 ? 'text-emerald-600 dark:text-emerald-400'
@@ -63,7 +220,10 @@ function PaceDelta({ value, baseline }: { value: number | null; baseline: number
   return (
     <p className="text-[11px] mt-0.5 truncate">
       <span className={`font-bold ${tone}`}>{pct > 0 ? '+' : ''}{pct}%</span>
-      <span className="text-slate-400 dark:text-slate-500"> vs your average</span>
+      <span className="text-slate-400 dark:text-slate-500"> vs </span>
+      <span className="text-slate-400 dark:text-slate-500 underline decoration-dotted underline-offset-2" title={BENCHMARK_TIP}>
+        your average
+      </span>
     </p>
   );
 }
@@ -89,17 +249,11 @@ function PaceTile({ label, tip, value, delta }: {
  * "Estimated" is Whatnot's own framing: these extrapolate the show's pace so
  * far out to a full hour, so a 20-minute show reports what it would do if it
  * kept going at that rate.
- *
- * Average Watch Time is deliberately absent. It needs viewer-session data,
- * which Whatnot does not export into the WN sheet — every row there is an
- * order, with no viewer or session columns. Give `avgWatchSeconds` a source
- * and the fourth tile appears on its own.
  */
 function ShowPaceGrid({ hs, baseline }: { hs: HostStat; baseline?: HostBaseline }) {
   const salesPerHour  = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
   const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
   const aov           = hs.paidOrders > 0 ? hs.paidSales / hs.paidOrders : null;
-  const avgWatchSeconds: number | null = null; // no data source yet — see above
 
   return (
     <div className="border-b border-slate-100 dark:border-slate-700">
@@ -117,30 +271,16 @@ function ShowPaceGrid({ hs, baseline }: { hs: HostStat; baseline?: HostBaseline 
           delta={<PaceDelta value={ordersPerHour} baseline={baseline?.ordersPerHour ?? null} />}
         />
       </div>
-      <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 border-t border-slate-100 dark:border-slate-700">
+      <div className="border-t border-slate-100 dark:border-slate-700">
         <PaceTile
           label="AOV"
           tip="Average spend per order in this show, excluding giveaways."
           value={aov !== null ? `$${Math.round(aov).toLocaleString('en-US')}` : '—'}
           delta={<PaceDelta value={aov} baseline={baseline?.aov ?? null} />}
         />
-        <PaceTile
-          label="Avg. Watch Time"
-          tip="Average time each viewer spent watching your show. Whatnot doesn't export viewer data to the WN sheet, so this isn't tracked here yet."
-          value={avgWatchSeconds !== null ? fmtWatchTime(avgWatchSeconds) : '—'}
-          delta={<p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">Not in the WN sheet</p>}
-        />
       </div>
     </div>
   );
-}
-
-/** 97 → "1 min 37s" */
-function fmtWatchTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  if (m === 0) return `${s}s`;
-  return `${m} min${s > 0 ? ` ${s}s` : ''}`;
 }
 
 function parseTabDate(tab: string): Date {
@@ -1251,7 +1391,7 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
-  const [view, setView] = useState<'stats' | 'calendar'>('stats');
+  const [view, setView] = useState<'stats' | 'trends' | 'calendar'>('stats');
   const [basePayRate, setBasePayRate] = useState<string>('');
   const [showTierInfo, setShowTierInfo] = useState(false);
 
@@ -1305,16 +1445,25 @@ export default function PerformancePage() {
   const hostStats = useMemo(() => computeHostStats(dayOrders), [dayOrders]);
 
   /**
-   * Each host's average across their other shows, for the "vs your average"
-   * deltas. Pooled (total sales ÷ total hours) rather than an average of each
-   * show's rate, so one very short show can't swing the baseline. The selected
-   * date is excluded — a show compared against itself always reads 0%.
+   * Each host's average across their recent shows, for the "vs your average"
+   * deltas.
+   *
+   * Scoped to the 28 days before the selected show, matching how Whatnot
+   * defines the same benchmark in-app, so a host comparing our number against
+   * theirs sees the same thing. Pooled (total sales ÷ total hours) rather than
+   * an average of each show's rate, so one very short show can't swing it. The
+   * selected date is excluded — a show compared against itself always reads 0%.
    */
   const hostBaselines = useMemo(() => {
     const currentTab = selectedDate ? isoToTab(selectedDate) : '';
+    const until = selectedDate ? parseTabDate(currentTab).getTime() : 0;
+    const since = until - BENCHMARK_DAYS * 86400000;
+
     const byTab: Record<string, Order[]> = {};
     for (const o of orders) {
       if (!o.tab || o.tab === currentTab) continue;
+      const t = parseTabDate(o.tab).getTime();
+      if (!(t >= since && t < until)) continue;
       (byTab[o.tab] ||= []).push(o);
     }
 
@@ -1389,6 +1538,13 @@ export default function PerformancePage() {
                 Show Stats
               </button>
               <button
+                onClick={() => setView('trends')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'trends' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 14l4-4 3 3 5-6" /></svg>
+                Trends
+              </button>
+              <button
                 onClick={() => setView('calendar')}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'calendar' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
               >
@@ -1455,6 +1611,8 @@ export default function PerformancePage() {
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No show data for this date</p>
                   <p className="text-slate-400 text-xs mt-1">Try a different date or use the arrows to navigate</p>
                 </div>
+              ) : view === 'trends' ? (
+                <TrendsView hostStats={visibleHostStats} dayOrders={hostDayOrders} date={selectedDate} />
               ) : (
                 <>
                   {/* Daily Tier Performance header */}
