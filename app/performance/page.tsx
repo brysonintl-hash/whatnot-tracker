@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
@@ -17,6 +17,131 @@ type Order = {
 };
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
+
+// ─── Show pace tiles ────────────────────────────────────────────────────────
+
+/**
+ * The ⓘ next to a pace tile's label.
+ *
+ * The bubble is positioned against the tile (PaceTile is the `relative`
+ * ancestor), not against this icon — anchored to the icon it overflowed the
+ * tile's edge and the card's `overflow-hidden` sliced the text off. Spanning
+ * left-4 to right-4 keeps it inside the tile wherever the icon happens to sit.
+ */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="inline-flex group/tip align-middle">
+      <svg
+        className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 cursor-help"
+        fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" strokeWidth={2} />
+        <path strokeLinecap="round" strokeWidth={2.5} d="M12 11v5M12 7.5v.01" />
+      </svg>
+      <span className="sr-only">{text}</span>
+      <span
+        className="absolute left-4 right-4 top-8 z-20 pointer-events-none
+                   invisible group-hover/tip:visible opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150"
+      >
+        <span className="block bg-slate-900 text-white text-[11px] leading-snug rounded-lg shadow-xl px-3 py-2">
+          {text}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** "-61% vs your average", or nothing when there's no history to compare against. */
+function PaceDelta({ value, baseline }: { value: number | null; baseline: number | null }) {
+  if (value === null || baseline === null || baseline <= 0) {
+    return <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">No past shows yet</p>;
+  }
+  const pct = Math.round(((value - baseline) / baseline) * 100);
+  const tone = pct > 0 ? 'text-emerald-600 dark:text-emerald-400'
+    : pct < 0 ? 'text-orange-500 dark:text-orange-400'
+    : 'text-slate-400';
+  return (
+    <p className="text-[11px] mt-0.5 truncate">
+      <span className={`font-bold ${tone}`}>{pct > 0 ? '+' : ''}{pct}%</span>
+      <span className="text-slate-400 dark:text-slate-500"> vs your average</span>
+    </p>
+  );
+}
+
+function PaceTile({ label, tip, value, delta }: {
+  label: string; tip: string; value: string; delta: ReactNode;
+}) {
+  return (
+    <div className="relative min-w-0 px-4 py-3">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{label}</span>
+        <InfoTip text={tip} />
+      </div>
+      <p className="text-xl font-black text-slate-900 dark:text-white leading-tight mt-0.5 truncate">{value}</p>
+      {delta}
+    </div>
+  );
+}
+
+/**
+ * The four headline pace numbers, mirroring what Whatnot shows hosts in-app.
+ *
+ * "Estimated" is Whatnot's own framing: these extrapolate the show's pace so
+ * far out to a full hour, so a 20-minute show reports what it would do if it
+ * kept going at that rate.
+ *
+ * Average Watch Time is deliberately absent. It needs viewer-session data,
+ * which Whatnot does not export into the WN sheet — every row there is an
+ * order, with no viewer or session columns. Give `avgWatchSeconds` a source
+ * and the fourth tile appears on its own.
+ */
+function ShowPaceGrid({ hs, baseline }: { hs: HostStat; baseline?: HostBaseline }) {
+  const salesPerHour  = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
+  const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
+  const aov           = hs.paidOrders > 0 ? hs.paidSales / hs.paidOrders : null;
+  const avgWatchSeconds: number | null = null; // no data source yet — see above
+
+  return (
+    <div className="border-b border-slate-100 dark:border-slate-700">
+      <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700">
+        <PaceTile
+          label="Est. Sales/hr"
+          tip="Estimated sales for a full hour, based on your show's average sales pace so far."
+          value={salesPerHour !== null ? `$${Math.round(salesPerHour).toLocaleString('en-US')}` : '—'}
+          delta={<PaceDelta value={salesPerHour} baseline={baseline?.salesPerHour ?? null} />}
+        />
+        <PaceTile
+          label="Est. Orders/hr"
+          tip="Estimated orders for a full hour, based on your show's average order pace so far."
+          value={ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—'}
+          delta={<PaceDelta value={ordersPerHour} baseline={baseline?.ordersPerHour ?? null} />}
+        />
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 border-t border-slate-100 dark:border-slate-700">
+        <PaceTile
+          label="AOV"
+          tip="Average spend per order in this show, excluding giveaways."
+          value={aov !== null ? `$${Math.round(aov).toLocaleString('en-US')}` : '—'}
+          delta={<PaceDelta value={aov} baseline={baseline?.aov ?? null} />}
+        />
+        <PaceTile
+          label="Avg. Watch Time"
+          tip="Average time each viewer spent watching your show. Whatnot doesn't export viewer data to the WN sheet, so this isn't tracked here yet."
+          value={avgWatchSeconds !== null ? fmtWatchTime(avgWatchSeconds) : '—'}
+          delta={<p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">Not in the WN sheet</p>}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** 97 → "1 min 37s" */
+function fmtWatchTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  if (m === 0) return `${s}s`;
+  return `${m} min${s > 0 ? ` ${s}s` : ''}`;
+}
 
 function parseTabDate(tab: string): Date {
   const parts = tab.split('/');
@@ -155,10 +280,25 @@ type HostStat = {
   totalProfit: number;
   totalOrders: number;
   totalUnits: number;
+  /** Orders that actually cost the buyer something — giveaways ($0) excluded, for AOV. */
+  paidOrders: number;
+  paidSales: number;
   overallMargin: number;
   durationHours: number;
   startTs: number | null;
   endTs: number | null;
+};
+
+/**
+ * A host's own running average across their OTHER shows, for the "vs your
+ * average" deltas on the pace tiles.
+ */
+type HostBaseline = {
+  salesPerHour: number | null;
+  ordersPerHour: number | null;
+  aov: number | null;
+  /** How many past shows the average is built from — 1 is a weak comparison. */
+  shows: number;
 };
 
 function computeHostStats(orders: Order[]): HostStat[] {
@@ -168,6 +308,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
   const map: Record<string, {
     host: string; livestream: number;
     sales: number; profit: number; orders: number; units: number;
+    paidOrders: number; paidSales: number;
     ran: number; voided: number;
     timestamps: number[];
     durStr: number | null;
@@ -182,7 +323,7 @@ function computeHostStats(orders: Order[]): HostStat[] {
 
     if (!(h in hostColorMap)) hostColorMap[h] = colorIdx++;
     if (!map[key]) {
-      map[key] = { host: h, livestream: ls, sales: 0, profit: 0, orders: 0, units: 0, ran: 0, voided: 0, timestamps: [], durStr: null, colorIdx: hostColorMap[h] };
+      map[key] = { host: h, livestream: ls, sales: 0, profit: 0, orders: 0, units: 0, paidOrders: 0, paidSales: 0, ran: 0, voided: 0, timestamps: [], durStr: null, colorIdx: hostColorMap[h] };
     }
 
     // Every row is an item that ran in the show, whether or not it paid out.
@@ -194,6 +335,11 @@ function computeHostStats(orders: Order[]): HostStat[] {
       map[key].profit += o.profit;
       map[key].orders++;
       map[key].units += o.qty;
+      // Giveaways go out at $0; averaging them in would drag AOV toward zero.
+      if (o.sold > 0) {
+        map[key].paidOrders++;
+        map[key].paidSales += o.sold;
+      }
     }
 
     const ts = parseTimestamp(o.timestamp);
@@ -231,6 +377,8 @@ function computeHostStats(orders: Order[]): HostStat[] {
         totalProfit: d.profit,
         totalOrders: d.orders,
         totalUnits: d.units,
+        paidOrders: d.paidOrders,
+        paidSales: d.paidSales,
         overallMargin,
         durationHours,
         startTs: sorted.length > 0 ? sorted[0] : null,
@@ -1156,6 +1304,47 @@ export default function PerformancePage() {
 
   const hostStats = useMemo(() => computeHostStats(dayOrders), [dayOrders]);
 
+  /**
+   * Each host's average across their other shows, for the "vs your average"
+   * deltas. Pooled (total sales ÷ total hours) rather than an average of each
+   * show's rate, so one very short show can't swing the baseline. The selected
+   * date is excluded — a show compared against itself always reads 0%.
+   */
+  const hostBaselines = useMemo(() => {
+    const currentTab = selectedDate ? isoToTab(selectedDate) : '';
+    const byTab: Record<string, Order[]> = {};
+    for (const o of orders) {
+      if (!o.tab || o.tab === currentTab) continue;
+      (byTab[o.tab] ||= []).push(o);
+    }
+
+    const acc: Record<string, { sales: number; orders: number; hours: number; paidSales: number; paidOrders: number; shows: number }> = {};
+    for (const tabOrders of Object.values(byTab)) {
+      for (const hs of computeHostStats(tabOrders)) {
+        // A show with no measurable duration can't contribute a rate.
+        if (hs.durationHours <= 0) continue;
+        const a = (acc[hs.host] ||= { sales: 0, orders: 0, hours: 0, paidSales: 0, paidOrders: 0, shows: 0 });
+        a.sales += hs.totalSales;
+        a.orders += hs.totalOrders;
+        a.hours += hs.durationHours;
+        a.paidSales += hs.paidSales;
+        a.paidOrders += hs.paidOrders;
+        a.shows++;
+      }
+    }
+
+    const out: Record<string, HostBaseline> = {};
+    for (const [host, a] of Object.entries(acc)) {
+      out[host] = {
+        salesPerHour: a.hours > 0 ? a.sales / a.hours : null,
+        ordersPerHour: a.hours > 0 ? a.orders / a.hours : null,
+        aov: a.paidOrders > 0 ? a.paidSales / a.paidOrders : null,
+        shows: a.shows,
+      };
+    }
+    return out;
+  }, [orders, selectedDate]);
+
   // Hosts only see their own shows — flexible name matching (handles partial / reversed names)
   const visibleHostStats = useMemo(() => {
     if (session?.role !== 'host') return hostStats;
@@ -1428,6 +1617,9 @@ export default function PerformancePage() {
 
                           {/* Stats box */}
                           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-t-0 rounded-b-xl overflow-hidden">
+                            {/* Headline pace tiles */}
+                            <ShowPaceGrid hs={hs} baseline={hostBaselines[hs.host]} />
+
                             {/* Stats list */}
                             <div className="px-5 py-4 space-y-3">
                               {stats.map(s => (
