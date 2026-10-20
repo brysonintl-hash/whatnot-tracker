@@ -1,7 +1,7 @@
 // ─── Show trends ───────────────────────────────────────────────────────────
 //
-// Order-pace series for the Performance page's Trends tab. Kept pure and free
-// of formatting so it can be tested directly: callers turn the timestamps into
+// Pace series for the trend strip on each host card. Kept pure and free of
+// formatting so it can be tested directly: callers turn the timestamps into
 // labels themselves.
 
 import { MAX_GAP_MS } from './hostDay';
@@ -9,9 +9,14 @@ import { MAX_GAP_MS } from './hostDay';
 export type TrendPoint = {
   /** Epoch ms of the order this point was measured at. */
   ts: number;
-  /** Estimated orders per hour at that moment. */
   value: number;
 };
+
+/** One order, reduced to what a trend needs. */
+export type TrendOrder = { ts: number; sold: number };
+
+/** The metrics charted on the strip — one per headline tile. */
+export type TrendMetric = 'sales' | 'orders' | 'aov';
 
 /** The three pace windows Whatnot offers on its Trends tab. */
 export const TREND_WINDOWS: { key: string; label: string; minutes: number | null }[] = [
@@ -21,42 +26,76 @@ export const TREND_WINDOWS: { key: string; label: string; minutes: number | null
 ];
 
 /**
- * Est. Orders/hr across a show, one point per order.
+ * A metric's value over the course of a show, one point per order.
  *
- * `windowMinutes === null` gives the running average — orders so far ÷ hours on
- * air so far. That is why it swings wildly in the first minutes and then
- * settles, which is the shape Whatnot's own chart shows. It uses the same
- * gap-capped duration as the rest of the page, so its final point is exactly
- * the Est. Orders/hr shown on the host's card.
+ * With `windowMinutes === null` this is the running figure — everything so far
+ * divided by hours on air so far. That is why it swings wildly in the opening
+ * minutes and then settles, the shape Whatnot's own chart shows, and it uses
+ * the same gap-capped duration as the rest of the page, so the last point is
+ * exactly the number on the host's tile.
  *
- * A window instead reports the rate over the trailing N minutes at each point,
- * which is what reveals where a show actually sped up or stalled.
+ * With a window it reports the trailing N minutes at each point, which is what
+ * reveals where a show actually sped up or stalled.
  *
- * The first point is always 0: at the opening order no time has elapsed, so
+ * AOV is an average rather than a rate, so it is never divided by hours:
+ * paid sales ÷ paid orders, over the same span.
+ *
+ * The first point is always 0 — at the opening order no time has elapsed, so
  * there is no rate to report yet.
  */
-export function buildOrdersPerHourSeries(timestamps: number[], windowMinutes: number | null): TrendPoint[] {
-  const ts = [...timestamps].sort((a, b) => a - b);
-  if (ts.length < 2) return [];
+export function buildTrendSeries(
+  orders: TrendOrder[],
+  metric: TrendMetric,
+  windowMinutes: number | null,
+): TrendPoint[] {
+  const rows = [...orders].sort((a, b) => a.ts - b.ts);
+  if (rows.length < 2) return [];
 
-  const points: TrendPoint[] = [{ ts: ts[0], value: 0 }];
+  // Giveaways go out at $0 and would drag AOV toward zero.
+  const paid = (o: TrendOrder) => o.sold > 0;
+
+  const points: TrendPoint[] = [{ ts: rows[0].ts, value: 0 }];
   let onAirMs = 0;
+  let runSold = rows[0].sold;
+  let runPaidSold = paid(rows[0]) ? rows[0].sold : 0;
+  let runPaidCount = paid(rows[0]) ? 1 : 0;
 
-  for (let i = 1; i < ts.length; i++) {
-    const gap = ts[i] - ts[i - 1];
+  for (let i = 1; i < rows.length; i++) {
+    const gap = rows[i].ts - rows[i - 1].ts;
     // A long gap is the host being off air between shows, not slow selling.
     if (gap <= MAX_GAP_MS) onAirMs += gap;
 
-    let value: number;
-    if (windowMinutes === null) {
-      value = onAirMs > 0 ? (i + 1) / (onAirMs / 3600000) : 0;
-    } else {
-      const from = ts[i] - windowMinutes * 60000;
-      let count = 0;
-      for (let j = i; j >= 0 && ts[j] > from; j--) count++;
-      value = count / (windowMinutes / 60);
+    runSold += rows[i].sold;
+    if (paid(rows[i])) {
+      runPaidSold += rows[i].sold;
+      runPaidCount++;
     }
-    points.push({ ts: ts[i], value });
+
+    let value = 0;
+    if (windowMinutes === null) {
+      const hours = onAirMs / 3600000;
+      if (metric === 'aov') {
+        value = runPaidCount > 0 ? runPaidSold / runPaidCount : 0;
+      } else if (hours > 0) {
+        value = metric === 'sales' ? runSold / hours : (i + 1) / hours;
+      }
+    } else {
+      const from = rows[i].ts - windowMinutes * 60000;
+      let count = 0, sold = 0, paidSold = 0, paidCount = 0;
+      for (let j = i; j >= 0 && rows[j].ts > from; j--) {
+        count++;
+        sold += rows[j].sold;
+        if (paid(rows[j])) { paidSold += rows[j].sold; paidCount++; }
+      }
+      if (metric === 'aov') {
+        value = paidCount > 0 ? paidSold / paidCount : 0;
+      } else {
+        const hours = windowMinutes / 60;
+        value = metric === 'sales' ? sold / hours : count / hours;
+      }
+    }
+
+    points.push({ ts: rows[i].ts, value });
   }
 
   return points;

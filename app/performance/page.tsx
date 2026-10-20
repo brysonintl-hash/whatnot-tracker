@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
@@ -8,7 +8,7 @@ import type { Role } from '@/lib/types';
 import { PAY_TIERS, getPayTier, resolvePayTier, MARGIN_GATE_PCT, MARGIN_GATE_FROM_PROFIT } from '@/lib/payTiers';
 import { isVoided } from '@/lib/sampleData';
 import { BUSINESS_TZ, parseTimestamp, parseDurationStr, MAX_GAP_MS } from '@/lib/hostDay';
-import { buildOrdersPerHourSeries, TREND_WINDOWS } from '@/lib/trends';
+import { buildTrendSeries, TREND_WINDOWS, type TrendPoint, type TrendOrder, type TrendMetric } from '@/lib/trends';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend } from 'chart.js';
 
@@ -23,56 +23,124 @@ type Order = {
 
 const HOST_COLORS = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F97316'];
 
-// ─── Trends ─────────────────────────────────────────────────────────────────
+// ─── Trend strip ────────────────────────────────────────────────────────────
 
-/** A metric Whatnot charts but the WN sheet has no columns for. */
-function MissingTrendCard({ title, needs }: { title: string; needs: string }) {
+/** One chart per headline tile, so the strip reads left-to-right like the tiles. */
+const TREND_PANELS: { metric: TrendMetric; title: string; money: boolean }[] = [
+  { metric: 'sales', title: 'Est. Sales/hr', money: true },
+  { metric: 'orders', title: 'Est. Orders/hr', money: false },
+  { metric: 'aov', title: 'AOV', money: true },
+];
+
+function TrendChart({ series, money, isDark }: { series: TrendPoint[]; money: boolean; isDark: boolean }) {
+  const grid = isDark ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)';
+  const tick = isDark ? '#94A3B8' : '#64748B';
+  const unit = money ? '' : ' orders/hr';
+
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-      <p className="text-sm font-black text-slate-900 dark:text-white">{title}</p>
-      <div className="mt-3 h-[160px] rounded-xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center px-6">
-        <svg className="w-7 h-7 text-slate-300 dark:text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 3v18h18M7 15l4-4 3 3 5-6" />
-        </svg>
-        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Not tracked yet</p>
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-snug">{needs}</p>
-      </div>
-    </div>
+    <Line
+      data={{
+        labels: series.map(pt => fmtTs(pt.ts)),
+        datasets: [{
+          data: series.map(pt => Math.round(pt.value * 10) / 10),
+          borderColor: '#34D399',
+          backgroundColor: 'rgba(52,211,153,0.14)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        }],
+      }}
+      options={{
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: c => `${money ? '$' : ''}${(c.parsed.y ?? 0).toLocaleString('en-US')}${unit}`,
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: grid },
+            ticks: {
+              color: tick, font: { size: 9 }, maxTicksLimit: 5,
+              callback: v => (money ? `$${Number(v).toLocaleString('en-US')}` : String(v)),
+            },
+          },
+          x: {
+            grid: { color: grid },
+            ticks: { color: tick, font: { size: 9 }, maxTicksLimit: 4, maxRotation: 0, autoSkip: true },
+          },
+        },
+      }}
+    />
   );
 }
 
-function OrdersTrendCard({ hs, dayOrders }: { hs: HostStat; dayOrders: Order[] }) {
+/**
+ * The swipeable trend strip inside a host card: one panel per headline tile,
+ * scrolled left/right, sharing one pace-window toggle.
+ *
+ * Each panel's "Entire Show" line ends exactly on the tile above it, since
+ * both run off the same gap-capped duration.
+ *
+ * Viewers and Followers aren't here because nothing in the WN sheet can feed
+ * them — it records orders only, with no viewer or session columns.
+ */
+function ShowTrendStrip({ hs, dayOrders }: { hs: HostStat; dayOrders: Order[] }) {
   const [windowKey, setWindowKey] = useState('show');
+  const [panelIdx, setPanelIdx] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const isDark = useTheme();
 
-  const timestamps = useMemo(() => {
+  const trendOrders = useMemo<TrendOrder[]>(() => {
     return dayOrders
       .filter(o => o.host === hs.host && (o.livestream || 1) === hs.livestream && !isVoided(o))
-      .map(o => parseTimestamp(o.timestamp))
-      .filter((t): t is number => t !== null);
+      .map(o => ({ ts: parseTimestamp(o.timestamp), sold: o.sold }))
+      .filter((o): o is TrendOrder => o.ts !== null)
+      .sort((a, b) => a.ts - b.ts);
   }, [dayOrders, hs.host, hs.livestream]);
 
   const minutes = TREND_WINDOWS.find(w => w.key === windowKey)?.minutes ?? null;
-  const series = useMemo(() => buildOrdersPerHourSeries(timestamps, minutes), [timestamps, minutes]);
+  const seriesByPanel = useMemo(
+    () => TREND_PANELS.map(p => buildTrendSeries(trendOrders, p.metric, minutes)),
+    [trendOrders, minutes],
+  );
 
-  const grid = isDark ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)';
-  const tick = isDark ? '#94A3B8' : '#64748B';
+  // Track which panel is centred so the dots and heading stay in step.
+  function onScroll() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    if (idx !== panelIdx) setPanelIdx(Math.min(TREND_PANELS.length - 1, Math.max(0, idx)));
+  }
+
+  function goTo(i: number) {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+  }
+
+  if (trendOrders.length < 2) return null;
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <p className="text-sm font-black text-slate-900 dark:text-white truncate">{hs.host}</p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
-            Est. Orders/hr · {fmtTimeRange(hs.startTs, hs.endTs) || 'no times recorded'}
-          </p>
-        </div>
+    <div className="border-b border-slate-100 dark:border-slate-700 px-4 py-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">
+          {TREND_PANELS[panelIdx].title} over the show
+        </p>
         <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 gap-0.5 flex-shrink-0">
           {TREND_WINDOWS.map(w => (
             <button
               key={w.key}
               onClick={() => setWindowKey(w.key)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
                 windowKey === w.key
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -84,83 +152,53 @@ function OrdersTrendCard({ hs, dayOrders }: { hs: HostStat; dayOrders: Order[] }
         </div>
       </div>
 
-      {series.length < 2 ? (
-        <div className="h-[200px] flex items-center justify-center text-xs text-slate-400">
-          Needs at least two orders with times to chart a pace.
+      <div className="relative">
+        <div
+          ref={scrollerRef}
+          onScroll={onScroll}
+          /* No padding here: panels are w-full, so any padding would make
+             clientWidth differ from a panel's width and every snap would land
+             a few pixels off, letting the next chart's axis bleed in. */
+          className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth
+                     [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {TREND_PANELS.map((panel, i) => (
+            <div key={panel.metric} className="snap-start shrink-0 w-full h-[140px]">
+              <TrendChart series={seriesByPanel[i]} money={panel.money} isDark={isDark} />
+            </div>
+          ))}
         </div>
-      ) : (
-        <div className="h-[200px]">
-          <Line
-            data={{
-              labels: series.map(pt => fmtTs(pt.ts)),
-              datasets: [{
-                data: series.map(pt => Math.round(pt.value * 10) / 10),
-                borderColor: '#34D399',
-                backgroundColor: 'rgba(52,211,153,0.14)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.35,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-              }],
-            }}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: c => `${c.parsed.y ?? 0} orders/hr`,
-                  },
-                },
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  grid: { color: grid },
-                  ticks: { color: tick, font: { size: 10 } },
-                },
-                x: {
-                  grid: { color: grid },
-                  ticks: {
-                    color: tick, font: { size: 10 },
-                    maxTicksLimit: 6, maxRotation: 0, autoSkip: true,
-                  },
-                },
-              },
-            }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
-function TrendsView({ hostStats, dayOrders, date }: { hostStats: HostStat[]; dayOrders: Order[]; date: string }) {
-  if (hostStats.length === 0) {
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center">
-        <p className="text-sm text-slate-400">No shows on {isoToDisplay(date) || 'this date'}.</p>
+        {/* Arrows for mouse users; the strip itself swipes on touch. */}
+        <button
+          onClick={() => goTo(Math.max(0, panelIdx - 1))}
+          disabled={panelIdx === 0}
+          aria-label="Previous trend"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-600 shadow flex items-center justify-center disabled:opacity-0 transition-opacity"
+        >
+          <svg className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <button
+          onClick={() => goTo(Math.min(TREND_PANELS.length - 1, panelIdx + 1))}
+          disabled={panelIdx === TREND_PANELS.length - 1}
+          aria-label="Next trend"
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-600 shadow flex items-center justify-center disabled:opacity-0 transition-opacity"
+        >
+          <svg className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+        </button>
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-5">
-      {[...hostStats].sort((a, b) => b.totalSales - a.totalSales).map(hs => (
-        <OrdersTrendCard key={`${hs.host}|${hs.livestream}`} hs={hs} dayOrders={dayOrders} />
-      ))}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <MissingTrendCard
-          title="Viewers"
-          needs="Viewer counts live in Whatnot's own analytics. The WN sheet only records orders, so there's nothing to chart here yet."
-        />
-        <MissingTrendCard
-          title="Followers"
-          needs="Followers gained during a show aren't in the WN sheet either — the scraper can read a seller's total follower count, but not when each follow happened."
-        />
+      <div className="flex items-center justify-center gap-1.5 mt-2">
+        {TREND_PANELS.map((panel, i) => (
+          <button
+            key={panel.metric}
+            onClick={() => goTo(i)}
+            aria-label={panel.title}
+            className={`h-1.5 rounded-full transition-all ${
+              i === panelIdx ? 'w-5 bg-slate-400 dark:bg-slate-400' : 'w-1.5 bg-slate-200 dark:bg-slate-600'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
@@ -1410,7 +1448,7 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
-  const [view, setView] = useState<'stats' | 'trends' | 'calendar'>('stats');
+  const [view, setView] = useState<'stats' | 'calendar'>('stats');
   const [basePayRate, setBasePayRate] = useState<string>('');
   const [showTierInfo, setShowTierInfo] = useState(false);
 
@@ -1562,13 +1600,6 @@ export default function PerformancePage() {
                 <span className="hidden sm:inline">Show </span>Stats
               </button>
               <button
-                onClick={() => setView('trends')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'trends' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 14l4-4 3 3 5-6" /></svg>
-                Trends
-              </button>
-              <button
                 onClick={() => setView('calendar')}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${view === 'calendar' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
               >
@@ -1638,8 +1669,6 @@ export default function PerformancePage() {
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No show data for this date</p>
                   <p className="text-slate-400 text-xs mt-1">Try a different date or use the arrows to navigate</p>
                 </div>
-              ) : view === 'trends' ? (
-                <TrendsView hostStats={visibleHostStats} dayOrders={hostDayOrders} date={selectedDate} />
               ) : (
                 <>
                   {/* Daily Tier Performance header */}
@@ -1731,7 +1760,6 @@ export default function PerformancePage() {
                       const color         = HOST_COLORS[hs.colorIdx % HOST_COLORS.length];
                       const profitPerHour = hs.durationHours > 0 ? hs.totalProfit / hs.durationHours : null;
                       const revenuePerHour = hs.durationHours > 0 ? hs.totalSales  / hs.durationHours : null;
-                      const ordersPerHour = hs.durationHours > 0 ? hs.totalOrders / hs.durationHours : null;
                       const itemsRanPerHour = hs.durationHours > 0 ? hs.itemsRan / hs.durationHours : null;
                       const tierInfo      = resolvePayTier(profitPerHour, hs.overallMargin);
                       const tier          = tierInfo.tier;
@@ -1751,7 +1779,8 @@ export default function PerformancePage() {
                         { label: 'Profit per Hour',  value: profitPerHour !== null ? `$${fmtMoney(profitPerHour)}/hr` : '—', valueClass: `font-black ${profitPerHour !== null && profitPerHour >= 300 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}` },
                         { label: 'Revenue per Hour', value: revenuePerHour !== null ? `$${fmtMoney(revenuePerHour)}` : '—', valueClass: 'text-slate-500 dark:text-slate-400 font-bold' },
                         { label: 'Items Ran per Hour', value: itemsRanPerHour !== null ? String(Math.round(itemsRanPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
-                        { label: 'Orders per Hour',  value: ordersPerHour !== null ? String(Math.round(ordersPerHour)) : '—', valueClass: 'text-slate-700 dark:text-slate-300 font-bold' },
+                        // Orders per Hour used to sit here — it's the same number
+                        // as the Est. Orders/hr tile above.
                       ];
 
                       return (
@@ -1804,6 +1833,9 @@ export default function PerformancePage() {
                           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-t-0 rounded-b-xl overflow-hidden">
                             {/* Headline pace tiles */}
                             <ShowPaceGrid hs={hs} baseline={hostBaselines[hs.host]} />
+
+                            {/* Swipeable trends for those same metrics */}
+                            <ShowTrendStrip hs={hs} dayOrders={hostDayOrders} />
 
                             {/* Stats list */}
                             <div className="px-5 py-4 space-y-3">
