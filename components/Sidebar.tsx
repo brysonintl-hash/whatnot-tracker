@@ -32,6 +32,7 @@ const I = {
   hd:     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
   report: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
   mail: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+  trophy: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M19 5h-2V3H7v2H5a2 2 0 00-2 2v1a4 4 0 004 4h.26A6 6 0 0011 15.9V18H8v2h8v-2h-3v-2.1A6 6 0 0016.74 12H17a4 4 0 004-4V7a2 2 0 00-2-2zM5 8V7h2v3a2 2 0 01-2-2zm14 0a2 2 0 01-2 2V7h2v1z" /></svg>,
   calc: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M9 7h6M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01M15 17h.01" /></svg>,
   script: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>,
   messages: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
@@ -73,6 +74,7 @@ const NAV: Record<Role, Section[]> = {
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
+      { href: '/leaderboard', label: 'Host Leaderboard', icon: I.trophy },
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
       { href: '/calculator', label: 'Pay Calculator', icon: I.calc },
       { href: '/users', label: 'User Management', icon: I.users },
@@ -100,6 +102,7 @@ const NAV: Record<Role, Section[]> = {
     ]},
     { title: 'Team', items: [
       { href: '/performance', label: 'Performance', icon: I.bar },
+      { href: '/leaderboard', label: 'Host Leaderboard', icon: I.trophy },
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
       { href: '/calculator', label: 'Pay Calculator', icon: I.calc },
     ]},
@@ -141,6 +144,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/script', label: 'Script Reader', icon: I.script },
       { href: '/performance', label: 'My Performance', icon: I.bar },
+      { href: '/leaderboard', label: 'Host Leaderboard', icon: I.trophy },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
