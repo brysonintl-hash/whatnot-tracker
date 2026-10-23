@@ -10,6 +10,8 @@ import {
   type LeaderboardRow, type MetricKey, type PeriodKey, type ShowRecord, type SortKey, type Weights,
 } from '@/lib/leaderboard';
 import { buildSampleShows } from '@/lib/sampleShows';
+import { showRecordsFromOrders } from '@/lib/showRecords';
+import type { SaleOrder } from '@/lib/sampleData';
 
 type Session = { username: string; role: Role; name: string };
 
@@ -226,6 +228,8 @@ export default function LeaderboardPage() {
   const [sort, setSort] = useState<SortKey>('overall');
   const [weights, setWeights] = useState<Weights>({ ...DEFAULT_WEIGHTS });
   const [showSettings, setShowSettings] = useState(false);
+  const [usingSample, setUsingSample] = useState(false);
+  const [dataNote, setDataNote] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
@@ -233,9 +237,24 @@ export default function LeaderboardPage() {
       if (s.role !== 'admin' && s.role !== 'manager' && s.role !== 'host') { router.push('/login'); return; }
       setSession(s);
     });
-    // Built after mount so the dates come from the browser's clock without
-    // risking a server/client mismatch on the rendered markup.
-    setShows(buildSampleShows(new Date()));
+
+    // Real shows from the WN sheet. Sample data is only a fallback for when
+    // the sheet can't be read (no credentials locally, or the API is down),
+    // and the page says so rather than passing invented hosts off as real.
+    fetch('/api/sales', { cache: 'no-store' })
+      .then(r => r.json())
+      .then((data: SaleOrder[] | { error?: string }) => {
+        if (!Array.isArray(data)) throw new Error('error' in data && data.error ? data.error : 'Sales data unavailable');
+        const records = showRecordsFromOrders(data);
+        if (records.length === 0) throw new Error('No shows found in the sales sheet');
+        setShows(records);
+        setUsingSample(false);
+      })
+      .catch((e: Error) => {
+        setShows(buildSampleShows(new Date()));
+        setUsingSample(true);
+        setDataNote(e.message);
+      });
   }, [router]);
 
   const board = useMemo(() => {
@@ -325,6 +344,24 @@ export default function LeaderboardPage() {
 
           {showSettings && (
             <WeightsPanel weights={weights} setWeights={setWeights} onClose={() => setShowSettings(false)} />
+          )}
+
+          {usingSample && (
+            <div className="mb-5 rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-amber-800 dark:text-amber-300">
+                  Showing sample hosts — these are not your real hosts
+                </p>
+                <p className="text-[11px] text-amber-900/70 dark:text-amber-200/60 mt-0.5 leading-relaxed">
+                  The sales sheet couldn&apos;t be read, so the board is filled with placeholder names and figures.
+                  {dataNote ? ` (${dataNote})` : ''} Real host names come straight from the sheet&apos;s host column
+                  once it loads.
+                </p>
+              </div>
+            </div>
           )}
 
           {ranked.length === 0 ? (
@@ -467,7 +504,9 @@ export default function LeaderboardPage() {
               host&apos;s shows before dividing, so one brief hot streak doesn&apos;t outweigh a full afternoon.
             </p>
             <p className="text-[11px] text-orange-900/50 dark:text-orange-200/40 mt-2">
-              Showing sample data until the board is connected to the WN sheet.
+              {usingSample
+                ? 'Showing sample data — the sales sheet could not be read.'
+                : 'Built from the WN sheet: one record per host per livestream, failed and cancelled orders excluded.'}
             </p>
           </div>
         </main>
