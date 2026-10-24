@@ -43,7 +43,7 @@ export default function KnowledgePage() {
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
-      if (!s || (s.role !== 'admin' && s.role !== 'manager' && s.role !== 'host')) { router.push('/login'); return; }
+      if (!s || (s.role !== 'admin' && s.role !== 'manager' && s.role !== 'host' && s.role !== 'shipper')) { router.push('/login'); return; }
       setSession(s);
     });
     fetch('/api/knowledge').then(r => r.json()).then(d => {

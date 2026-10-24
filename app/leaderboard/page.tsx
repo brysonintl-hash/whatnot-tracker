@@ -234,7 +234,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
       if (!s) { router.push('/login'); return; }
-      if (s.role !== 'admin' && s.role !== 'manager' && s.role !== 'host') { router.push('/login'); return; }
+      if (s.role !== 'admin' && s.role !== 'manager' && s.role !== 'host' && s.role !== 'shipper') { router.push('/login'); return; }
       setSession(s);
     });
 

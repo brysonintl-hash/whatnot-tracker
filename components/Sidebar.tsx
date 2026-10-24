@@ -116,18 +116,27 @@ const NAV: Record<Role, Section[]> = {
   // public storefront — but Record<Role, Section[]> needs every role
   // covered, and empty is the correct "no internal access" value anyway.
   customer: [],
+  // Shippers get the host's operational tabs too — everything except
+  // My Performance, which only shows a host their own shows.
   shipper: [
     { title: 'Overview', items: [
       { href: '/shipper', label: 'Dashboard', icon: I.grid },
       { href: '/messages', label: 'Messages', icon: I.messages },
     ]},
-    { title: 'Tasks', items: [
+    { title: 'Operations', items: [
+      { href: '/inventory', label: 'Inventory', icon: I.box },
+      { href: '/sales', label: 'Sales', icon: I.chart },
+      { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
+      { href: '/leaderboard', label: 'Host Leaderboard', icon: I.trophy },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
     ]},
     { title: 'Time', items: [
       { href: '/timekeeping', label: 'Timekeeping', icon: I.clock },
+    ]},
+    { title: 'System', items: [
+      { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
     ]},
     { title: 'Account', items: [
       { href: '/settings', label: 'Settings', icon: I.settings },
@@ -142,7 +151,6 @@ const NAV: Record<Role, Section[]> = {
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
-      { href: '/script', label: 'Script Reader', icon: I.script },
       { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/leaderboard', label: 'Host Leaderboard', icon: I.trophy },
       { href: '/pendings', label: 'Pendings', icon: I.clip },

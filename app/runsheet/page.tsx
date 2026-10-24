@@ -68,7 +68,7 @@ export default function RunSheetPage() {
 
   useEffect(() => {
     fetch('/api/me').then(r => (r.ok ? r.json() : null)).then((s: Session | null) => {
-      if (!s || !['host', 'admin', 'manager'].includes(s.role)) { router.push('/login'); return; }
+      if (!s || !['host', 'admin', 'manager', 'shipper'].includes(s.role)) { router.push('/login'); return; }
       setSession(s);
     });
 
