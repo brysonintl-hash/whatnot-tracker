@@ -75,6 +75,17 @@ export type LeaderboardRow = {
   rank: number;
   /** Spots gained vs the previous period; null when there's nothing to compare. */
   rankChange: number | null;
+  /**
+   * The sorted metric show by show, oldest first — the sparkline's shape.
+   * Per show rather than pooled, so it reads as a history rather than a single
+   * number repeated.
+   */
+  trend: number[];
+  /**
+   * Percent change in the sorted metric against the previous period, or null
+   * when the host didn't stream then and there's nothing to compare to.
+   */
+  changePct: number | null;
   eligible: boolean;
   /** Why they aren't ranked, for the "Not enough data yet" list. */
   ineligibleReason?: string;
@@ -198,6 +209,26 @@ export function buildLeaderboard(
 
   const scored = scoreRows(base, weights);
 
+  /**
+   * The sorted metric, show by show, oldest first.
+   *
+   * "overall" is a score relative to everyone else, so it has no meaning for a
+   * single show — the sparkline falls back to profit per hour there, the
+   * bottom-line number, and the UI says so.
+   */
+  const trendMetric: MetricKey = sort === 'overall' ? 'profitPerHour' : sort;
+  const trendByHost = new Map<string, number[]>();
+  for (const s of [...shows].sort((a, b) => parseShowDate(a.date) - parseShowDate(b.date))) {
+    if (!s.host) continue;
+    const m = metricsFor({
+      host: s.host, shows: 1, hours: s.durationHours, sales: s.sales,
+      orders: s.orders, paidOrders: s.paidOrders ?? s.orders, profit: s.grossProfit,
+    });
+    const list = trendByHost.get(s.host) ?? [];
+    list.push(m[trendMetric]);
+    trendByHost.set(s.host, list);
+  }
+
   let rows: LeaderboardRow[] = base.map((b, i) => ({
     host: b.host,
     initial: (b.host.trim()[0] ?? '?').toUpperCase(),
@@ -207,6 +238,8 @@ export function buildLeaderboard(
     overall: scored[i].overall,
     rank: 0,
     rankChange: null,
+    trend: trendByHost.get(b.host) ?? [],
+    changePct: null,
     eligible: b.eligible,
     ineligibleReason: b.eligible ? undefined : ineligibleReason(b.totals),
   }));
@@ -232,11 +265,25 @@ export function buildLeaderboard(
       .sort((a, b) => sortValue(b, sort) - sortValue(a, sort) || a.host.localeCompare(b.host));
 
     const prevRank = new Map(prevRanked.map((r, i) => [r.host, i + 1]));
+    // Measured on the same metric the sparkline plots, so the line and the
+    // percentage beside it always describe the same thing. (Sorting by
+    // "overall" plots profit/hr, because a relative score has no per-show
+    // meaning — and comparing overall scores would read 0% whenever everyone
+    // improved by the same amount, which is true but useless.)
+    const prevValue = new Map(prevRanked.map(r => [r.host, r.metrics[trendMetric]]));
+
     for (const r of ranked) {
       const before = prevRank.get(r.host);
       // A host who wasn't ranked last period has no movement to show — we
       // can't say they "gained" spots from a rank they never held.
       r.rankChange = before === undefined ? null : before - r.rank;
+
+      // Same reasoning for the percentage: no previous figure, no change.
+      // A previous value of zero has no meaningful percentage either.
+      const was = prevValue.get(r.host);
+      r.changePct = was === undefined || was === 0
+        ? null
+        : ((r.metrics[trendMetric] - was) / Math.abs(was)) * 100;
     }
   }
 
