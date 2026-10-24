@@ -1,34 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/storage';
+import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { getSalesData } from '@/lib/sheets';
 
-type Host = { id: string; name: string; color: string };
+export const dynamic = 'force-dynamic';
 
-const DEFAULT_HOSTS: Host[] = [
-  { id: '1', name: 'Jason', color: '#F59E0B' },
-];
-
+/**
+ * The distinct host names in the WN sheet, newest shows first.
+ *
+ * User Management uses this to populate the "host stats" picker, so an admin
+ * links an account by choosing a name that genuinely exists in the sheet
+ * rather than typing one and silently mismatching it.
+ */
 export async function GET() {
-  const hosts = readData<Host[]>('hosts.json', DEFAULT_HOSTS);
-  return NextResponse.json(hosts);
-}
+  const session = await getSession();
+  if (!session || (session.role !== 'admin' && session.role !== 'manager')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
-export async function POST(req: NextRequest) {
-  const { name, color } = await req.json();
-  const hosts = readData<Host[]>('hosts.json', DEFAULT_HOSTS);
-  const colors = ['#F59E0B', '#DC2626', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899'];
-  const newHost: Host = {
-    id: Date.now().toString(),
-    name,
-    color: color || colors[hosts.length % colors.length],
-  };
-  hosts.push(newHost);
-  writeData('hosts.json', hosts);
-  return NextResponse.json(newHost);
-}
+  try {
+    const orders = await getSalesData();
 
-export async function DELETE(req: NextRequest) {
-  const { id } = await req.json();
-  const hosts = readData<Host[]>('hosts.json', DEFAULT_HOSTS);
-  writeData('hosts.json', hosts.filter(h => h.id !== id));
-  return NextResponse.json({ success: true });
+    // Count shows per host so the picker can show who is actually active.
+    const seen = new Map<string, { host: string; orders: number; tabs: Set<string> }>();
+    for (const o of orders) {
+      const host = (o.host ?? '').trim();
+      if (!host) continue;
+      const key = host.toLowerCase();
+      let e = seen.get(key);
+      if (!e) { e = { host, orders: 0, tabs: new Set() }; seen.set(key, e); }
+      e.orders++;
+      if (o.tab) e.tabs.add(o.tab);
+    }
+
+    const hosts = Array.from(seen.values())
+      .map(e => ({ host: e.host, orders: e.orders, shows: e.tabs.size }))
+      .sort((a, b) => b.shows - a.shows || a.host.localeCompare(b.host));
+
+    return NextResponse.json({ hosts });
+  } catch (e) {
+    console.error('api/hosts: sales read failed', e);
+    return NextResponse.json(
+      { hosts: [], error: 'Could not read the sales sheet, so host names are unavailable right now.' },
+      { status: 200 },
+    );
+  }
 }

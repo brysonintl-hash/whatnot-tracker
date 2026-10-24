@@ -6,7 +6,8 @@ import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 
 type Session = { username: string; role: Role; name: string };
-type User = { id: string; username: string; name: string; role: Role; status: 'active' | 'pending'; createdAt: string; lastSeen: string | null };
+type User = { id: string; username: string; name: string; role: Role; status: 'active' | 'pending'; createdAt: string; lastSeen: string | null; hostName?: string | null };
+type SheetHost = { host: string; orders: number; shows: number };
 
 function fmtLastSeen(iso: string | null): { label: string; online: boolean } {
   if (!iso) return { label: 'Never', online: false };
@@ -46,6 +47,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [sheetHosts, setSheetHosts] = useState<SheetHost[]>([]);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [filter, setFilter] = useState<RoleFilter>('team');
 
   useEffect(() => {
@@ -54,6 +57,12 @@ export default function UsersPage() {
       setSession(s);
     });
     fetchUsers();
+    // Names that actually appear in the sheet's host column, so linking is a
+    // pick from real data rather than typing a name that may not match.
+    fetch('/api/hosts')
+      .then(r => r.json())
+      .then(d => setSheetHosts(Array.isArray(d?.hosts) ? d.hosts : []))
+      .catch(() => setSheetHosts([]));
   }, []);
 
   function fetchUsers() {
@@ -71,6 +80,23 @@ export default function UsersPage() {
       body: JSON.stringify({ role }),
     });
     setUsers(us => us.map(u => u.id === id ? { ...u, role, status: 'active' as const } : u));
+    setSaving(null);
+  }
+
+  async function changeHostName(id: string, hostName: string) {
+    setSaving(id);
+    const res = await fetch(`/api/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostName }),
+    });
+    if (res.ok) {
+      setUsers(us => us.map(u => u.id === id ? { ...u, hostName: hostName || null } : u));
+      setLinkError(null);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setLinkError(body.error ?? 'Could not save the host link.');
+    }
     setSaving(null);
   }
 
@@ -152,6 +178,24 @@ export default function UsersPage() {
               <span className="text-xs text-slate-400">{visibleUsers.length} shown</span>
             </div>
 
+            {linkError && (
+              <div className="mx-5 mb-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3.5 py-2.5 flex items-start justify-between gap-3">
+                <p className="text-xs text-red-700 dark:text-red-300">{linkError}</p>
+                <button onClick={() => setLinkError(null)} className="text-red-400 hover:text-red-600 text-xs font-bold flex-shrink-0">Dismiss</button>
+              </div>
+            )}
+
+            {!loading && users.some(u => u.role === 'host' && !u.hostName) && (
+              <div className="mx-5 mb-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3.5 py-2.5">
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                  <strong>Host Stats</strong> links an account to the name its shows are recorded under in the sales
+                  sheet — &ldquo;Evon Bantegui&rdquo; signs in, but the sheet says &ldquo;Evon&rdquo;. Until it&apos;s
+                  set, that host sees no stats at all. It isn&apos;t guessed from the name, because two hosts called
+                  William would both match.
+                </p>
+              </div>
+            )}
+
             {loading ? (
               <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Loading...</div>
             ) : (
@@ -159,7 +203,7 @@ export default function UsersPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-700">
-                      {['Name', 'Username', 'Current Role', 'Change Role', 'Last Online', 'Joined', ''].map(h => (
+                      {['Name', 'Username', 'Current Role', 'Change Role', 'Host Stats', 'Last Online', 'Joined', ''].map(h => (
                         <th key={h} className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-5">{h}</th>
                       ))}
                     </tr>
@@ -196,6 +240,43 @@ export default function UsersPage() {
                                 {ROLES.map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                               </select>
                               {u.status === 'pending' && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">↑ Activate</span>}
+                            </div>
+                          )}
+                        </td>
+                        {/* Which sheet host name this account's stats come from */}
+                        <td className="py-3 px-4">
+                          {u.role !== 'host' ? (
+                            <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={u.hostName ?? ''}
+                                disabled={saving === u.id}
+                                onChange={e => changeHostName(u.id, e.target.value)}
+                                title="Which name in the sales sheet this host's stats come from"
+                                className={`text-xs border rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 ${
+                                  u.hostName
+                                    ? 'border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300'
+                                    : 'border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
+                                }`}
+                              >
+                                <option value="">Not linked</option>
+                                {/* Keep a stale link visible so it can be seen and corrected,
+                                    even if that name no longer appears in the sheet. */}
+                                {u.hostName && !sheetHosts.some(h => h.host.toLowerCase() === (u.hostName ?? '').toLowerCase()) && (
+                                  <option value={u.hostName}>{u.hostName} (not in sheet)</option>
+                                )}
+                                {sheetHosts.map(h => (
+                                  <option key={h.host} value={h.host}>
+                                    {h.host} · {h.shows} {h.shows === 1 ? 'show' : 'shows'}
+                                  </option>
+                                ))}
+                              </select>
+                              {!u.hostName && (
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold whitespace-nowrap" title="This host sees no stats until a sheet name is linked">
+                                  sees nothing
+                                </span>
+                              )}
                             </div>
                           )}
                         </td>

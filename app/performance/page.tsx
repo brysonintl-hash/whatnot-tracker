@@ -14,7 +14,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend);
 
-type Session = { username: string; role: Role; name: string };
+type Session = { username: string; role: Role; name: string; hostName?: string | null };
 type Order = {
   tab: string; orderId: string; buyer: string; modelNum: string; productName: string;
   qty: number; sold: number; cost: number; earn: number; profit: number; margin: number;
@@ -692,14 +692,12 @@ function TierHistorySection({ allOrders, myName }: { allOrders: Order[]; myName:
 
   const allHosts = useMemo(() => {
     const hosts = Array.from(new Set(allOrders.map(o => o.host).filter(Boolean))) as string[];
-    if (!myName) return hosts.sort();
-    const mn = myName.toLowerCase().trim();
-    return hosts
-      .filter(h => {
-        const hn = h.toLowerCase().trim();
-        return hn === mn || hn.includes(mn) || mn.includes(hn);
-      })
-      .sort();
+    // `myName` is the linked sheet host name for a host account, null for
+    // staff who see everyone. Exact match only — see visibleHostStats.
+    if (myName === null) return hosts.sort();
+    const mn = myName.trim().toLowerCase();
+    if (!mn) return [];
+    return hosts.filter(h => h.trim().toLowerCase() === mn).sort();
   }, [allOrders, myName]);
 
   const historyMap = useMemo(() => {
@@ -1551,24 +1549,29 @@ export default function PerformancePage() {
     return out;
   }, [orders, selectedDate]);
 
-  // Hosts only see their own shows — flexible name matching (handles partial / reversed names)
+  /**
+   * A host sees only the shows on the sheet host name an admin linked to their
+   * account — an exact, case-insensitive match on that one name.
+   *
+   * This used to match the account name against the sheet by substring, which
+   * leaked: two Williams both matched "William", and a host called "Ann"
+   * matched "Joanna". With no link set we show nothing at all rather than
+   * guess, so an unlinked account can never land on someone else's figures.
+   */
+  const myHostName = session?.role === 'host' ? (session.hostName ?? '').trim().toLowerCase() : null;
+  const isMine = (host: string) => myHostName !== null && host.trim().toLowerCase() === myHostName;
+
   const visibleHostStats = useMemo(() => {
     if (session?.role !== 'host') return hostStats;
-    const myName = session.name.toLowerCase().trim();
-    return hostStats.filter(hs => {
-      const h = hs.host.toLowerCase().trim();
-      return h === myName || h.includes(myName) || myName.includes(h);
-    });
-  }, [hostStats, session]);
+    if (!myHostName) return [];
+    return hostStats.filter(hs => isMine(hs.host));
+  }, [hostStats, session, myHostName]);
 
   const hostDayOrders = useMemo(() => {
     if (session?.role !== 'host') return dayOrders;
-    const myName = session.name.toLowerCase().trim();
-    return dayOrders.filter(o => {
-      const h = (o.host ?? '').toLowerCase().trim();
-      return h === myName || h.includes(myName) || myName.includes(h);
-    });
-  }, [dayOrders, session]);
+    if (!myHostName) return [];
+    return dayOrders.filter(o => isMine(o.host ?? ''));
+  }, [dayOrders, session, myHostName]);
 
   if (!session) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
@@ -1663,7 +1666,20 @@ export default function PerformancePage() {
               </div>
 
               {/* Results */}
-              {dayOrders.length === 0 ? (
+              {session.role === 'host' && !myHostName ? (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-amber-300 dark:border-amber-800 p-8 text-center">
+                  <div className="text-3xl mb-3">🔗</div>
+                  <p className="font-black text-slate-900 dark:text-white text-sm">Your account isn&apos;t linked to a host yet</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto leading-relaxed">
+                    Your shows are recorded in the sales sheet under a host name, and an admin needs to connect that
+                    name to your account before your stats can show here. Ask an admin to open User Management and set
+                    the host name for <strong className="text-slate-700 dark:text-slate-200">{session.name}</strong>.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-3">
+                    Nothing is shown until then, so you never see another host&apos;s numbers by mistake.
+                  </p>
+                </div>
+              ) : dayOrders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
                   <div className="text-4xl mb-3">📅</div>
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No show data for this date</p>
@@ -1903,7 +1919,7 @@ export default function PerformancePage() {
 
                   <TierHistorySection
                     allOrders={orders}
-                    myName={session?.role === 'host' ? session.name : null}
+                    myName={session?.role === 'host' ? (session.hostName ?? '') : null}
                   />
                 </>
               )}

@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 import type { StoredUser } from './types';
 
 const PW_SHEET = 'pw';
-const HEADERS = ['id', 'username', 'password', 'name', 'role', 'status', 'createdAt'];
+const HEADERS = ['id', 'username', 'password', 'name', 'role', 'status', 'createdAt', 'hostName'];
 
 function getAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -28,7 +28,7 @@ export async function readUsersFromSheet(): Promise<StoredUser[] | null> {
     const sheets = google.sheets({ version: 'v4', auth });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${PW_SHEET}!A1:G2000`,
+      range: `${PW_SHEET}!A1:H2000`,
     });
 
     const rows = res.data.values || [];
@@ -46,6 +46,7 @@ export async function readUsersFromSheet(): Promise<StoredUser[] | null> {
         role: (row[4] || 'host') as StoredUser['role'],
         status: (row[5] || 'pending') as StoredUser['status'],
         createdAt: row[6] || new Date().toISOString(),
+        hostName: row[7] || undefined,
       }))
       .filter(u => u.id && u.username);
   } catch (e) {
@@ -63,11 +64,11 @@ export async function writeUsersToSheet(users: StoredUser[]): Promise<void> {
     const sheets = google.sheets({ version: 'v4', auth });
     const values = [
       HEADERS,
-      ...users.map(u => [u.id, u.username, u.password, u.name, u.role, u.status, u.createdAt]),
+      ...users.map(u => [u.id, u.username, u.password, u.name, u.role, u.status, u.createdAt, u.hostName ?? '']),
     ];
 
     // Clear existing data then write fresh
-    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${PW_SHEET}!A:G` });
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${PW_SHEET}!A:H` });
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${PW_SHEET}!A1`,

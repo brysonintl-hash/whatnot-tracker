@@ -175,6 +175,24 @@ export async function updateUserRole(id: string, role: Role): Promise<boolean> {
   return true;
 }
 
+/**
+ * Link an account to a name in the WN sheet's host column, or clear the link
+ * by passing an empty string.
+ *
+ * Stored trimmed; comparisons elsewhere are case-insensitive but exact — no
+ * substring matching, or one host would see another's shows.
+ */
+export async function updateUserHostName(id: string, hostName: string): Promise<boolean> {
+  const users = await getCache();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return false;
+  const trimmed = hostName.trim();
+  const updated = [...users];
+  updated[idx] = { ...updated[idx], hostName: trimmed || undefined };
+  await save(updated);
+  return true;
+}
+
 export async function updateUserPassword(id: string, password: string): Promise<boolean> {
   const users = await getCache();
   const idx = users.findIndex(u => u.id === id);
