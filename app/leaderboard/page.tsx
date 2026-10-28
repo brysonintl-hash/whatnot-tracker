@@ -6,14 +6,14 @@ import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 import {
   METRICS, DEFAULT_WEIGHTS, PERIODS, MIN_SHOWS, MIN_HOURS,
-  buildLeaderboard, periodWindows, showsInWindow,
+  buildLeaderboard, periodWindows, showsInWindow, DEFAULT_PERIOD,
   type LeaderboardRow, type PeriodKey, type ShowRecord, type SortKey, type Weights,
 } from '@/lib/leaderboard';
 import { buildSampleShows } from '@/lib/sampleShows';
 import { showRecordsFromOrders } from '@/lib/showRecords';
 import type { SaleOrder } from '@/lib/sampleData';
 
-type Session = { username: string; role: Role; name: string };
+type Session = { username: string; role: Role; name: string; hostName?: string | null };
 
 // Warm family to match the dashboard, spread far enough apart that two hosts
 // side by side never read as the same colour.
@@ -230,6 +230,91 @@ function ChangePill({ pct }: { pct: number | null }) {
   );
 }
 
+
+/** A gap expressed in the sorted metric's own units. */
+function formatGap(key: SortKey, v: number): string {
+  if (key === 'overall') return `${v.toFixed(1)} pts`;
+  return METRICS.find(m => m.key === key)!.format(v);
+}
+
+/**
+ * The next rung up.
+ *
+ * Shows the gap to the host directly above rather than to the leader: a gap
+ * you could close this week is something to chase, while "60 points off the
+ * top" mostly tells a host to stop trying. Whoever is first sees their cushion
+ * instead, which is its own reason to defend it.
+ */
+function ChaseLine({ row, sort }: { row: LeaderboardRow; sort: SortKey }) {
+  if (row.rank === 1) {
+    if (row.leadOverNext === null) return null;
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4-6.2-4.6-6.2 4.6 2.4-7.4L2 9.4h7.6z" /></svg>
+        Leading by {formatGap(sort, row.leadOverNext)}
+      </span>
+    );
+  }
+  if (row.gapToNext === null || !row.chasing) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500
+                     transition-colors duration-200 group-hover/row:text-orange-600 dark:group-hover/row:text-orange-400">
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5l7 9h-14z" /></svg>
+      {formatGap(sort, row.gapToNext)} to pass {row.chasing}
+    </span>
+  );
+}
+
+/**
+ * A host's own standing, pinned above the board.
+ *
+ * The table tells everyone where they sit; this says what to do next, in the
+ * units of whatever is being ranked. Only shown to a host whose account is
+ * linked to a sheet name, since otherwise we don't know which row is theirs.
+ */
+function YourStanding({ row, sort, color, total, runnerUp }: {
+  row: LeaderboardRow; sort: SortKey; color: string; total: number; runnerUp: string | null;
+}) {
+  const first = row.rank === 1;
+  return (
+    <div className="mb-5 rounded-2xl overflow-hidden lb-rise shadow-lg"
+      style={{ background: first
+        ? 'linear-gradient(110deg,#7C2D12 0%,#B45309 55%,#D97706 100%)'
+        : 'linear-gradient(110deg,#0B1220 0%,#1E293B 55%,#3B2A5A 100%)' }}>
+      <div className="px-5 py-4 flex items-center gap-4 flex-wrap">
+        <Avatar color={color} initial={row.initial} size={46} ring="rgba(255,255,255,0.35)" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-black uppercase tracking-[0.15em] text-white/50">Your standing</p>
+          <p className="text-lg font-black text-white leading-tight">
+            {first ? `You're #1 of ${total} — hold it` : `You're #${row.rank} of ${total}`}
+          </p>
+          <p className="text-xs text-white/70 mt-0.5">
+            {first
+              ? row.leadOverNext !== null
+                ? <>You&apos;re <strong className="text-white">{formatGap(sort, row.leadOverNext)}</strong> clear of {runnerUp ?? 'second place'}. Hold the gap and the crown stays yours.</>
+                : 'You’re the only ranked host this period.'
+              : row.gapToNext !== null && row.chasing
+                ? <>Just <strong className="text-white">{formatGap(sort, row.gapToNext)}</strong> more and you overtake <strong className="text-white">{row.chasing}</strong>.</>
+                : 'Keep streaming — your next show moves this.'}
+          </p>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-3xl font-black text-white leading-none">{formatFor(sort, row)}</p>
+          <p className="text-[10px] uppercase tracking-wide font-bold text-white/50 mt-1">
+            {sort === 'overall' ? 'Overall Score' : SORTS.find(x => x.key === sort)?.label}
+          </p>
+        </div>
+      </div>
+      {!first && row.gapToNext !== null && (
+        <div className="h-1.5 bg-black/25">
+          <div className="h-full bg-gradient-to-r from-amber-400 to-orange-400 lb-grow origin-left"
+            style={{ width: `${Math.max(4, Math.min(100, (1 - row.gapToNext / Math.max(1e-9, (sort === 'overall' ? row.overall : row.metrics[sort]) + row.gapToNext)) * 100))}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Podium ─────────────────────────────────────────────────────────────────
 
 const PLACES = [
@@ -389,7 +474,7 @@ export default function LeaderboardPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [shows, setShows] = useState<ShowRecord[] | null>(null);
-  const [period, setPeriod] = useState<PeriodKey>('last28');
+  const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PERIOD);
   const [sort, setSort] = useState<SortKey>('overall');
   const [weights, setWeights] = useState<Weights>({ ...DEFAULT_WEIGHTS });
   const [showSettings, setShowSettings] = useState(false);
@@ -443,6 +528,11 @@ export default function LeaderboardPage() {
   const podium = ranked.slice(0, 3);
   const colors = buildColorMap([...ranked, ...unranked].map(r => r.host));
   const trendLabel = sort === 'overall' ? 'Profit/hr' : SORTS.find(s => s.key === sort)?.label;
+  // Which row belongs to the person looking, so the board can speak to them
+  // directly. Exact match on the linked sheet name — same rule the Performance
+  // page uses, so an unlinked account simply gets no personal card.
+  const myHostName = session.role === 'host' ? (session.hostName ?? '').trim().toLowerCase() : '';
+  const myRow = myHostName ? ranked.find(r => r.host.trim().toLowerCase() === myHostName) ?? null : null;
   const trendTip = `${trendLabel} show by show, oldest on the left. The percentage compares this period's ${trendLabel} with the period before.`
     + (sort === 'overall' ? ' Overall is a score relative to other hosts, so it has no per-show value — profit per hour stands in for it here.' : '');
 
@@ -547,6 +637,11 @@ export default function LeaderboardPage() {
             </div>
           ) : (
             <>
+              {myRow && (
+                <YourStanding row={myRow} sort={sort} color={colors[myRow.host]}
+                  total={ranked.length} runnerUp={ranked[1]?.host ?? null} />
+              )}
+
               {/* Podium */}
               <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-7">
                 {podium.map((row, i) => (
@@ -618,6 +713,7 @@ export default function LeaderboardPage() {
                                 <p className="text-[11px] text-slate-400 dark:text-slate-500">
                                   {row.totals.shows} shows · {fmtHours(row.totals.hours)}
                                 </p>
+                                <ChaseLine row={row} sort={sort} />
                               </div>
                             </div>
                           </td>

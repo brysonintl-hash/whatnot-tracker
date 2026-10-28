@@ -86,6 +86,19 @@ export type LeaderboardRow = {
    * when the host didn't stream then and there's nothing to compare to.
    */
   changePct: number | null;
+  /**
+   * How much more of the sorted metric it would take to overtake the host one
+   * place above — the next rung, not the summit. Null for whoever is first.
+   *
+   * A gap to the person directly ahead is something a host can actually close
+   * this week; "you are 60 points off the leader" mostly tells them to give
+   * up. The leader instead gets `leadOverNext`.
+   */
+  gapToNext: number | null;
+  /** For rank 1 only: how far clear of second place they are. */
+  leadOverNext: number | null;
+  /** The host immediately above, so the gap can be named. */
+  chasing: string | null;
   eligible: boolean;
   /** Why they aren't ranked, for the "Not enough data yet" list. */
   ineligibleReason?: string;
@@ -240,6 +253,9 @@ export function buildLeaderboard(
     rankChange: null,
     trend: trendByHost.get(b.host) ?? [],
     changePct: null,
+    gapToNext: null,
+    leadOverNext: null,
+    chasing: null,
     eligible: b.eligible,
     ineligibleReason: b.eligible ? undefined : ineligibleReason(b.totals),
   }));
@@ -252,6 +268,19 @@ export function buildLeaderboard(
   ranked.forEach((r, i) => { r.rank = i + 1; });
 
   const unranked = rows.filter(r => !r.eligible).sort((a, b) => a.host.localeCompare(b.host));
+
+  // The next rung up: what it would take to overtake the host directly above.
+  ranked.forEach((r, i) => {
+    if (i === 0) {
+      r.leadOverNext = ranked.length > 1
+        ? sortValue(r, sort) - sortValue(ranked[1], sort)
+        : null;
+      return;
+    }
+    const above = ranked[i - 1];
+    r.chasing = above.host;
+    r.gapToNext = Math.max(0, sortValue(above, sort) - sortValue(r, sort));
+  });
 
   // Rank movement, measured on the same sort so the arrow matches the column.
   if (opts.previous && opts.previous.length > 0) {
@@ -297,14 +326,16 @@ export function buildLeaderboard(
 
 // ── Periods ────────────────────────────────────────────────────────────────
 
-export type PeriodKey = 'week' | 'month' | 'last28' | 'all';
+export type PeriodKey = 'week' | 'month' | 'all';
 
 export const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: 'week', label: 'This week' },
-  { key: 'month', label: 'This month' },
-  { key: 'last28', label: 'Last 28 days' },
+  { key: 'month', label: 'Month to date' },
   { key: 'all', label: 'All time' },
 ];
+
+/** What the board opens on: the 1st of this month through today. */
+export const DEFAULT_PERIOD: PeriodKey = 'month';
 
 /** Parsed as local midnight, so a date never slips a day by timezone. */
 export function parseShowDate(date: string): number {
@@ -315,31 +346,50 @@ export function parseShowDate(date: string): number {
 export type Window = { from: number; to: number } | null;
 
 /**
- * The window a period covers, and the equally long one before it.
+ * The window a period covers, and the matching one before it.
  *
- * "This week" starts Monday; "this month" starts on the 1st. Both are
- * to-date rather than rolling, which is what someone means by "this week".
- * All time has no bounds and therefore no previous window to compare against.
+ * Both periods are to-date rather than rolling — "this week" starts Monday,
+ * "month to date" starts on the 1st — which is what people mean by them.
+ *
+ * The previous window is the *same stretch* of the previous week or month,
+ * not simply the same number of days immediately before. On the 26th, a
+ * month-to-date board compares the 1st–26th against the 1st–26th of last
+ * month; sliding back by a day count instead would have compared it against
+ * the 5th–30th, which is neither a month nor a like-for-like stretch, and the
+ * trend arrows would have been quietly meaningless.
+ *
+ * All time has no bounds and therefore nothing to compare against.
  */
 export function periodWindows(period: PeriodKey, now: Date = new Date()): { current: Window; previous: Window } {
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+  const dayStart = new Date(y, mo, d).getTime();
   const DAY = 86400000;
-  const to = dayStart + DAY - 1; // through the end of today
+  const endOf = (ms: number) => ms + DAY - 1;
 
   if (period === 'all') return { current: null, previous: null };
 
-  let from: number;
   if (period === 'week') {
     const dow = (new Date(dayStart).getDay() + 6) % 7; // Monday = 0
-    from = dayStart - dow * DAY;
-  } else if (period === 'month') {
-    from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  } else {
-    from = dayStart - 27 * DAY;
+    const from = dayStart - dow * DAY;
+    // Exactly one week back, so Monday–Wednesday compares with Monday–Wednesday.
+    return {
+      current: { from, to: endOf(dayStart) },
+      previous: { from: from - 7 * DAY, to: endOf(dayStart - 7 * DAY) },
+    };
   }
 
-  const span = to - from + 1;
-  return { current: { from, to }, previous: { from: from - span, to: from - 1 } };
+  // Month to date, against the same days of the previous month. A short
+  // previous month is clamped to its own last day, so 31 March compares
+  // against the whole of February rather than spilling into March.
+  const from = new Date(y, mo, 1).getTime();
+  const prevFrom = new Date(y, mo - 1, 1);
+  const prevMonthDays = new Date(y, mo, 0).getDate();
+  const prevTo = new Date(y, mo - 1, Math.min(d, prevMonthDays)).getTime();
+
+  return {
+    current: { from, to: endOf(dayStart) },
+    previous: { from: prevFrom.getTime(), to: endOf(prevTo) },
+  };
 }
 
 export function showsInWindow(shows: ShowRecord[], window: Window): ShowRecord[] {
