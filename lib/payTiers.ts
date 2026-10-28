@@ -1,14 +1,14 @@
 // ─── Host pay tiers ────────────────────────────────────────────────────────
 //
 // A host's streaming rate is set by the show's profit per hour. Tiers from
-// $500/hr profit upward also require a 25%+ margin — clear the profit bar on
+// $500/hr profit upward also require a 20%+ margin — clear the profit bar on
 // thin margins and the host drops exactly one tier.
 //
 // Non-streaming hours are paid at the separate base rate ($18/hr), entered on
 // the Pay Calculator; these tiers only cover time on air.
 
 export const MARGIN_GATE_FROM_PROFIT = 500;
-export const MARGIN_GATE_PCT = 25;
+export const MARGIN_GATE_PCT = 20;
 
 export type PayTier = {
   /** 1 is the top tier. */
@@ -99,7 +99,7 @@ export type TierResult = {
   tier: PayTier | null;
   /** The tier the profit alone would have earned. */
   earned: PayTier | null;
-  /** True when the 25% margin requirement knocked them down a tier. */
+  /** True when the margin requirement knocked them down a tier. */
   tieredDown: boolean;
 };
 
