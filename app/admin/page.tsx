@@ -4,10 +4,11 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
+import RevenueByHostCard from '@/components/RevenueByHostCard';
 import type { Role } from '@/lib/types';
 
 const USChoroplethMap = dynamic(() => import('@/components/USChoroplethMap'), { ssr: false });
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, ArcElement, Filler);
@@ -58,7 +59,6 @@ function pct(curr: number, prev: number) {
   return ((curr - prev) / prev) * 100;
 }
 
-const HOST_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // â"€â"€ Icons â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -153,17 +153,17 @@ function CalendarView({ orders }: { orders: Order[] }) {
           <p className="text-3xl font-black text-white mb-3">${fmt(mRev)}</p>
           <p className="text-slate-500 text-[11px]">{opDays} operating day{opDays !== 1 ? 's' : ''}</p>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+        <div className="dash-card dash-rise bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5" style={{ animationDelay: '70ms' }}>
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Gross Profit</p>
           <p className={`text-2xl font-black mb-1 ${mProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(mProfit)}</p>
           <p className="text-slate-400 text-[11px]">{mMargin.toFixed(1)}% margin</p>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+        <div className="dash-card dash-rise bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5" style={{ animationDelay: '140ms' }}>
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Net Profit</p>
           <p className={`text-2xl font-black mb-1 ${mProfit >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>${fmt(mProfit)}</p>
           <p className="text-slate-400 text-[11px]">{mProfit >= 0 ? 'Profitable' : 'Not profitable'}</p>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+        <div className="dash-card dash-rise bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5" style={{ animationDelay: '210ms' }}>
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Total Sales</p>
           <p className="text-2xl font-black text-slate-900 dark:text-white mb-1">{mCount}</p>
           <p className="text-slate-400 text-[11px]">{opDays > 0 ? (mCount / opDays).toFixed(1) : '0'} avg/day</p>
@@ -541,6 +541,23 @@ export default function AdminPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
+          <style>{`
+            @keyframes dashRise { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:none } }
+            @keyframes dashFade { from { opacity:0 } to { opacity:1 } }
+            /* backwards, not both: a forwards fill keeps asserting transform:none after
+               the animation ends, which outranks .dash-card:hover in the cascade and
+               silently kills the hover lift. */
+            .dash-rise { animation: dashRise .6s cubic-bezier(.22,1,.36,1) backwards }
+            .rbh-row   { animation: dashFade .5s ease-out both }
+            /* Lift every dashboard card on hover, without touching each one. */
+            .dash-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease }
+            .dash-card:hover { transform: translateY(-3px) }
+            @media (prefers-reduced-motion: reduce) {
+              .dash-rise,.rbh-row { animation: none !important }
+              .dash-card { transition: none }
+              .dash-card:hover { transform: none }
+            }
+          `}</style>
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Loading data...</div>
           ) : (
@@ -585,7 +602,7 @@ export default function AdminPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
+                    <div className="dash-card dash-rise bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 shadow-lg sm:col-span-2 lg:col-span-1" style={{ animationDelay: '0ms' }}>
                       <div className="flex items-start justify-between mb-1">
                         <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Gross Volume</p>
                         {(() => { const c = pct(revenue, prevRevenue); return c !== null ? <span className={`text-xs font-bold ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c >= 0 ? '↑' : '↓'} {Math.abs(c).toFixed(1)}% vs prev.</span> : null; })()}
@@ -625,7 +642,7 @@ export default function AdminPage() {
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-                    <div className="lg:col-span-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+                    <div className="dash-card dash-rise lg:col-span-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5" style={{ animationDelay: '280ms' }}>
                       <div className="flex items-start justify-between mb-3">
                         <div><h2 className="font-bold text-slate-900 dark:text-white text-sm">Gross Volume</h2><p className="text-xl font-black text-slate-900 dark:text-white">${fmt(revenue)}</p></div>
                         <span className="flex items-center gap-1 text-xs text-slate-400"><span className="w-2.5 h-1.5 rounded-sm bg-amber-400 inline-block" /> This period</span>
@@ -633,12 +650,8 @@ export default function AdminPage() {
                       <Line data={{ labels: byTab.map(([t]) => t), datasets: [{ label: 'Sales ($)', data: byTab.map(([, v]) => v), borderColor: '#F59E0B', backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#F59E0B', pointBorderColor: '#fff', pointBorderWidth: 1.5 }] }}
                         options={{ responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` $${fmt(c.raw as number)}` } } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }, y: { grid: { color: 'rgba(148,163,184,0.08)' }, ticks: { font: { size: 10 }, color: '#94a3b8', callback: v => `$${(Number(v)/1000).toFixed(0)}k` } } } }} />
                     </div>
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex flex-col">
-                      <div className="mb-3"><h2 className="font-bold text-slate-900 dark:text-white text-sm">Revenue by Host</h2><p className="text-xs text-slate-400 mt-0.5">{Object.keys(byHost).length} hosts</p></div>
-                      <div className="flex-1 flex items-center justify-center min-h-[240px]">
-                        <Doughnut data={{ labels: Object.keys(byHost), datasets: [{ data: Object.values(byHost), backgroundColor: HOST_COLORS, borderWidth: 3, borderColor: 'transparent', hoverBorderColor: '#fff' }] }}
-                          options={{ responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, color: '#94a3b8', usePointStyle: true, pointStyleWidth: 8 } } } }} />
-                      </div>
+                    <div className="dash-rise lg:col-span-2" style={{ animationDelay: '350ms' }}>
+                      <RevenueByHostCard byHost={byHost} />
                     </div>
                   </div>
 
