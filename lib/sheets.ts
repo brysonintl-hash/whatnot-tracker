@@ -126,9 +126,11 @@ export type ClaimRecord = {
   dateOrder?: string;
   modelNumber?: string;
   itemName?: string;
-  // Incomplete-order fields — how many of the item were bought vs. received
+  // Incomplete-order fields — how many of the item were bought vs. received,
+  // plus whatever the buyer said or the team needs to remember about it
   qtyOrdered?: number;
   qtyReceived?: number;
+  note?: string;
   // USPS claim fields
   amountRequested?: number;
   amountApproved?: number;
@@ -152,7 +154,7 @@ const CLAIM_TABS: Record<string, string> = {
 // inserting them mid-row, which would shift STATUS out from under that path.
 const CLAIM_HEADERS: Record<string, string[]> = {
   cancellation: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS'],
-  incomplete: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS', 'QTY ORDERED', 'QTY RECEIVED'],
+  incomplete: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS', 'QTY ORDERED', 'QTY RECEIVED', 'NOTE'],
   replacement: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS'],
   refund: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS'],
   usps: ['USERNAME', 'AMOUNT REQUESTED', 'AMOUNT APPROVED', 'DATE SUBMITTED', 'TRACKING NUMBER', 'STATUS'],
@@ -173,7 +175,7 @@ function claimToRow(type: string, data: Omit<ClaimRecord, 'rowIndex'>): (string 
     return [data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status];
   }
   const base: (string | number)[] = [data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status];
-  if (type === 'incomplete') base.push(data.qtyOrdered ?? '', data.qtyReceived ?? '');
+  if (type === 'incomplete') base.push(data.qtyOrdered ?? '', data.qtyReceived ?? '', data.note ?? '');
   return base;
 }
 
@@ -198,7 +200,38 @@ async function ensureClaimTab(
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [CLAIM_HEADERS[type]] },
   });
+  headersSynced.add(tab);
   return true;
+}
+
+// A tab created before a column was added still has the old header row, so a
+// new column would land under a blank heading. Fill in the missing headings
+// once per process — blanks only, so a heading anyone renamed by hand stays.
+const headersSynced = new Set<string>();
+async function syncClaimHeaders(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  type: string,
+): Promise<void> {
+  const tab = CLAIM_TABS[type];
+  if (headersSynced.has(tab)) return;
+  const want = CLAIM_HEADERS[type];
+  try {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A1:${lastCol(type)}1` });
+    const have = (res.data.values?.[0] ?? []).map(v => (v ?? '').toString());
+    const merged = want.map((h, i) => have[i]?.trim() ? have[i] : h);
+    if (merged.some((h, i) => h !== have[i])) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${tab}'!A1:${lastCol(type)}1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [merged] },
+      });
+    }
+    headersSynced.add(tab);
+  } catch {
+    // The tab probably isn't there yet; addClaim creates it on the retry path.
+  }
 }
 
 export async function getClaims(type: string): Promise<ClaimRecord[]> {
@@ -228,7 +261,7 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
       }));
     }
     // General: A=orderNumber, B=dateOrder, C=modelNumber, D=itemName, E=username, F=status
-    // Incomplete adds: G=qtyOrdered, H=qtyReceived
+    // Incomplete adds: G=qtyOrdered, H=qtyReceived, I=note
     return numbered.map(({ row, rowIndex }): ClaimRecord => ({
       rowIndex,
       orderNumber: row[0] || '',
@@ -237,7 +270,7 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
       itemName: row[3] || '',
       username: row[4] || '',
       status: row[5] || '',
-      ...(type === 'incomplete' ? { qtyOrdered: parseQty(row[6]), qtyReceived: parseQty(row[7]) } : {}),
+      ...(type === 'incomplete' ? { qtyOrdered: parseQty(row[6]), qtyReceived: parseQty(row[7]), note: row[8] || '' } : {}),
     }));
   } catch (e) {
     console.error('getClaims error:', e);
@@ -258,6 +291,7 @@ export async function addClaim(type: string, data: Omit<ClaimRecord, 'rowIndex'>
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [claimToRow(type, data)] },
   });
+  await syncClaimHeaders(sheets, spreadsheetId, type);
   try {
     await append();
   } catch (e) {

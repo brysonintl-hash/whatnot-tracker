@@ -30,6 +30,7 @@ type ClaimRecord = {
   // Incomplete-order fields
   qtyOrdered?: number;
   qtyReceived?: number;
+  note?: string;
   // USPS claim fields
   amountRequested?: number;
   amountApproved?: number;
@@ -65,7 +66,7 @@ const STATUS_LABEL: Record<string, string> = { pending: 'Pending', 'in-progress'
 const emptyClaimForm = {
   orderNumber: '', dateOrder: '', modelNumber: '', itemName: '',
   username: '', status: '',
-  qtyOrdered: '', qtyReceived: '',
+  qtyOrdered: '', qtyReceived: '', note: '',
   amountRequested: '', amountApproved: '', dateSubmitted: '', trackingNumber: '',
 };
 
@@ -102,6 +103,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
       status: c.status || '',
       qtyOrdered: c.qtyOrdered != null ? String(c.qtyOrdered) : '',
       qtyReceived: c.qtyReceived != null ? String(c.qtyReceived) : '',
+      note: c.note || '',
       amountRequested: c.amountRequested != null ? String(c.amountRequested) : '',
       amountApproved: c.amountApproved != null ? String(c.amountApproved) : '',
       dateSubmitted: c.dateSubmitted || '',
@@ -132,6 +134,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
           ...(isIncomplete ? {
             qtyOrdered: editForm.qtyOrdered === '' ? undefined : parseInt(editForm.qtyOrdered, 10),
             qtyReceived: editForm.qtyReceived === '' ? undefined : parseInt(editForm.qtyReceived, 10),
+            note: editForm.note,
           } : {}),
         }),
       }),
@@ -196,6 +199,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
           ...(isIncomplete ? {
             qtyOrdered: form.qtyOrdered === '' ? undefined : parseInt(form.qtyOrdered, 10),
             qtyReceived: form.qtyReceived === '' ? undefined : parseInt(form.qtyReceived, 10),
+            note: form.note,
           } : {}),
         }),
       });
@@ -338,6 +342,14 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                 {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            {isIncomplete && (
+              <div className="col-span-2 md:col-span-3">
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Note</label>
+                <textarea rows={2} value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="What the buyer said, what was sent, tracking — anything the next person needs"
+                  className={`w-full resize-y ${inputCls}`} />
+              </div>
+            )}
             <div className="col-span-2 md:col-span-3 flex flex-col gap-2 items-end">
               {saveError && (
                 <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg px-3 py-2 w-full">
@@ -386,6 +398,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                     </>
                   )}
                   <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
+                  {isIncomplete && <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Note</th>}
                   {isAdminOrManager && <th className="py-3 px-4 w-16" />}
                 </tr>
               </thead>
@@ -497,6 +510,17 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(c.status)}`}>{c.status || '—'}</span>
                       )}
                     </td>
+                    {isIncomplete && (
+                      <td className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[240px]">
+                        {isEditing ? (
+                          <textarea rows={2} value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} className={`${inCls} resize-y`} placeholder="Note" />
+                        ) : c.note ? (
+                          // The full note stays reachable on hover rather than
+                          // stretching the row to whatever the longest one is.
+                          <span className="block truncate" title={c.note}>{c.note}</span>
+                        ) : <span className="text-slate-400">—</span>}
+                      </td>
+                    )}
                     {isAdminOrManager && (
                       <td className="py-2 px-4">
                         {isEditing ? (
