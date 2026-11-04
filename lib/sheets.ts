@@ -358,6 +358,72 @@ export async function updateClaim(type: string, rowIndex: number, data: Omit<Cla
   });
 }
 
+// ─── Open-claim counts for the sidebar badge ────────────────────────────────
+
+export type ClaimCounts = Record<string, number>;
+
+// "Still needs someone" — the same rule the Shipments page uses for its own
+// per-tab badges, so the sidebar and the page can never disagree.
+function isOpenStatus(type: string, status: string): boolean {
+  return type === 'usps' ? status !== 'Approved' : status !== 'Resolved';
+}
+
+// The sidebar polls this on every page, for every admin. One batchGet covers
+// all five tabs, and a short cache plus a shared in-flight promise keeps a
+// burst of sessions down to a single round trip — the same shape as the sales
+// cache above, for the same reason.
+const CLAIM_COUNT_TTL_MS = 60_000;
+let claimCountCache: { at: number; data: ClaimCounts } | null = null;
+let claimCountInFlight: Promise<ClaimCounts> | null = null;
+
+export async function getClaimCounts(): Promise<ClaimCounts> {
+  const auth = getAuth();
+  if (!auth) return {};
+  if (claimCountCache && Date.now() - claimCountCache.at < CLAIM_COUNT_TTL_MS) return claimCountCache.data;
+  if (claimCountInFlight) return claimCountInFlight;
+
+  claimCountInFlight = fetchClaimCounts(auth)
+    .then(data => {
+      claimCountCache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      claimCountInFlight = null;
+    });
+  return claimCountInFlight;
+}
+
+async function fetchClaimCounts(auth: ReturnType<typeof getAuth>): Promise<ClaimCounts> {
+  const sheets = google.sheets({ version: 'v4', auth: auth! });
+  const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const types = Object.keys(CLAIM_TABS);
+  const ranges = types.map(t => `'${CLAIM_TABS[t]}'!A2:F2000`);
+
+  const count = (type: string, rows: string[][]) =>
+    rows.filter(r => (r[0] ?? '').toString().trim() && isOpenStatus(type, (r[5] ?? '').toString().trim())).length;
+
+  try {
+    const res = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges });
+    const out: ClaimCounts = {};
+    types.forEach((t, i) => { out[t] = count(t, (res.data.valueRanges?.[i]?.values ?? []) as string[][]); });
+    return out;
+  } catch {
+    // batchGet is all-or-nothing: one tab that isn't there yet fails the whole
+    // call. Fall back to reading them separately so a missing tab costs only
+    // its own count rather than blanking every badge.
+    const out: ClaimCounts = {};
+    await Promise.all(types.map(async t => {
+      try {
+        const r = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${CLAIM_TABS[t]}'!A2:F2000` });
+        out[t] = count(t, (r.data.values ?? []) as string[][]);
+      } catch {
+        out[t] = 0;
+      }
+    }));
+    return out;
+  }
+}
+
 // ─── Write assignment back to SHIPMENT RECORDS Google Sheet ──────────────────
 
 export async function updateShipmentInSheet(tab: string, shipmentId: string, assignedName: string, status: string): Promise<void> {

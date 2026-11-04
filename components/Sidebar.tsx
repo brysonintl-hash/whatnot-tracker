@@ -189,6 +189,8 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [shipmentCount, setShipmentCount] = useState(0);
+  const [shipCounts, setShipCounts] = useState<{ shipments: number; claims: Record<string, number>; total: number } | null>(null);
+  const [newCustomerCount, setNewCustomerCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -202,6 +204,22 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
     if (pathname.startsWith('/shipping')) setExpandedItems(new Set(['/shipping']));
   }, [pathname]);
 
+  // Each Shipments child badges its own queue, so the parent's number is
+  // visibly made up of the rows underneath it rather than coming from nowhere.
+  const CHILD_COUNT_KEY: Record<string, string> = {
+    '/shipping?tab=cancellation': 'cancellation',
+    '/shipping?tab=incomplete': 'incomplete',
+    '/shipping?tab=replacement': 'replacement',
+    '/shipping?tab=refund': 'refund',
+    '/shipping?tab=usps': 'usps',
+  };
+  function childCount(href: string): number {
+    if (!shipCounts) return 0;
+    if (href === '/shipping') return shipCounts.shipments;
+    const key = CHILD_COUNT_KEY[href];
+    return key ? (shipCounts.claims?.[key] ?? 0) : 0;
+  }
+
   function toggleExpanded(href: string) {
     setExpandedItems(prev => {
       const next = new Set(prev);
@@ -210,15 +228,38 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
     });
   }
 
+  // Customers sign themselves up, so they arrive "active" and never show up
+  // in the pending-approval count. What makes one new is simply that it
+  // registered after the admin last opened User Management — kept per
+  // browser, since it is a "have I looked at this yet", not a fact about
+  // the account. With nothing stored yet, start the clock now rather than
+  // greeting a first-time admin with a badge counting every customer ever.
+  //
+  // Marking seen and counting live in one effect on purpose: as two, the
+  // in-flight fetch resolved against the timestamp it captured before the
+  // mark was written and put the badge straight back.
   useEffect(() => {
     if (role !== 'admin') return;
-    fetch('/api/users')
-      .then(r => r.json())
-      .then((users: { status: string }[]) => {
-        setPendingUserCount(users.filter(u => u.status === 'pending').length);
-      })
-      .catch(() => {});
-  }, [role]);
+    const onUsersPage = pathname.startsWith('/users');
+    const markSeen = () => localStorage.setItem('usersSeenAt', new Date().toISOString());
+    if (onUsersPage || !localStorage.getItem('usersSeenAt')) markSeen();
+
+    const fetchUsers = () => {
+      fetch('/api/users')
+        .then(r => r.json())
+        .then((users: { status: string; role: string; createdAt: string }[]) => {
+          if (!Array.isArray(users)) return;
+          setPendingUserCount(users.filter(u => u.status === 'pending').length);
+          // Read the marker now, not when the request went out.
+          const seenAt = localStorage.getItem('usersSeenAt') ?? new Date().toISOString();
+          setNewCustomerCount(onUsersPage ? 0 : users.filter(u => u.role === 'customer' && u.createdAt > seenAt).length);
+        })
+        .catch(() => {});
+    };
+    fetchUsers();
+    const t = setInterval(fetchUsers, 60000);
+    return () => clearInterval(t);
+  }, [role, pathname]);
 
   useEffect(() => {
     const fetchCount = () => {
@@ -249,6 +290,19 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
     };
     fetchCount();
     const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== 'admin' && role !== 'manager') return;
+    const fetchCounts = () => {
+      fetch('/api/shipments/counts')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && typeof d.total === 'number') setShipCounts(d); })
+        .catch(() => {});
+    };
+    fetchCounts();
+    const t = setInterval(fetchCounts, 60000);
     return () => clearInterval(t);
   }, [role]);
 
@@ -356,9 +410,22 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                 const isPendings = item.href === '/pendings';
                 const isShipments = item.href === '/shipping';
                 const isMessages = item.href === '/messages';
-                const usersBadge = isUsers && pendingUserCount > 0;
+                // Two different things both mean "open User Management": an
+                // account waiting on approval, and a customer who just signed
+                // up. One number to notice, the split spelled out on hover.
+                const usersCount = pendingUserCount + newCustomerCount;
+                const usersBadge = isUsers && usersCount > 0;
+                const usersTitle = [
+                  pendingUserCount > 0 ? `${pendingUserCount} awaiting approval` : '',
+                  newCustomerCount > 0 ? `${newCustomerCount} new customer${newCustomerCount === 1 ? '' : 's'}` : '',
+                ].filter(Boolean).join(' · ');
                 const pendingsBadge = isPendings && pendingTaskCount > 0;
-                const shipmentsBadge = isShipments && (role === 'host' || role === 'shipper') && shipmentCount > 0;
+                // Hosts and shippers see their own open assignments; admins and
+                // managers see everything still open under Shipments.
+                const ownShipments = (role === 'host' || role === 'shipper') ? shipmentCount : 0;
+                const teamShipments = (role === 'admin' || role === 'manager') ? (shipCounts?.total ?? 0) : 0;
+                const shipmentsTotal = ownShipments + teamShipments;
+                const shipmentsBadge = isShipments && shipmentsTotal > 0;
                 const messagesBadge = isMessages && unreadMessageCount > 0;
                 const hasBadge = usersBadge || pendingsBadge || shipmentsBadge || messagesBadge;
 
@@ -386,7 +453,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                             <span className="whitespace-nowrap">{item.label}</span>
                             {shipmentsBadge && (
                               <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                                {shipmentCount}
+                                {shipmentsTotal > 99 ? '99+' : shipmentsTotal}
                               </span>
                             )}
                             <svg className={`w-3.5 h-3.5 ml-auto flex-shrink-0 transition-transform duration-150 ${isChildExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,14 +462,40 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                           </>
                         )}
                       </button>
-                      {open && isChildExpanded && (
-                        <div className="ml-3 pl-3 border-l border-slate-700 mt-0.5 mb-1 space-y-0.5">
-                          {item.children.map(child => (
-                            <Link key={child.href} href={child.href} onClick={() => setMobileOpen(false)}
-                              className="flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-200 hover:bg-slate-800">
-                              {child.label}
-                            </Link>
-                          ))}
+                      {open && (
+                        // grid-template-rows 0fr -> 1fr animates to the real
+                        // content height without measuring it, so the submenu
+                        // slides instead of snapping. The children stay mounted
+                        // while closed, so they are hidden from the tab order
+                        // and from screen readers rather than just clipped.
+                        <div
+                          aria-hidden={!isChildExpanded}
+                          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none ${
+                            isChildExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="ml-3 pl-3 border-l border-slate-700 mt-0.5 mb-1 space-y-0.5">
+                              {item.children.map((child, ci) => {
+                                const n = childCount(child.href);
+                                return (
+                                  <Link key={child.href} href={child.href} onClick={() => setMobileOpen(false)}
+                                    tabIndex={isChildExpanded ? undefined : -1}
+                                    style={{ transitionDelay: isChildExpanded ? `${60 + ci * 35}ms` : '0ms' }}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 transition-all duration-300 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none hover:text-slate-200 hover:bg-slate-800 ${
+                                      isChildExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-1'
+                                    }`}>
+                                    <span className="whitespace-nowrap">{child.label}</span>
+                                    {n > 0 && (
+                                      <span className="ml-auto min-w-[16px] h-[16px] px-1 rounded-full bg-amber-500/90 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                                        {n > 99 ? '99+' : n}
+                                      </span>
+                                    )}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -430,8 +523,9 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                       <>
                         <span className="whitespace-nowrap">{item.label}</span>
                         {usersBadge && (
-                          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                            {pendingUserCount}
+                          <span title={usersTitle}
+                            className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                            {usersCount > 99 ? '99+' : usersCount}
                           </span>
                         )}
                         {pendingsBadge && (
