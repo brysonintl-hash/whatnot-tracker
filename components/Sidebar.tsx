@@ -50,6 +50,7 @@ const SHIPMENTS_NAV: NavItem = {
   children: [
     { href: '/shipping', label: 'Assign Shipments', icon: I.ship },
     { href: '/shipping?tab=cancellation', label: 'Cancellations', icon: I.clip },
+    { href: '/shipping?tab=incomplete', label: 'Incomplete Orders', icon: I.clip },
     { href: '/shipping?tab=replacement', label: 'Replacements', icon: I.clip },
     { href: '/shipping?tab=refund', label: 'Refunds', icon: I.clip },
     { href: '/shipping?tab=usps', label: 'USPS Claims', icon: I.clip },

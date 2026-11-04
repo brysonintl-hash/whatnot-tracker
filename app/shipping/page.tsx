@@ -27,6 +27,9 @@ type ClaimRecord = {
   dateOrder?: string;
   modelNumber?: string;
   itemName?: string;
+  // Incomplete-order fields
+  qtyOrdered?: number;
+  qtyReceived?: number;
   // USPS claim fields
   amountRequested?: number;
   amountApproved?: number;
@@ -37,11 +40,12 @@ type ClaimRecord = {
   status: string;
 };
 
-type SectionType = 'shipments' | 'cancellation' | 'replacement' | 'refund' | 'usps';
+type SectionType = 'shipments' | 'cancellation' | 'incomplete' | 'replacement' | 'refund' | 'usps';
 
 const SECTION_LABELS: Record<SectionType, string> = {
   shipments: 'Assign Shipments',
   cancellation: 'Cancellations',
+  incomplete: 'Incomplete Orders',
   replacement: 'Replacements',
   refund: 'Refunds',
   usps: 'USPS Claims',
@@ -49,6 +53,7 @@ const SECTION_LABELS: Record<SectionType, string> = {
 
 const USPS_STATUSES = ['Under Review', 'Approved'];
 const CLAIM_STATUSES = ['Open', 'In Progress', 'Resolved'];
+const INCOMPLETE_STATUSES = ['Reported', 'Sending Missing Items', 'Shipped', 'Resolved'];
 
 const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
@@ -60,6 +65,7 @@ const STATUS_LABEL: Record<string, string> = { pending: 'Pending', 'in-progress'
 const emptyClaimForm = {
   orderNumber: '', dateOrder: '', modelNumber: '', itemName: '',
   username: '', status: '',
+  qtyOrdered: '', qtyReceived: '',
   amountRequested: '', amountApproved: '', dateSubmitted: '', trackingNumber: '',
 };
 
@@ -82,7 +88,8 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const isUsps = type === 'usps';
-  const statusOptions = isUsps ? USPS_STATUSES : CLAIM_STATUSES;
+  const isIncomplete = type === 'incomplete';
+  const statusOptions = isUsps ? USPS_STATUSES : isIncomplete ? INCOMPLETE_STATUSES : CLAIM_STATUSES;
 
   function openEdit(c: ClaimRecord) {
     setEditingIdx(c.rowIndex);
@@ -93,6 +100,8 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
       itemName: c.itemName || '',
       username: c.username || '',
       status: c.status || '',
+      qtyOrdered: c.qtyOrdered != null ? String(c.qtyOrdered) : '',
+      qtyReceived: c.qtyReceived != null ? String(c.qtyReceived) : '',
       amountRequested: c.amountRequested != null ? String(c.amountRequested) : '',
       amountApproved: c.amountApproved != null ? String(c.amountApproved) : '',
       dateSubmitted: c.dateSubmitted || '',
@@ -120,6 +129,10 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
           dateOrder: editForm.dateOrder,
           modelNumber: editForm.modelNumber,
           itemName: editForm.itemName,
+          ...(isIncomplete ? {
+            qtyOrdered: editForm.qtyOrdered === '' ? undefined : parseInt(editForm.qtyOrdered, 10),
+            qtyReceived: editForm.qtyReceived === '' ? undefined : parseInt(editForm.qtyReceived, 10),
+          } : {}),
         }),
       }),
     });
@@ -180,6 +193,10 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
           itemName: form.itemName,
           username: form.username,
           status: form.status,
+          ...(isIncomplete ? {
+            qtyOrdered: form.qtyOrdered === '' ? undefined : parseInt(form.qtyOrdered, 10),
+            qtyReceived: form.qtyReceived === '' ? undefined : parseInt(form.qtyReceived, 10),
+          } : {}),
         }),
       });
       const data = await res.json();
@@ -221,8 +238,18 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
 
   function statusColor(s: string) {
     if (s === 'Approved' || s === 'Resolved') return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700';
-    if (s === 'Under Review' || s === 'In Progress') return 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700';
+    if (s === 'Under Review' || s === 'In Progress' || s === 'Sending Missing Items' || s === 'Shipped') return 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700';
     return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700';
+  }
+
+  // How many units never arrived. Only meaningful once both counts are in —
+  // a blank Received is "not reported", not "received zero", so it stays a dash
+  // rather than silently reading as the whole order missing.
+  function missingPill(c: ClaimRecord) {
+    if (c.qtyOrdered == null || c.qtyReceived == null) return <span className="text-xs text-slate-400">—</span>;
+    const missing = c.qtyOrdered - c.qtyReceived;
+    if (missing <= 0) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700">Complete</span>;
+    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-700">{missing} short</span>;
   }
 
   const inputCls = 'text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400';
@@ -286,10 +313,20 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Model #</label>
               <input value={form.modelNumber} onChange={e => setForm(f => ({ ...f, modelNumber: e.target.value }))} placeholder="Model #" className={`w-full ${inputCls}`} />
             </div>
-            <div className="col-span-2">
+            <div className={isIncomplete ? 'col-span-2 md:col-span-1' : 'col-span-2'}>
               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Item Name</label>
-              <input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Item name" className={`w-full ${inputCls}`} />
+              <input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} placeholder={isIncomplete ? 'e.g. 6 pack of Empire pipe levels' : 'Item name'} className={`w-full ${inputCls}`} />
             </div>
+            {isIncomplete && <>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Qty Ordered</label>
+                <input type="number" min="0" step="1" value={form.qtyOrdered} onChange={e => setForm(f => ({ ...f, qtyOrdered: e.target.value }))} placeholder="6" className={`w-full ${inputCls}`} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Qty Received</label>
+                <input type="number" min="0" step="1" value={form.qtyReceived} onChange={e => setForm(f => ({ ...f, qtyReceived: e.target.value }))} placeholder="1" className={`w-full ${inputCls}`} />
+              </div>
+            </>}
             <div>
               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Username</label>
               <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username" className={`w-full ${inputCls}`} />
@@ -320,7 +357,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
         {loading ? (
           <div className="p-8 text-center text-slate-400 text-sm">Loading...</div>
         ) : claims.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-sm">No {SECTION_LABELS[type].toLowerCase()} records yet</div>
+          <div className="p-8 text-center text-slate-400 text-sm">No {SECTION_LABELS[type].toLowerCase()} yet</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -340,6 +377,11 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                       <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
                       <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Model #</th>
                       <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Item Name</th>
+                      {isIncomplete && <>
+                        <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Ordered</th>
+                        <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Received</th>
+                        <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Missing</th>
+                      </>}
                       <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Username</th>
                     </>
                   )}
@@ -409,11 +451,32 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                       </>
                     ) : (
                       <>
-                        <td className="py-3 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{c.orderNumber || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-400">{c.dateOrder || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.modelNumber || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">{c.itemName || '—'}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{c.username || '—'}</td>
+                        <td className="py-2 px-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {isEditing ? <input value={editForm.orderNumber} onChange={e => setEditForm(f => ({ ...f, orderNumber: e.target.value }))} className={inCls} placeholder="Order #" /> : (c.orderNumber || '—')}
+                        </td>
+                        <td className="py-2 px-4 text-xs text-slate-400">
+                          {isEditing ? <input type="date" value={editForm.dateOrder} onChange={e => setEditForm(f => ({ ...f, dateOrder: e.target.value }))} className={inCls} /> : (c.dateOrder || '—')}
+                        </td>
+                        <td className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300">
+                          {isEditing ? <input value={editForm.modelNumber} onChange={e => setEditForm(f => ({ ...f, modelNumber: e.target.value }))} className={inCls} placeholder="Model #" /> : (c.modelNumber || '—')}
+                        </td>
+                        <td className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-[200px] truncate">
+                          {isEditing ? <input value={editForm.itemName} onChange={e => setEditForm(f => ({ ...f, itemName: e.target.value }))} className={inCls} placeholder="Item name" /> : (c.itemName || '—')}
+                        </td>
+                        {isIncomplete && <>
+                          <td className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300">
+                            {isEditing ? <input type="number" min="0" step="1" value={editForm.qtyOrdered} onChange={e => setEditForm(f => ({ ...f, qtyOrdered: e.target.value }))} className={`${inCls} w-16`} /> : (c.qtyOrdered ?? '—')}
+                          </td>
+                          <td className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300">
+                            {isEditing ? <input type="number" min="0" step="1" value={editForm.qtyReceived} onChange={e => setEditForm(f => ({ ...f, qtyReceived: e.target.value }))} className={`${inCls} w-16`} /> : (c.qtyReceived ?? '—')}
+                          </td>
+                          <td className="py-2 px-4">{missingPill(c)}</td>
+                        </>}
+                        <td className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300">
+                          {isEditing ? <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))} className={inCls} placeholder="Username" />
+                            : c.username ? <a href={`https://www.whatnot.com/user/${c.username}`} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">{c.username}</a>
+                            : '—'}
+                        </td>
                       </>
                     )}
                     <td className="py-2 px-4">
@@ -449,7 +512,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminO
                           </div>
                         ) : (
                           <div className="flex items-center gap-1">
-                            {isUsps && (
+                            {(isUsps || isIncomplete) && (
                               <button onClick={() => openEdit(c)}
                                 className="text-slate-400 hover:text-blue-500 transition-colors p-1 rounded"
                                 title="Edit">
@@ -498,7 +561,7 @@ function ShippingPageInner() {
   // Sync active section with ?tab= URL param whenever it changes
   useEffect(() => {
     const tab = searchParams.get('tab') as SectionType;
-    if (tab && ['cancellation', 'replacement', 'refund', 'usps'].includes(tab)) {
+    if (tab && ['cancellation', 'incomplete', 'replacement', 'refund', 'usps'].includes(tab)) {
       setActiveSection(tab);
     } else {
       setActiveSection('shipments');
@@ -564,7 +627,7 @@ function ShippingPageInner() {
     });
     load();
     // Prefetch unresolved counts for badge display
-    (['cancellation', 'replacement', 'refund', 'usps'] as const).forEach(t => {
+    (['cancellation', 'incomplete', 'replacement', 'refund', 'usps'] as const).forEach(t => {
       fetch(`/api/claims?type=${t}`)
         .then(r => r.json())
         .then((data: ClaimRecord[]) => {
@@ -731,7 +794,7 @@ function ShippingPageInner() {
     </div>
   );
 
-  const sections: SectionType[] = ['shipments', 'cancellation', 'replacement', 'refund', 'usps'];
+  const sections: SectionType[] = ['shipments', 'cancellation', 'incomplete', 'replacement', 'refund', 'usps'];
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">

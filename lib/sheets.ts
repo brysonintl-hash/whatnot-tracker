@@ -117,15 +117,18 @@ async function fetchSalesFromSheets(auth: NonNullable<ReturnType<typeof getAuth>
 
 export type ShipmentRecord = { shipmentId: string; tab: string };
 
-// ─── Claim Records (Cancellations / Replacement / Refund / USPS Claim) ───────
+// ─── Claim Records (Cancellations / Incomplete / Replacement / Refund / USPS) ─
 
 export type ClaimRecord = {
   rowIndex: number;
-  // General claim fields (cancellation / replacement / refund)
+  // General claim fields (cancellation / incomplete / replacement / refund)
   orderNumber?: string;
   dateOrder?: string;
   modelNumber?: string;
   itemName?: string;
+  // Incomplete-order fields — how many of the item were bought vs. received
+  qtyOrdered?: number;
+  qtyReceived?: number;
   // USPS claim fields
   amountRequested?: number;
   amountApproved?: number;
@@ -138,10 +141,65 @@ export type ClaimRecord = {
 
 const CLAIM_TABS: Record<string, string> = {
   cancellation: 'CANCELLATIONS',
+  incomplete: 'INCOMPLETE ORDER',
   replacement: 'REPLACEMENT',
   refund: 'REFUND',
   usps: 'USPS CLAIM',
 };
+
+// Every tab keeps STATUS in column F so one status-write path serves them all.
+// INCOMPLETE ORDER hangs its two quantity columns off the end rather than
+// inserting them mid-row, which would shift STATUS out from under that path.
+const CLAIM_HEADERS: Record<string, string[]> = {
+  cancellation: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS'],
+  incomplete: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS', 'QTY ORDERED', 'QTY RECEIVED'],
+  replacement: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS'],
+  refund: ['ORDER NUMBER', 'DATE ORDER', 'MODEL NUMBER', 'ITEM NAME', 'USERNAME', 'STATUS'],
+  usps: ['USERNAME', 'AMOUNT REQUESTED', 'AMOUNT APPROVED', 'DATE SUBMITTED', 'TRACKING NUMBER', 'STATUS'],
+};
+
+function lastCol(type: string): string {
+  return String.fromCharCode('A'.charCodeAt(0) + (CLAIM_HEADERS[type]?.length ?? 6) - 1);
+}
+
+function parseQty(val: string | undefined): number | undefined {
+  if (val == null || val === '') return undefined;
+  const n = parseInt(String(val).replace(/[^\d-]/g, ''), 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function claimToRow(type: string, data: Omit<ClaimRecord, 'rowIndex'>): (string | number)[] {
+  if (type === 'usps') {
+    return [data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status];
+  }
+  const base: (string | number)[] = [data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status];
+  if (type === 'incomplete') base.push(data.qtyOrdered ?? '', data.qtyReceived ?? '');
+  return base;
+}
+
+// A tab the app writes to may not exist in the workbook yet — a new claim
+// category ships here before anyone adds it by hand in Sheets. Create it with
+// its header row the first time a write needs it, so nobody has to.
+async function ensureClaimTab(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  type: string,
+): Promise<boolean> {
+  const tab = CLAIM_TABS[type];
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  if (meta.data.sheets?.some(s => s.properties?.title === tab)) return false;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [{ addSheet: { properties: { title: tab } } }] },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${tab}'!A1:${lastCol(type)}1`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [CLAIM_HEADERS[type]] },
+  });
+  return true;
+}
 
 export async function getClaims(type: string): Promise<ClaimRecord[]> {
   const auth = getAuth();
@@ -151,12 +209,16 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
   try {
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.SALES_SHEET_ID!;
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A2:F2000` });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A2:${lastCol(type)}2000` });
     const rows = res.data.values || [];
+    // rowIndex must come from the row's real position in the sheet, so number
+    // the rows BEFORE dropping the blank ones. Filtering first makes a gap
+    // anywhere above a record point edits and deletes at the wrong row.
+    const numbered = rows.map((row, idx) => ({ row, rowIndex: idx + 2 })).filter(r => r.row[0]);
     if (type === 'usps') {
       // USPS: A=username, B=amountRequested, C=amountApproved, D=dateSubmitted, E=trackingNumber, F=status
-      return rows.filter(r => r[0]).map((row, idx): ClaimRecord => ({
-        rowIndex: idx + 2,
+      return numbered.map(({ row, rowIndex }): ClaimRecord => ({
+        rowIndex,
         username: row[0] || '',
         amountRequested: parseMoney(row[1]),
         amountApproved: row[2] ? parseMoney(row[2]) : undefined,
@@ -166,14 +228,16 @@ export async function getClaims(type: string): Promise<ClaimRecord[]> {
       }));
     }
     // General: A=orderNumber, B=dateOrder, C=modelNumber, D=itemName, E=username, F=status
-    return rows.filter(r => r[0]).map((row, idx): ClaimRecord => ({
-      rowIndex: idx + 2,
+    // Incomplete adds: G=qtyOrdered, H=qtyReceived
+    return numbered.map(({ row, rowIndex }): ClaimRecord => ({
+      rowIndex,
       orderNumber: row[0] || '',
       dateOrder: row[1] || '',
       modelNumber: row[2] || '',
       itemName: row[3] || '',
       username: row[4] || '',
       status: row[5] || '',
+      ...(type === 'incomplete' ? { qtyOrdered: parseQty(row[6]), qtyReceived: parseQty(row[7]) } : {}),
     }));
   } catch (e) {
     console.error('getClaims error:', e);
@@ -186,21 +250,27 @@ export async function addClaim(type: string, data: Omit<ClaimRecord, 'rowIndex'>
   if (!auth) throw new Error('Google Sheets not configured');
   const tab = CLAIM_TABS[type];
   if (!tab) throw new Error(`Unknown claim type: ${type}`);
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SALES_SHEET_ID!;
+  const append = () => sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `'${tab}'!A2:${lastCol(type)}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [claimToRow(type, data)] },
+  });
   try {
-    const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.SALES_SHEET_ID!;
-    const values = type === 'usps'
-      ? [[data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status]]
-      : [[data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status]];
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: `'${tab}'!A2:F`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values },
-    });
+    await append();
   } catch (e) {
-    console.error('addClaim error:', e);
-    throw e;
+    // The usual cause of a failed append is a tab that isn't there yet.
+    // Create it and retry once; anything else still throws.
+    try {
+      const created = await ensureClaimTab(sheets, spreadsheetId, type);
+      if (!created) throw e;
+    } catch {
+      console.error('addClaim error:', e);
+      throw e;
+    }
+    await append();
   }
 }
 
@@ -245,14 +315,12 @@ export async function updateClaim(type: string, rowIndex: number, data: Omit<Cla
   if (!tab) return;
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.SALES_SHEET_ID!;
-  const values = type === 'usps'
-    ? [[data.username, data.amountRequested ?? 0, data.amountApproved ?? '', data.dateSubmitted ?? '', data.trackingNumber ?? '', data.status]]
-    : [[data.orderNumber ?? '', data.dateOrder ?? '', data.modelNumber ?? '', data.itemName ?? '', data.username, data.status]];
+  const end = lastCol(type);
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${tab}'!A${rowIndex}:F${rowIndex}`,
+    range: `'${tab}'!A${rowIndex}:${end}${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
-    requestBody: { values },
+    requestBody: { values: [claimToRow(type, data)] },
   });
 }
 
