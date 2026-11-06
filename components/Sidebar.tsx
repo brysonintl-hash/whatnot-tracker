@@ -67,6 +67,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
+      { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
@@ -95,6 +96,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
+      { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
       SHIPMENTS_NAV,
@@ -151,6 +153,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales', icon: I.chart },
+      { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/performance', label: 'My Performance', icon: I.bar },
       { href: '/leaderboard', label: 'Host Leaderboard', icon: I.trophy },

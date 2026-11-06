@@ -219,6 +219,13 @@ function demoItems(): RunItem[] {
     ['48-20-8998', 'SHOCKWAVE Impact Duty Bit, 3/8 in.', 27.47, 9.61, 11.0, 480, 415, 51, 14],
     ['48-20-9000', 'SHOCKWAVE Impact Duty Bit, 1/16 in.', 4.77, 1.67, 2.0, 219, 1, 113, 105],
     ['48-20-9009', 'SHOCKWAVE Impact Duty Bit, 5/64 in.', 8.47, 2.96, 4.0, 36, 0, 28, 8],
+    // These model numbers also appear in the sample sales rows, so the Show
+    // Analyzer has something to join against when there are no credentials:
+    // two still runnable, one down to its last few, one sold out.
+    ['DCF887B', 'DEWALT 20V MAX XR Brushless Impact Driver', 95.0, 71.25, 80.0, 40, 0, 18, 22],
+    ['2767-20', 'Milwaukee M18 FUEL High Torque Impact Wrench', 185.0, 142.0, 155.0, 30, 1, 11, 18],
+    ['48-22-8485', 'Milwaukee PACKOUT Wall and Floor Mount', 31.97, 22.38, 26.0, 12, 0, 9, 3],
+    ['48-59-1850', 'Milwaukee M18 REDLITHIUM 5.0 Ah Battery 2-Pack', 129.0, 98.0, 110.0, 25, 2, 23, 0],
   ];
   return raw.map(([modelNum, description, retail, cost, startPrice, qty, amz, wn, remaining]) => ({
     modelNum, description, image: '', link: '', upc: '', asin: '',
