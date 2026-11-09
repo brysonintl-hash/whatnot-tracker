@@ -277,6 +277,82 @@ function ItemsTab({ data }: { data: Perf }) {
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 
+type WebhookInfo = {
+  configured: boolean;
+  status: {
+    received: number; byType: Record<string, number>; lastReceivedAt: string | null;
+    rejected: number; lastRejected: { at: string; reason: string } | null;
+  };
+  recent: { id: string; type: string; at: string; outcome: string; note?: string; ref?: string }[];
+  lineupShows: number;
+  lineupEntries: number;
+  timelines: number;
+};
+
+/** Is Whatnot reaching us, and what is it sending. */
+function WebhookPanel({ info }: { info: WebhookInfo }) {
+  const s = info.status;
+  const ago = (iso: string | null) => {
+    if (!iso) return 'never';
+    const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+  };
+  const healthy = info.configured && s.received > 0;
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Live updates from Whatnot (webhooks)</h3>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${healthy
+          ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+          : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'}`}>
+          {!info.configured ? 'Secret missing' : s.received ? `Receiving · last ${ago(s.lastReceivedAt)}` : 'Waiting for the first event'}
+        </span>
+      </div>
+
+      {!info.configured && (
+        <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+          WHATNOT_WEBHOOK_SECRET is not set, so every delivery is being turned away for now. Whatnot keeps retrying
+          for about 2½ days, so nothing is lost once it is added in Railway.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        {[
+          ['Events received', s.received],
+          ['Turned away', s.rejected],
+          ['Shows with a lineup', info.lineupShows],
+          ['Parcels timed', info.timelines],
+        ].map(([label, n]) => (
+          <div key={label as string} className="bg-slate-50 dark:bg-slate-900/40 rounded-lg py-2">
+            <p className="text-lg font-black text-slate-900 dark:text-white">{(n as number).toLocaleString('en-US')}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {s.lastRejected && (
+        <p className="text-[11px] text-slate-400">
+          Last turned away {ago(s.lastRejected.at)}: {s.lastRejected.reason}
+        </p>
+      )}
+
+      {info.recent.length > 0 && (
+        <div className="max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700">
+          {info.recent.map(e => (
+            <div key={e.id} className="px-3 py-1.5 flex items-center gap-2 text-[11px]">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${e.outcome === 'processed' ? 'bg-emerald-500' : e.outcome === 'failed' ? 'bg-red-500' : 'bg-slate-300'}`}
+                aria-label={e.outcome} />
+              <span className="font-mono text-slate-600 dark:text-slate-300">{e.type}</span>
+              <span className="text-slate-400 truncate">{e.note ?? e.ref ?? ''}</span>
+              <span className="ml-auto text-slate-400 whitespace-nowrap">{ago(e.at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SetupTab({ data, reload }: { data: Perf; reload: () => void }) {
   const [shows, setShows] = useState<ShowRow[]>([]);
   const [busy, setBusy] = useState('');
@@ -291,6 +367,16 @@ function SetupTab({ data, reload }: { data: Perf; reload: () => void }) {
   }, []);
 
   useEffect(loadShows, [loadShows]);
+
+  const [hook, setHook] = useState<WebhookInfo | null>(null);
+  useEffect(() => {
+    const get = () => fetch('/api/whatnot/webhook', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null)).then(setHook).catch(() => {});
+    get();
+    // Deliveries arrive on their own schedule; keep the panel current.
+    const t = setInterval(get, 15000);
+    return () => clearInterval(t);
+  }, []);
 
   async function sync(body: Record<string, unknown>, label: string) {
     setBusy(label); setMsg('');
@@ -457,6 +543,8 @@ function SetupTab({ data, reload }: { data: Perf; reload: () => void }) {
           <datalist id="known-hosts">{known.map(h => <option key={h} value={h} />)}</datalist>
         </div>
       </div>
+
+      {hook && <WebhookPanel info={hook} />}
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white">3 · Purchase costs</h3>

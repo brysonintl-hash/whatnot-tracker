@@ -33,7 +33,11 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/reset-password') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/storefront') ||
-    pathname.startsWith('/api/deals')
+    pathname.startsWith('/api/deals') ||
+    // Whatnot's webhook deliveries carry no session; the route verifies each
+    // one by its signature instead. Exact match, so no other /api/whatnot
+    // route is opened up, and the route's own GET still requires an admin.
+    pathname === '/api/whatnot/webhook'
   ) {
     return NextResponse.next();
   }
