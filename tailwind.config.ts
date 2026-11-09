@@ -167,6 +167,9 @@ const config: Config = {
         // an animated transform on an ancestor would pin it to this wrapper
         // instead of the viewport while scrolling.
         'page-in': { from: { opacity: '0' }, to: { opacity: '1' } },
+        // Sparklines draw themselves in: the path is given pathLength=1 and
+        // stroke-dasharray 1, so animating the offset from 1 to 0 reveals it.
+        'spark-draw': { from: { strokeDashoffset: '1' }, to: { strokeDashoffset: '0' } },
       },
       animation: {
         'fade-in': 'fade-in 160ms ease-out',

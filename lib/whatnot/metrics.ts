@@ -49,6 +49,10 @@ export type ShowPerf = {
   marginPct: number | null;
   /** Share of this show's item revenue we could put a cost against. */
   costCoveragePct: number;
+  /** Revenue from the order items we hold for this show — usually below `sales` until the item backfill finishes. */
+  itemRevenue: number;
+  /** The part of itemRevenue that has a purchase cost. Profit and margin are measured over this. */
+  costedRevenue: number;
 
   /** Rates. Null when the show has no measured airtime. */
   salesPerHour: number | null;
@@ -97,6 +101,8 @@ export type HostPerf = {
   stockSellThroughPct: number | null;
 
   costCoveragePct: number;
+  itemRevenue: number;
+  costedRevenue: number;
 };
 
 export type PerfInput = {
@@ -199,6 +205,8 @@ export function buildPerformance(input: PerfInput): PerfOutput {
         // cost file understates coverage rather than inventing a margin.
         marginPct: agg.covered > 0 ? (grossProfit / agg.covered) * 100 : null,
         costCoveragePct: agg.total > 0 ? (agg.covered / agg.total) * 100 : 0,
+        itemRevenue: agg.total,
+        costedRevenue: agg.covered,
 
         salesPerHour: div(sales, hours),
         profitPerHour: div(grossProfit, hours),
@@ -298,6 +306,8 @@ function rollUpHosts(
 
         stockSellThroughPct: denom > 0 ? (sold / denom) * 100 : null,
         costCoveragePct: a.total > 0 ? (a.covered / a.total) * 100 : 0,
+        itemRevenue: a.total,
+        costedRevenue: a.covered,
       };
     })
     // Unassigned shows are a data-entry job, not a host — always last.

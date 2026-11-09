@@ -53,8 +53,13 @@ async function syncShows(): Promise<SyncResult> {
 
 async function syncOrders(opts: { days?: number; full?: boolean }): Promise<SyncResult> {
   const t0 = Date.now();
-  const known = opts.full ? undefined : store.getOrderIds();
   const since = opts.days ? daysAgoISO(opts.days) : undefined;
+  // A backfill reaches back by date and must page straight past orders we
+  // already hold: they are the newest ones, so stopping at the first known id
+  // meant a backfill after any earlier fetch stopped on page one. Only a plain
+  // update — no date given — stops at familiar ground. Re-fetched orders
+  // simply overwrite their stored copy.
+  const known = opts.full || since ? undefined : store.getOrderIds();
 
   const orders = await whatnot.listOrders({
     since,

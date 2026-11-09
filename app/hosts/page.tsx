@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import type { Role } from '@/lib/types';
 import type { ShowPerf, HostPerf, ItemPerf } from '@/lib/whatnot/metrics';
 import type { MatchReport } from '@/lib/whatnot/sku';
 import type { SyncState } from '@/lib/whatnot/store';
+import HostsOverview, { type Overview } from './overview';
 
 type Session = { username: string; role: Role; name: string };
 
@@ -20,6 +21,7 @@ type Perf = {
   itemCount: number;
   match: MatchReport;
   unassignedShows: number;
+  overview: Overview;
   inventory: { tab: string; demo: boolean; costRows: number; error?: string };
   sync: SyncState & { stats: Record<string, number> };
 };
@@ -109,115 +111,13 @@ function CoverageNote({ match }: { match: MatchReport }) {
   return (
     <div className={`border rounded-xl p-3 ${tone}`}>
       <p className="text-xs leading-relaxed">
-        <span className="font-bold">Margin covers {pct(match.coveragePct)} of sales.</span>{' '}
+        <span className="font-bold">Costs found for {pct(match.coveragePct)} of the item sales we hold.</span>{' '}
         {int(match.matched)} of {int(match.items)} sold items were matched to a purchase cost
         {exact > 0
           ? <> — {int(exact)} by SKU and {int(match.byRoute.title)} by reading the model number out of the title.</>
           : <>, all {int(match.byRoute.title)} of them by reading the model number out of the product title.
               No product in the catalogue has a SKU or external ID set yet; filling those in makes this exact
               instead of a guess.</>}
-      </p>
-    </div>
-  );
-}
-
-// ─── Hosts ──────────────────────────────────────────────────────────────────
-
-function HostsTab({ data }: { data: Perf }) {
-  if (!data.hosts.length) {
-    return <Empty title="No shows in this range"
-      body="Widen the range, or run a sync on the Setup tab if nothing has been pulled from Whatnot yet." />;
-  }
-
-  const t = data.hosts.reduce((a, h) => ({
-    sales: a.sales + h.sales, profit: a.profit + h.grossProfit,
-    hours: a.hours + h.hours, give: a.give + h.giveawaySpend,
-  }), { sales: 0, profit: 0, hours: 0, give: 0 });
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile label="Sales" value={money(t.sales)} sub={`${int(data.shows.length)} shows`} />
-        <Tile label="Gross profit" value={money(t.profit)} tone="good"
-          sub={t.sales > 0 ? `${pct((t.profit / t.sales) * 100)} of sales` : undefined} />
-        <Tile label="Hours on air" value={hrs(t.hours)}
-          sub={t.hours > 0 ? `${money(t.sales / t.hours)}/hr` : undefined} />
-        <Tile label="Giveaway cost" value={money(t.give, 2)} tone="warn"
-          sub={t.sales > 0 ? `${pct((t.give / t.sales) * 100, 2)} of sales` : undefined} />
-      </div>
-
-      <CoverageNote match={data.match} />
-
-      {data.unassignedShows > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
-          <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-            <span className="font-bold">{int(data.unassignedShows)} shows have no host set.</span>{' '}
-            Whatnot streams everything from one account and never records who was on camera, so this has to come
-            from us. The Setup tab can fill most of it in from the host column already in your sales sheet.
-          </p>
-        </div>
-      )}
-
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-700">
-              <tr>
-                <th className={TH}>Host</th>
-                <th className={THR}>Shows</th>
-                <th className={THR}>Hours</th>
-                <th className={THR}>Sales</th>
-                <th className={THR}>Sales/hr</th>
-                <th className={THR}>Profit</th>
-                <th className={THR}>Profit/hr</th>
-                <th className={THR}>Margin</th>
-                <th className={THR}>Payout/hr</th>
-                <th className={THR}>Orders/hr</th>
-                <th className={THR}>AOV</th>
-                <th className={THR}>Units</th>
-                <th className={THR}>Sell-thru</th>
-                <th className={THR}>Giveaway</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {data.hosts.map(h => (
-                <tr key={h.host} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
-                  <td className={`${TD} font-bold text-slate-900 dark:text-white whitespace-nowrap`}>
-                    {h.host}
-                    {h.costCoveragePct < 60 && (
-                      <span className="ml-2 text-[9px] font-bold text-amber-600 dark:text-amber-400"
-                        title={`Only ${pct(h.costCoveragePct)} of this host's sales could be costed`}>
-                        {pct(h.costCoveragePct, 0)} costed
-                      </span>
-                    )}
-                  </td>
-                  <td className={TDR}>{int(h.shows)}</td>
-                  <td className={TDR}>{hrs(h.hours)}</td>
-                  <td className={TDR}>{money(h.sales)}</td>
-                  <td className={`${TDR} font-bold`}>{money(h.salesPerHour)}</td>
-                  <td className={`${TDR} ${h.grossProfit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{money(h.grossProfit)}</td>
-                  <td className={`${TDR} font-bold text-emerald-600 dark:text-emerald-400`}>{money(h.profitPerHour)}</td>
-                  <td className={TDR}>{pct(h.marginPct)}</td>
-                  <td className={TDR}>{money(h.earningsPerHour)}</td>
-                  <td className={TDR}>{h.ordersPerHour == null ? '—' : h.ordersPerHour.toFixed(1)}</td>
-                  <td className={TDR}>{money(h.aov, 2)}</td>
-                  <td className={TDR}>{int(h.unitsSold)}</td>
-                  <td className={TDR} title="Units sold ÷ (units sold + stock still on the shelf) for the items this host ran. Whatnot exposes no show lineup, so this is not sold-÷-offered.">
-                    {pct(h.stockSellThroughPct, 0)}
-                  </td>
-                  <td className={`${TDR} text-amber-600 dark:text-amber-400`}>
-                    {money(h.giveawaySpend, 2)}
-                    <span className="text-slate-400 text-[10px]"> / {pct(h.giveawayPctOfSales, 2)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <p className="text-[11px] text-slate-400 px-1">
-        Sales, payout, hours on air, orders and giveaway cost come from Whatnot&apos;s own show analytics.
-        Profit and margin are ours — item revenue less the purchase cost on the inventory sheet.
       </p>
     </div>
   );
@@ -596,6 +496,19 @@ export default function HostDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<TabKey>('hosts');
+  const tabRefs = useRef<Partial<Record<TabKey, HTMLButtonElement | null>>>({});
+  const [underline, setUnderline] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
+  // Measured from the live button so the underline fits labels of any width,
+  // and re-measured on resize because the tab row can scroll on a phone.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = tabRefs.current[tab];
+      if (el) setUnderline({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [tab, session]);
   const [days, setDays] = useState(90);
   const [host, setHost] = useState('');
 
@@ -650,12 +563,18 @@ export default function HostDashboardPage() {
           <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize flex-shrink-0">{session.role}</span>
         </header>
 
-        <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 flex gap-1 overflow-x-auto flex-shrink-0">
+        <div className="relative bg-slate-900 border-b border-slate-800 px-4 sm:px-6 flex gap-1 overflow-x-auto flex-shrink-0">
+          {/* One underline that glides to the active tab, rather than four
+              borders that blink on and off. */}
+          <span aria-hidden
+            className="absolute bottom-0 h-0.5 bg-red-500 rounded-full transition-[left,width] duration-300 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none"
+            style={underline} />
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`px-3 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${tab === t.key
-                ? 'border-red-500 text-red-400'
-                : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
+              ref={el => { tabRefs.current[t.key] = el; }}
+              className={`px-3 py-3 text-xs font-bold whitespace-nowrap transition-colors duration-200 ${tab === t.key
+                ? 'text-red-400'
+                : 'text-slate-500 hover:text-slate-200'}`}>
               {t.label}
               {t.key === 'setup' && data && data.unassignedShows > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 bg-amber-500 text-white text-[9px] font-black rounded-full">
@@ -705,11 +624,19 @@ export default function HostDashboardPage() {
             <Empty title="Nothing pulled from Whatnot yet"
               body="Open the Setup tab and run a sync. The first one fetches your shows, orders and what was sold in each — give it a few minutes." />
           ) : (
-            <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-              {tab === 'hosts' && <HostsTab data={data} />}
+            // Held at reduced opacity while refetching, never blanked, so a
+            // range change doesn't make the layout jump.
+            <div className={`transition-opacity duration-300 ${loading ? 'opacity-60' : ''}`}>
+             <div key={tab} className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:animate-none">
+              {tab === 'hosts' && (
+                <HostsOverview overview={data.overview} hosts={data.hosts}
+                  unassignedShows={data.unassignedShows} days={data.range.days}
+                  onGoSetup={() => setTab('setup')} />
+              )}
               {tab === 'shows' && <ShowsTab data={data} />}
               {tab === 'items' && <ItemsTab data={data} />}
               {tab === 'setup' && <SetupTab data={data} reload={load} />}
+             </div>
             </div>
           )}
         </main>
