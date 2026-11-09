@@ -10,7 +10,7 @@ export const maxDuration = 120;
 
 const ALLOWED = ['admin', 'manager'];
 
-const STREAMS: AlertStream[] = ['fulfillment', 'support', 'messages', 'milestones'];
+const STREAMS: AlertStream[] = ['cancellations', 'messages', 'support', 'fulfillment', 'milestones'];
 
 function clampHour(v: unknown, fallback: number): number {
   const n = Number(v);
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       await sendMessage(cfg, [
         '<b>Stack Bargains alerts are connected.</b>',
         '',
-        'This channel will carry fulfillment problems, show results and support mail.',
+        'This channel will carry customer support: cancellation requests and buyer messages waiting on a reply.',
         `Set up by ${session.name || session.username}.`,
       ].join('\n'));
       return NextResponse.json({ ok: true });

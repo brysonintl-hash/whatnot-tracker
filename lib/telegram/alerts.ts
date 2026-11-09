@@ -11,7 +11,21 @@ import type { WnShipment, WnShow, WnShowAnalytics, WnOrder } from '../whatnot/ty
 import { money as m } from '../whatnot/types';
 import { esc } from './client';
 
-export type AlertStream = 'fulfillment' | 'support' | 'messages' | 'milestones';
+/**
+ * `cancellations` and `messages` are the customer-support streams — buyers
+ * waiting on a reply. They are the only two on by default; the rest are
+ * opt-in, because a parcel-by-parcel feed buries the one message that matters.
+ */
+export type AlertStream = 'cancellations' | 'messages' | 'support' | 'fulfillment' | 'milestones';
+
+/**
+ * What Whatnot puts in a shipment's required_actions while a buyer's
+ * cancellation request waits on the seller. Observed live on 2026-11-09: every
+ * "Cancellation requested" thread in the Seller Hub support inbox had it, and
+ * the order itself still read pending_fulfillment — so the shipment is the
+ * only place the API shows the request at all.
+ */
+export const PENDING_CANCELLATION = 'order_pending_cancellation';
 
 export type Severity = 'critical' | 'warning' | 'info';
 
@@ -59,6 +73,11 @@ export function fulfillmentAlerts(
     const shipped = Boolean(s.tracking?.tracking_code);
     const labelled = Boolean(s.documents?.label_url);
     const who = s.recipient?.username ? `@${s.recipient.username}` : 'a buyer';
+
+    // A parcel the buyer has asked to cancel is a support question, not a
+    // shipping one — cancellationAlerts reports it. Chasing its label or its
+    // deadline here would push someone to ship an order that may be called off.
+    if (s.required_actions?.includes(PENDING_CANCELLATION)) continue;
 
     // Whatnot's own exception list. Whatever it says, it wants attention.
     if (s.required_actions?.length) {
@@ -108,6 +127,53 @@ export function fulfillmentAlerts(
     }
   }
 
+  return out;
+}
+
+/** What the runner could find out about a cancellation's order, for the message. */
+export type CancellationDetail = {
+  orderId?: string;
+  orderUrl?: string;
+  items?: string[];
+  total?: number;
+};
+
+/**
+ * Buyers waiting on a yes or no to a cancellation.
+ *
+ * One alert per request: the key is the shipment, so it fires when the
+ * request appears and never again while it sits there. Once the seller
+ * answers, Whatnot drops the flag and the shipment simply stops matching.
+ */
+export function cancellationAlerts(
+  shipments: WnShipment[],
+  details: Record<string, CancellationDetail>,
+  now: string,
+): Alert[] {
+  const out: Alert[] = [];
+  for (const s of shipments) {
+    if (!s.required_actions?.includes(PENDING_CANCELLATION)) continue;
+    const d = details[s.id] ?? {};
+    const who = s.recipient?.username ? `@${s.recipient.username}` : 'A buyer';
+    const what = d.items?.length
+      ? d.items.length === 1 ? d.items[0] : `${d.items[0]} +${d.items.length - 1} more`
+      : null;
+
+    out.push({
+      key: `cancel:${s.id}`,
+      stream: 'cancellations',
+      severity: 'warning',
+      title: `${who} wants to cancel`,
+      detail: [
+        what,
+        d.total != null ? money(d.total) : null,
+        d.orderId ? `order ${d.orderId}` : `shipment ${s.id}`,
+      ].filter(Boolean).join(' · '),
+      // The order page is where the request is approved or declined.
+      url: d.orderUrl ?? s.url,
+      at: now,
+    });
+  }
   return out;
 }
 
@@ -207,9 +273,10 @@ const ICON: Record<Severity, string> = {
 };
 
 const STREAM_TITLE: Record<AlertStream, string> = {
+  cancellations: 'Cancellation requests',
+  messages: 'Buyer messages',
+  support: 'Whatnot support',
   fulfillment: 'Fulfillment',
-  support: 'Support',
-  messages: 'Messages',
   milestones: 'Shows & sales',
 };
 
@@ -223,7 +290,8 @@ const STREAM_TITLE: Record<AlertStream, string> = {
 export function renderDigest(alerts: Alert[], opts: { heading?: string } = {}): string {
   if (!alerts.length) return '';
 
-  const order: AlertStream[] = ['fulfillment', 'support', 'messages', 'milestones'];
+  // Buyers waiting on a reply first; everything else after.
+  const order: AlertStream[] = ['cancellations', 'messages', 'support', 'fulfillment', 'milestones'];
   const sev: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
 
   const lines: string[] = [];

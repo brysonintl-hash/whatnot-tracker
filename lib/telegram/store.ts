@@ -57,7 +57,10 @@ export type TelegramSettings = {
 export const DEFAULT_SETTINGS: TelegramSettings = {
   enabled: false,
   chatId: '',
-  streams: { fulfillment: true, support: true, messages: true, milestones: true },
+  // Customer support only, by request: the channel is for buyers waiting on a
+  // reply. Parcel-by-parcel fulfillment alerts and show results are available
+  // but off, because at ~200 orders a day they would drown the support ones.
+  streams: { cancellations: true, messages: true, support: false, fulfillment: false, milestones: false },
   thresholds: DEFAULT_THRESHOLDS,
   bigSaleMinimum: 250,
   quietHours: { from: 21, to: 7 },

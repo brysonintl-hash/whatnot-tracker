@@ -20,22 +20,30 @@ type Status = {
   gmailConfigured: boolean;
 };
 
-const STREAM_COPY: Record<AlertStream, { label: string; help: string }> = {
+// Listed in the order they appear on the page: the two customer-support
+// streams first, then the noisier ones that are off unless someone opts in.
+const STREAM_COPY: Record<AlertStream, { label: string; help: string; support?: boolean }> = {
+  cancellations: {
+    label: 'Cancellation requests',
+    help: 'A buyer has asked to cancel and is waiting on your yes or no. Read straight from Whatnot, so it works with nothing else set up. One message per request, with the item and order total.',
+    support: true,
+  },
+  messages: {
+    label: 'Buyer messages',
+    help: 'Questions like “Any update?”. Whatnot has no API for its message inbox, so this relays Whatnot’s own notification emails — it needs those emails switched on in Whatnot, Gmail connected here, and the sender address below.',
+    support: true,
+  },
+  support: {
+    label: 'Whatnot staff mail',
+    help: 'Threads from Whatnot’s own support team (the addresses on the Gmail Support page). These are Whatnot writing to you, not buyers.',
+  },
   fulfillment: {
     label: 'Fulfillment problems',
-    help: 'Parcels past their drop-off deadline, orders with no label after a few hours, and anything Whatnot itself has flagged as needing action.',
+    help: 'Parcels past their drop-off deadline and orders with no label after a few hours. Busy — at a couple of hundred orders a day this can be dozens of alerts.',
   },
   milestones: {
     label: 'Shows & big sales',
     help: 'A summary when a show ends — sales, sales per hour, orders, AOV, payout and giveaway cost — plus single orders over your threshold.',
-  },
-  support: {
-    label: 'Support mail',
-    help: 'New threads from the Whatnot support addresses already configured on the Gmail Support page.',
-  },
-  messages: {
-    label: 'Buyer messages',
-    help: 'Whatnot has no messages API, so this relays Whatnot’s own notification emails. Add the sender address below once you know what it is.',
   },
 };
 
@@ -107,7 +115,7 @@ export default function AlertsPage() {
           <div className="min-w-0">
             <h1 className="text-lg font-black text-white">Telegram Alerts</h1>
             <p className="text-xs text-slate-400 hidden sm:block truncate">
-              Fulfillment problems, show results and support mail, pushed to your team group
+              Buyers waiting on a reply, pushed to your team group
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -204,38 +212,47 @@ export default function AlertsPage() {
               <div className={`${card} p-4 space-y-3`}>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">3 · What gets sent</h2>
                 <div className="space-y-2">
-                  {(Object.keys(STREAM_COPY) as AlertStream[]).map(k => (
-                    <label key={k} className="flex gap-3 items-start cursor-pointer">
+                  {(Object.keys(STREAM_COPY) as AlertStream[]).map((k, i, all) => (
+                    <div key={k}>
+                    {/* Split the support streams from the opt-in ones, so the
+                        noisy feeds read as extras rather than the default. */}
+                    {i > 0 && STREAM_COPY[all[i - 1]].support && !STREAM_COPY[k].support && (
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 pt-3 pb-1 border-t border-slate-100 dark:border-slate-700 mt-1">
+                        Optional — off by default, these can be busy
+                      </p>
+                    )}
+                    <label className="flex gap-3 items-start cursor-pointer">
                       <input type="checkbox" checked={s.streams[k]}
                         onChange={e => setDraft({ ...s, streams: { ...s.streams, [k]: e.target.checked } })}
                         className="mt-0.5 accent-red-500 w-4 h-4 flex-shrink-0" />
                       <span className="min-w-0">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">{STREAM_COPY[k].label}</span>
                         <span className="block text-[11px] text-slate-400 leading-relaxed">{STREAM_COPY[k].help}</span>
-                        {k === 'support' && !status.gmailConfigured && (
+                        {(k === 'support' || k === 'messages') && !status.gmailConfigured && (
                           <span className="block text-[11px] text-amber-600 dark:text-amber-400">Gmail is not configured on this server, so nothing will come through.</span>
                         )}
                       </span>
                     </label>
+                    {/* The sender box sits under the stream it configures. */}
+                    {k === 'messages' && s.streams.messages && (
+                      <div className="pl-7 pt-2 pb-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                          Notification senders to relay
+                        </label>
+                        <input
+                          value={s.messageSenders.join(', ')}
+                          onChange={e => setDraft({ ...s, messageSenders: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })}
+                          placeholder="e.g. noreply@whatnot.com, notifications@whatnot.com"
+                          className={`${INPUT} w-full mt-1`} />
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                          Find a Whatnot message notification in Gmail and copy the exact From address. Leave blank
+                          and nothing is relayed.
+                        </p>
+                      </div>
+                    )}
+                    </div>
                   ))}
                 </div>
-
-                {s.streams.messages && (
-                  <div className="pl-7">
-                    <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                      Notification senders to relay
-                    </label>
-                    <input
-                      value={s.messageSenders.join(', ')}
-                      onChange={e => setDraft({ ...s, messageSenders: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })}
-                      placeholder="e.g. noreply@whatnot.com, notifications@whatnot.com"
-                      className={`${INPUT} w-full mt-1`} />
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Find a Whatnot message notification in Gmail and copy the exact From address. Leave blank
-                      and nothing is relayed.
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* ── 4. Tuning ─────────────────────────────────────────── */}

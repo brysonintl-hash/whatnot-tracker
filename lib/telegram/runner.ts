@@ -11,11 +11,13 @@
 import { whatnot, hasToken } from '../whatnot/client';
 import * as wnStore from '../whatnot/store';
 import {
-  fulfillmentAlerts, milestoneAlerts, bigSaleAlerts, mailAlerts, renderDigest,
-  applyQuietHours, type Alert, type MailThread,
+  fulfillmentAlerts, milestoneAlerts, bigSaleAlerts, mailAlerts, cancellationAlerts, renderDigest,
+  applyQuietHours, PENDING_CANCELLATION, type Alert, type MailThread, type CancellationDetail,
 } from './alerts';
 import { configFromEnv, sendMessage, type TelegramConfig } from './client';
-import { getSettings, claimUnsent, addRun, type TelegramSettings } from './store';
+import { getSettings, claimUnsent, addRun, getSent, type TelegramSettings } from './store';
+import type { WnShipment } from '../whatnot/types';
+import { money } from '../whatnot/types';
 import { BUSINESS_TZ } from '../hostDay';
 import { getGmailToken, getHeader } from '../gmail';
 import { getGmailFilters, buildGmailQuery } from '../gmailFilterStore';
@@ -44,8 +46,8 @@ export function resolveConfig(settings: TelegramSettings): TelegramConfig | null
  * depends on it. Orders come back newest-first and stop at the first known
  * one, so a quiet poll is a single request.
  */
-async function refresh(): Promise<string | undefined> {
-  if (!hasToken()) return 'WHATNOT_API_KEY is not set, so nothing could be refreshed';
+async function refresh(): Promise<{ error?: string; shipments?: WnShipment[] }> {
+  if (!hasToken()) return { error: 'WHATNOT_API_KEY is not set, so nothing could be refreshed' };
   try {
     const known = wnStore.getOrderIds();
     const orders = await whatnot.listOrders({ knownIds: known, max: 500 });
@@ -67,10 +69,47 @@ async function refresh(): Promise<string | undefined> {
       try { rows.push(await whatnot.getShowAnalytics(s.id)); } catch { /* not ready yet */ }
     }
     if (rows.length) wnStore.putAnalytics(rows);
-    return undefined;
+    return { shipments };
   } catch (e) {
-    return `Whatnot refresh failed: ${e instanceof Error ? e.message : String(e)}`;
+    return { error: `Whatnot refresh failed: ${e instanceof Error ? e.message : String(e)}` };
   }
+}
+
+/**
+ * Item names and order totals for cancellation requests not yet announced.
+ *
+ * A shipment only says who the buyer is. Three small lookups turn "@leibishg
+ * wants to cancel" into something a person can answer without opening
+ * Whatnot. Only done for requests not already in the ledger, so a request
+ * sitting unanswered costs nothing on later polls.
+ */
+async function cancellationDetails(shipments: WnShipment[]): Promise<Record<string, CancellationDetail>> {
+  const sent = getSent();
+  const todo = shipments.filter(s =>
+    s.required_actions?.includes(PENDING_CANCELLATION) && !(`cancel:${s.id}` in sent));
+  const out: Record<string, CancellationDetail> = {};
+
+  for (const s of todo) {
+    try {
+      const shipItems = await whatnot.listShipmentItems(s.id);
+      const orderId = shipItems[0]?.order_id;
+      if (!orderId) continue;
+      const [order, items] = await Promise.all([
+        whatnot.getOrder(orderId),
+        whatnot.listOrderItems(orderId),
+      ]);
+      out[s.id] = {
+        orderId,
+        orderUrl: order.url,
+        total: money(order.amounts?.total),
+        items: items.map(i => i.purchased_item?.title).filter(Boolean),
+      };
+    } catch {
+      // Without the detail the alert still goes out, naming the buyer and the
+      // shipment; a failed lookup must not swallow the request itself.
+    }
+  }
+  return out;
 }
 
 /** Recent Gmail threads from the given senders. */
@@ -131,16 +170,28 @@ export async function runOnce(opts: RunOptions = {}): Promise<RunOutcome> {
   }
 
   const notes: string[] = [];
+  let fetched: WnShipment[] | undefined;
   if (!opts.skipRefresh) {
-    const err = await refresh();
-    if (err) notes.push(err);
+    const r = await refresh();
+    if (r.error) notes.push(r.error);
+    fetched = r.shipments;
   }
+
+  // Judge the shipments just fetched rather than everything ever stored: a
+  // parcel that dropped out of the newest page keeps whatever state it had
+  // when last seen, and a stale "pending cancellation" would be a false alarm.
+  const shipments = fetched ?? wnStore.getShipments();
 
   // ── Gather ───────────────────────────────────────────────────────────────
   const alerts: Alert[] = [];
 
+  if (settings.streams.cancellations) {
+    const details = opts.skipRefresh ? {} : await cancellationDetails(shipments);
+    alerts.push(...cancellationAlerts(shipments, details, nowIso));
+  }
+
   if (settings.streams.fulfillment) {
-    alerts.push(...fulfillmentAlerts(wnStore.getShipments(), nowIso, settings.thresholds));
+    alerts.push(...fulfillmentAlerts(shipments, nowIso, settings.thresholds));
   }
 
   if (settings.streams.milestones) {
@@ -188,6 +239,21 @@ export async function runOnce(opts: RunOptions = {}): Promise<RunOutcome> {
     notes.push(`${held.length} held until quiet hours end`);
   }
 
+  // A preview should show what is waiting, quiet hours or not. Otherwise
+  // pressing Preview at night shows "nothing to send" while five buyers are in
+  // the queue, which reads as the feature being broken.
+  if (opts.dryRun) {
+    const all = [...send, ...held];
+    const heading = held.length && !send.length
+      ? `${all.length} waiting — held for quiet hours, will post when they end`
+      : all.length > 1 ? `${all.length} updates` : undefined;
+    return {
+      found, sent: 0, held: held.length, suppressed,
+      preview: all.length ? renderDigest(all, { heading }) : undefined,
+      note: notes.join('; ') || undefined,
+    };
+  }
+
   if (!send.length) {
     const outcome: RunOutcome = {
       found, sent: 0, held: held.length, suppressed,
@@ -199,10 +265,6 @@ export async function runOnce(opts: RunOptions = {}): Promise<RunOutcome> {
 
   const heading = send.length === 1 ? undefined : `${send.length} updates`;
   const text = renderDigest(send, { heading });
-
-  if (opts.dryRun) {
-    return { found, sent: 0, held: held.length, suppressed, preview: text, note: notes.join('; ') };
-  }
 
   try {
     await sendMessage(cfg, text, { silent: send.every(a => a.severity === 'info') });
