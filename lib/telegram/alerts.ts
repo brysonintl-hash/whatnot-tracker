@@ -39,6 +39,8 @@ export type Alert = {
   detail: string;
   url?: string;
   at: string;
+  /** Structured fields, for streams that have their own message layout. */
+  card?: CancellationCard;
 };
 
 export type FulfillmentThresholds = {
@@ -135,8 +137,27 @@ export type CancellationDetail = {
   orderId?: string;
   orderUrl?: string;
   items?: string[];
-  total?: number;
+  /** What the buyer bid for the item(s) — not the order total, which adds shipping and tax. */
+  price?: number;
 };
+
+/** Everything the cancellation message shows for one request. */
+export type CancellationCard = {
+  buyer: string | null;
+  orderId: string | null;
+  shipmentId: string;
+  item: string | null;
+  price: number | null;
+  url: string;
+};
+
+/**
+ * Titles carry two things that are noise in an alert: a "[$169.00]" retail tag
+ * in front, which reads like the price paid, and a trailing "#6" lot number.
+ */
+export function cleanTitle(t: string): string {
+  return t.replace(/^\s*\[\$[\d,.]+\]\s*/, '').replace(/\s+#\d+\s*$/, '').trim();
+}
 
 /**
  * Buyers waiting on a yes or no to a cancellation.
@@ -155,8 +176,9 @@ export function cancellationAlerts(
     if (!s.required_actions?.includes(PENDING_CANCELLATION)) continue;
     const d = details[s.id] ?? {};
     const who = s.recipient?.username ? `@${s.recipient.username}` : 'A buyer';
-    const what = d.items?.length
-      ? d.items.length === 1 ? d.items[0] : `${d.items[0]} +${d.items.length - 1} more`
+    const titles = (d.items ?? []).map(cleanTitle).filter(Boolean);
+    const what = titles.length
+      ? titles.length === 1 ? titles[0] : `${titles[0]} +${titles.length - 1} more`
       : null;
 
     out.push({
@@ -166,28 +188,46 @@ export function cancellationAlerts(
       title: `${who} wants to cancel`,
       detail: [
         what,
-        d.total != null ? money(d.total) : null,
+        d.price != null ? money(d.price) : null,
         d.orderId ? `order ${d.orderId}` : `shipment ${s.id}`,
       ].filter(Boolean).join(' · '),
       // The order page is where the request is approved or declined.
       url: d.orderUrl ?? s.url,
       at: now,
+      card: {
+        buyer: s.recipient?.username ?? null,
+        orderId: d.orderId ?? null,
+        shipmentId: s.id,
+        item: what,
+        price: d.price ?? null,
+        url: d.orderUrl ?? s.url,
+      },
     });
   }
   return out;
 }
 
 /** A show that has finished and been totted up. */
+/** A show that ended longer ago than this is history, not news. */
+export const MILESTONE_MAX_AGE_HOURS = 48;
+
 export function milestoneAlerts(
   shows: WnShow[],
   analytics: Record<string, WnShowAnalytics>,
   hostOf: (showId: string) => string | null,
   now: string,
+  maxAgeHours: number = MILESTONE_MAX_AGE_HOURS,
 ): Alert[] {
   const out: Alert[] = [];
 
   for (const s of shows) {
     if (s.status !== 'ended') continue;
+    // Without this the first poll announced every show ever held — 324 of them
+    // on the first live run — because none had been said before.
+    if (maxAgeHours > 0) {
+      const ended = s.ended_at ?? s.updated_at;
+      if (!ended || hoursBetween(now, ended) > maxAgeHours) continue;
+    }
     const a = analytics[s.id];
     // Figures before Whatnot has finished calculating would only have to be
     // corrected later, so the alert waits.
@@ -315,6 +355,45 @@ export function renderDigest(alerts: Alert[], opts: { heading?: string } = {}): 
   }
 
   return lines.join('\n').trim();
+}
+
+const dollars = (n: number) =>
+  Number.isInteger(n) ? `$${n.toLocaleString('en-US')}` : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Cancellation requests, one block each under a single header.
+ *
+ *   🚨 STACK BARGAINS | CANCELLATIONS
+ *   📋 Pending Requests: 4
+ *
+ *   🟠 @buyer | #order
+ *   📦 Item | $20
+ *   🔗 View Order: Open in Whatnot
+ *
+ * `totalPending` is everything waiting on the seller right now; the blocks are
+ * only the ones not announced before, so the header says how many are new when
+ * the two differ rather than leaving the numbers to disagree.
+ */
+export function renderCancellations(alerts: Alert[], totalPending: number): string {
+  const cards = alerts.filter(a => a.card);
+  if (!cards.length) return '';
+  const total = Math.max(totalPending, cards.length);
+
+  const lines = [
+    '🚨 <b>STACK BARGAINS | CANCELLATIONS</b>',
+    `📋 Pending Requests: <b>${total}</b>${cards.length < total ? ` (${cards.length} new)` : ''}`,
+  ];
+
+  for (const a of cards) {
+    const c = a.card!;
+    lines.push('');
+    lines.push(`🟠 ${c.buyer ? `@${esc(c.buyer)}` : 'A buyer'} | ${c.orderId ? `#${esc(c.orderId)}` : `shipment ${esc(c.shipmentId)}`}`);
+    if (c.item || c.price != null) {
+      lines.push(`📦 ${esc(c.item ?? 'Item unknown')}${c.price != null ? ` | <b>${dollars(c.price)}</b>` : ''}`);
+    }
+    lines.push(`🔗 <b>View Order:</b> <a href="${esc(c.url)}">Open in Whatnot</a>`);
+  }
+  return lines.join('\n');
 }
 
 /** Alerts outside quiet hours, plus whatever is critical enough to override them. */

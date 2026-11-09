@@ -84,13 +84,11 @@ async function call<T>(cfg: TelegramConfig, method: string, body: Record<string,
   throw new TelegramError('gave up after retries', 0);
 }
 
-/** Split on line boundaries so a digest never breaks mid-entry. */
-export function splitMessage(text: string, limit = MAX_MESSAGE): string[] {
-  if (text.length <= limit) return [text];
+/** Split on line boundaries, hard-splitting a single line only if it alone is too long. */
+function splitLines(text: string, limit: number): string[] {
   const out: string[] = [];
   let buf = '';
   for (const line of text.split('\n')) {
-    // A single line longer than the limit is hard-split; nothing else to do.
     if (line.length > limit) {
       if (buf) { out.push(buf); buf = ''; }
       for (let i = 0; i < line.length; i += limit) out.push(line.slice(i, i + limit));
@@ -98,6 +96,29 @@ export function splitMessage(text: string, limit = MAX_MESSAGE): string[] {
     }
     if (buf.length + line.length + 1 > limit) { out.push(buf); buf = line; }
     else buf = buf ? `${buf}\n${line}` : line;
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+/**
+ * Split a long message without cutting a block in half.
+ *
+ * Alerts are written as blocks separated by a blank line, so cuts fall between
+ * blocks first; only a block that is itself too long is split by line.
+ */
+export function splitMessage(text: string, limit = MAX_MESSAGE): string[] {
+  if (text.length <= limit) return [text];
+  const out: string[] = [];
+  let buf = '';
+  for (const block of text.split('\n\n')) {
+    if (block.length > limit) {
+      if (buf) { out.push(buf); buf = ''; }
+      out.push(...splitLines(block, limit));
+      continue;
+    }
+    if (buf && buf.length + 2 + block.length > limit) { out.push(buf); buf = block; }
+    else buf = buf ? `${buf}\n\n${block}` : block;
   }
   if (buf) out.push(buf);
   return out;

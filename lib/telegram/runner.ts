@@ -11,7 +11,7 @@
 import { whatnot, hasToken } from '../whatnot/client';
 import * as wnStore from '../whatnot/store';
 import {
-  fulfillmentAlerts, milestoneAlerts, bigSaleAlerts, mailAlerts, cancellationAlerts, renderDigest,
+  fulfillmentAlerts, milestoneAlerts, bigSaleAlerts, mailAlerts, cancellationAlerts, renderDigest, renderCancellations,
   applyQuietHours, PENDING_CANCELLATION, type Alert, type MailThread, type CancellationDetail,
 } from './alerts';
 import { configFromEnv, sendMessage, type TelegramConfig } from './client';
@@ -101,7 +101,8 @@ async function cancellationDetails(shipments: WnShipment[]): Promise<Record<stri
       out[s.id] = {
         orderId,
         orderUrl: order.url,
-        total: money(order.amounts?.total),
+        // What the buyer bid, not the order total — that adds shipping and tax.
+        price: items.reduce((sum, i) => sum + money(i.unit_price) * (i.quantity || 1), 0),
         items: items.map(i => i.purchased_item?.title).filter(Boolean),
       };
     } catch {
@@ -147,6 +148,32 @@ async function recentMail(senders: string[], max = 15): Promise<MailThread[]> {
   }
 }
 
+/**
+ * Turn alerts into the messages to post.
+ *
+ * Cancellation requests get their own message in their own layout, posted
+ * first; everything else shares one digest.
+ */
+function compose(
+  alerts: Alert[],
+  pendingTotal: number,
+  heading?: string,
+): { text: string; silent: boolean }[] {
+  const cancels = alerts.filter(a => a.stream === 'cancellations');
+  const rest = alerts.filter(a => a.stream !== 'cancellations');
+  const out: { text: string; silent: boolean }[] = [];
+
+  if (cancels.length) {
+    const text = renderCancellations(cancels, pendingTotal);
+    out.push({ text: heading ? `<i>${heading}</i>\n\n${text}` : text, silent: false });
+  }
+  if (rest.length) {
+    const h = rest.length > 1 ? `${rest.length} updates` : undefined;
+    out.push({ text: renderDigest(rest, { heading: h }), silent: rest.every(a => a.severity === 'info') });
+  }
+  return out;
+}
+
 export type RunOptions = {
   /** Work everything out and render the digest, but send nothing. */
   dryRun?: boolean;
@@ -184,6 +211,9 @@ export async function runOnce(opts: RunOptions = {}): Promise<RunOutcome> {
 
   // ── Gather ───────────────────────────────────────────────────────────────
   const alerts: Alert[] = [];
+  // Everything waiting on the seller right now, for the message header —
+  // which may be more than the ones being announced this time.
+  const pendingTotal = shipments.filter(s => s.required_actions?.includes(PENDING_CANCELLATION)).length;
 
   if (settings.streams.cancellations) {
     const details = opts.skipRefresh ? {} : await cancellationDetails(shipments);
@@ -244,12 +274,10 @@ export async function runOnce(opts: RunOptions = {}): Promise<RunOutcome> {
   // the queue, which reads as the feature being broken.
   if (opts.dryRun) {
     const all = [...send, ...held];
-    const heading = held.length && !send.length
-      ? `${all.length} waiting — held for quiet hours, will post when they end`
-      : all.length > 1 ? `${all.length} updates` : undefined;
+    const texts = compose(all, pendingTotal, held.length && !send.length ? `${all.length} waiting — held for quiet hours, will post when they end` : undefined);
     return {
       found, sent: 0, held: held.length, suppressed,
-      preview: all.length ? renderDigest(all, { heading }) : undefined,
+      preview: texts.length ? texts.map(t => t.text).join('\n\n──────────\n\n') : undefined,
       note: notes.join('; ') || undefined,
     };
   }
@@ -263,11 +291,10 @@ export async function runOnce(opts: RunOptions = {}): Promise<RunOutcome> {
     return outcome;
   }
 
-  const heading = send.length === 1 ? undefined : `${send.length} updates`;
-  const text = renderDigest(send, { heading });
-
   try {
-    await sendMessage(cfg, text, { silent: send.every(a => a.severity === 'info') });
+    for (const m of compose(send, pendingTotal)) {
+      await sendMessage(cfg, m.text, { silent: m.silent });
+    }
     const outcome: RunOutcome = {
       found, sent: send.length, held: held.length, suppressed,
       note: notes.join('; ') || undefined,
