@@ -86,6 +86,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'System', items: [
       { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
       { href: '/storefront', label: 'Storefront', icon: I.image },
+      { href: '/alerts', label: 'Telegram Alerts', icon: I.messages },
       { href: '/settings', label: 'Settings', icon: I.settings },
     ]},
   ],
@@ -115,6 +116,7 @@ const NAV: Record<Role, Section[]> = {
     ]},
     { title: 'System', items: [
       { href: '/knowledge', label: 'Knowledge Base', icon: I.check },
+      { href: '/alerts', label: 'Telegram Alerts', icon: I.messages },
       { href: '/settings', label: 'Settings', icon: I.settings },
     ]},
   ],
