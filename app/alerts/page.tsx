@@ -160,8 +160,10 @@ export default function AlertsPage() {
                 <div>
                   <h2 className="text-sm font-bold text-slate-900 dark:text-white">2 · The group</h2>
                   <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                    Add the bot to your team group, send any message in there, then press Find my groups.
-                    Telegram only reports chats from the last 24 hours, so send the message first.
+                    Add the bot to your team group, then press Find my groups. If nothing shows up, send
+                    <span className="font-mono"> /start</span> in the group and try again — bots are deaf to ordinary
+                    group chat by default, but they always see commands and their own invitation. Telegram only
+                    reports the last 24 hours.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 items-center">
