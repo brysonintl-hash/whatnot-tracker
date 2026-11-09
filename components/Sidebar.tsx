@@ -67,6 +67,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
+      { href: '/hosts', label: 'Host & Profit', icon: I.trophy },
       { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
@@ -96,6 +97,7 @@ const NAV: Record<Role, Section[]> = {
     { title: 'Operations', items: [
       { href: '/inventory', label: 'Inventory', icon: I.box },
       { href: '/sales', label: 'Sales Analytics', icon: I.chart },
+      { href: '/hosts', label: 'Host & Profit', icon: I.trophy },
       { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
