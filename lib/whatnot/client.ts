@@ -91,7 +91,13 @@ function readLimitHeaders(res: Response): void {
 
 const MAX_RETRIES = 4;
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * `retryServerErrors: false` is for calls that change something on Whatnot.
+ * A 5xx after the server has acted would otherwise send the change twice;
+ * a 429 is still retried, because a refused request was never acted on.
+ */
+async function request<T>(path: string, init?: RequestInit, opts: { retryServerErrors?: boolean } = {}): Promise<T> {
+  const retryServerErrors = opts.retryServerErrors ?? true;
   let lastErr: unknown;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -115,7 +121,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     // 429 tells us exactly how long to wait; 5xx gets exponential backoff.
-    if (res.status === 429 || res.status >= 500) {
+    if (res.status === 429 || (retryServerErrors && res.status >= 500)) {
       if (attempt === MAX_RETRIES) {
         throw new WhatnotError(`${res.status} after ${MAX_RETRIES} retries`, res.status, undefined, requestId);
       }
@@ -232,6 +238,40 @@ export const whatnot = {
   getShipment: (id: string) => request<WnShipment>(`/shipments/${encodeURIComponent(id)}`),
   listShipmentItems: (shipmentId: string) =>
     pageAll<WnShipmentItem>(`/shipments/${encodeURIComponent(shipmentId)}/items`),
+
+  /**
+   * Newest first, stopping at the first parcel created before `since`.
+   * Like /orders, /shipments takes no date filter.
+   */
+  async listShipmentsSince(since: string, max = 3000): Promise<WnShipment[]> {
+    const out: WnShipment[] = [];
+    let stop = false;
+    await pageAll<WnShipment>('/shipments', {
+      onPage: rows => {
+        for (const s of rows as WnShipment[]) {
+          if (s.created_at && s.created_at < since) { stop = true; break; }
+          out.push(s);
+          if (out.length >= max) { stop = true; break; }
+        }
+        return !stop;
+      },
+    });
+    return out;
+  },
+
+  /**
+   * Ask Whatnot to buy the label with the shipment's saved settings — the same
+   * thing as the Generate Label button in Seller Hub. Needs write:shipments.
+   *
+   * A 200 only means queued: the label turns up on the shipment a few seconds
+   * later, and a failure in Whatnot's worker after that is not reported back.
+   */
+  generateLabel: (shipmentId: string) =>
+    request<{ shipment_id: string }>(
+      `/shipments/${encodeURIComponent(shipmentId)}/generate_label`,
+      { method: 'POST' },
+      { retryServerErrors: false },
+    ),
 
   /** Current per-second ceiling, as last reported by the server. */
   rateBudget: () => budget,

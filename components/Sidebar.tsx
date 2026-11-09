@@ -57,6 +57,15 @@ const SHIPMENTS_NAV: NavItem = {
   ],
 };
 
+// Managers also see who handled which shipment and how often it went wrong.
+const MANAGER_SHIPMENTS_NAV: NavItem = {
+  ...SHIPMENTS_NAV,
+  children: [
+    ...SHIPMENTS_NAV.children!,
+    { href: '/shipping?tab=accountability', label: 'Accountability', icon: I.report },
+  ],
+};
+
 const NAV: Record<Role, Section[]> = {
   admin: [
     { title: 'Overview', items: [
@@ -72,7 +81,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
-      SHIPMENTS_NAV,
+      MANAGER_SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
       { href: '/support', label: 'Gmail Support', icon: I.mail },
     ]},
@@ -104,7 +113,7 @@ const NAV: Record<Role, Section[]> = {
       { href: '/analyzer', label: 'Show Analyzer', icon: I.tv },
       { href: '/runsheet', label: 'Run in Livestream', icon: I.clip },
       { href: '/pendings', label: 'Pendings', icon: I.clip },
-      SHIPMENTS_NAV,
+      MANAGER_SHIPMENTS_NAV,
       { href: '/amazon', label: 'Amazon Analyzer', icon: I.amz },
       { href: '/support', label: 'Gmail Support', icon: I.mail },
     ]},

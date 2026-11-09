@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState, useMemo, Suspense } from 'react';
+import { useEffect, useState, useMemo, useRef, Fragment, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
+import {
+  WnStatus, LabelActions, ShipmentDetails, ReportProblemModal, usd, timeOf,
+  type WnView, type Handler, type LedgerEvent, type Problem,
+} from './shipmentParts';
+import Accountability from './accountability';
 
 type Session = { username: string; role: Role; name: string };
 
@@ -17,7 +22,33 @@ type Assignment = {
   pinged: boolean; pingMessage: string; pingAt: string;
 };
 
-type ShipmentRow = { shipmentId: string; tab: string; assignment: Assignment | null };
+type ShipmentRow = {
+  shipmentId: string; tab: string; assignment: Assignment | null;
+  /** The parcel as Whatnot has it; null for a sheet row Whatnot hasn't listed. */
+  wn: WnView | null;
+  handler: Handler | null;
+  events: LedgerEvent[];
+  problems: Problem[];
+};
+type TabInfo = { tab: string; total: number; unassigned: number; needsLabel: number };
+type QueueSync = { refreshedAt: string | null; running: boolean; error: string | null; pendingContents: number };
+type WnFilter = 'all' | 'needs-label' | 'ready' | 'shipped';
+const WN_FILTER_LABEL: Record<WnFilter, string> = { all: 'Any', 'needs-label': 'Needs Label', ready: 'Ready to Ship', shipped: 'Shipped' };
+function wnBucket(r: ShipmentRow): WnFilter | null {
+  const st = r.wn?.status;
+  if (!st) return null;
+  if (st === 'created') return 'needs-label';
+  if (st === 'label_generated') return 'ready';
+  if (st === 'dropped_off' || st === 'in_transit' || st === 'delivered') return 'shipped';
+  return null;
+}
+function ago(iso: string | null): string {
+  if (!iso) return 'not yet';
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  return `${Math.round(m / 60)} h ago`;
+}
 type User = { username: string; name: string; role: Role };
 
 type ClaimRecord = {
@@ -41,7 +72,7 @@ type ClaimRecord = {
   status: string;
 };
 
-type SectionType = 'shipments' | 'cancellation' | 'incomplete' | 'replacement' | 'refund' | 'usps';
+type SectionType = 'shipments' | 'cancellation' | 'incomplete' | 'replacement' | 'refund' | 'usps' | 'accountability';
 
 const SECTION_LABELS: Record<SectionType, string> = {
   shipments: 'Assign Shipments',
@@ -50,6 +81,7 @@ const SECTION_LABELS: Record<SectionType, string> = {
   replacement: 'Replacements',
   refund: 'Refunds',
   usps: 'USPS Claims',
+  accountability: 'Accountability',
 };
 
 const USPS_STATUSES = ['Under Review', 'Approved'];
@@ -74,7 +106,7 @@ const emptyClaimForm = {
 
 type TrackResult = { status: string; description: string; city: string; state: string; date: string; time: string };
 
-function ClaimsSection({ type, isAdminOrManager }: { type: SectionType; isAdminOrManager: boolean }) {
+function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 'shipments' | 'accountability'>; isAdminOrManager: boolean }) {
   const [claims, setClaims] = useState<ClaimRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyClaimForm);
@@ -578,6 +610,13 @@ function ShippingPageInner() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('');
+  const [tabs, setTabs] = useState<TabInfo[]>([]);
+  const [sync, setSync] = useState<QueueSync | null>(null);
+  const [whatnotOn, setWhatnotOn] = useState(true);
+  const [wnFilter, setWnFilter] = useState<WnFilter>('all');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [reportFor, setReportFor] = useState<string | null>(null);
+  const tabRef = useRef('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'pending' | 'in-progress' | 'resolved'>('all');
   const [activeSection, setActiveSection] = useState<SectionType>('shipments');
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
@@ -585,7 +624,7 @@ function ShippingPageInner() {
   // Sync active section with ?tab= URL param whenever it changes
   useEffect(() => {
     const tab = searchParams.get('tab') as SectionType;
-    if (tab && ['cancellation', 'incomplete', 'replacement', 'refund', 'usps'].includes(tab)) {
+    if (tab && ['cancellation', 'incomplete', 'replacement', 'refund', 'usps', 'accountability'].includes(tab)) {
       setActiveSection(tab);
     } else {
       setActiveSection('shipments');
@@ -636,18 +675,54 @@ function ShippingPageInner() {
     a.click(); URL.revokeObjectURL(url);
   }
 
-  async function load() {
-    const [sRes, uRes] = await Promise.all([fetch('/api/shipments'), fetch('/api/users')]);
-    const [sData, uData] = await Promise.all([sRes.json(), uRes.json()]);
-    setShipments(Array.isArray(sData) ? sData : []);
-    setUsers(Array.isArray(uData) ? uData.filter((u: User) => u.role === 'host' || u.role === 'shipper') : []);
+  async function load(tab: string = tabRef.current, opts: { refresh?: boolean } = {}) {
+    const qs = new URLSearchParams();
+    if (tab) qs.set('tab', tab);
+    if (opts.refresh) qs.set('refresh', '1');
+    try {
+      const res = await fetch(`/api/shipments?${qs}`);
+      const data = await res.json();
+      if (res.ok) {
+        setShipments(Array.isArray(data.rows) ? data.rows : []);
+        setTabs(Array.isArray(data.tabs) ? data.tabs : []);
+        setSync(data.sync ?? null);
+        setWhatnotOn(data.whatnot !== false);
+        if (data.tab !== undefined) { tabRef.current = data.tab; setSelectedTab(data.tab); }
+      }
+    } catch { /* keep what's on screen; the next poll tries again */ }
     setLoading(false);
   }
+
+  async function loadUsers() {
+    try {
+      const uData = await (await fetch('/api/users')).json();
+      setUsers(Array.isArray(uData) ? uData.filter((u: User) => u.role === 'host' || u.role === 'shipper') : []);
+    } catch { /* the assign menu stays empty; assigning still works from the API */ }
+  }
+
+  function goTo(tab: string) {
+    tabRef.current = tab;
+    setSelectedTab(tab);
+    setExpanded(new Set());
+    setSelected(new Set());
+    load(tab);
+  }
+
+  // Whatnot changes under us all day, so keep the list current while the page
+  // is in view: every few seconds while a refresh is filling in, else every minute.
+  const syncBusy = Boolean(sync?.running || (sync?.pendingContents ?? 0) > 0);
+  useEffect(() => {
+    if (activeSection !== 'shipments') return;
+    const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, syncBusy ? 5000 : 60000);
+    return () => clearInterval(t);
+  }, [activeSection, syncBusy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
       if (!s) { router.push('/login'); return; }
       setSession(s);
+      // The team list is admin-only; asking as anyone else is a 403.
+      if (s.role === 'admin') loadUsers();
     });
     load();
     // Prefetch unresolved counts for badge display
@@ -663,17 +738,8 @@ function ShippingPageInner() {
     });
   }, []);
 
-  const allTabs = useMemo(() => {
-    const tabs = Array.from(new Set(shipments.map(s => s.tab))).sort((a, b) => {
-      const parse = (t: string) => { const [m, d, y] = t.split('/').map(Number); return new Date(2000 + y, m - 1, d).getTime(); };
-      return parse(b) - parse(a);
-    });
-    return tabs;
-  }, [shipments]);
-
-  useEffect(() => {
-    if (allTabs.length > 0 && !selectedTab) setSelectedTab(allTabs[0]);
-  }, [allTabs]);
+  // Newest first, as the server sorts them.
+  const allTabs = useMemo(() => tabs.map(t => t.tab), [tabs]);
 
   const currentTabIdx = allTabs.indexOf(selectedTab);
   const prevTab = currentTabIdx < allTabs.length - 1 ? allTabs[currentTabIdx + 1] : null;
@@ -681,9 +747,15 @@ function ShippingPageInner() {
 
   const isAdminOrManager = session?.role === 'admin' || session?.role === 'manager';
 
+  // The server already sends just the selected day to managers.
   const tabShipments = useMemo(() =>
     selectedTab ? shipments.filter(s => s.tab === selectedTab) : [],
     [shipments, selectedTab]);
+  const wnCounts = useMemo(() => {
+    const c: Record<WnFilter, number> = { all: tabShipments.length, 'needs-label': 0, ready: 0, shipped: 0 };
+    for (const r of tabShipments) { const b = wnBucket(r); if (b) c[b]++; }
+    return c;
+  }, [tabShipments]);
 
   const unassignedInTab = useMemo(() => tabShipments.filter(s => !s.assignment), [tabShipments]);
 
@@ -691,13 +763,18 @@ function ShippingPageInner() {
     if (!session) return [];
     if (isAdminOrManager) {
       return tabShipments.filter(s => {
+        if (wnFilter !== 'all' && wnBucket(s) !== wnFilter) return false;
         if (statusFilter === 'all') return true;
         if (statusFilter === 'unassigned') return !s.assignment;
         return s.assignment?.status === statusFilter;
       });
     }
     return shipments.filter(s => s.assignment?.assignedTo === session.username);
-  }, [shipments, tabShipments, session, statusFilter, isAdminOrManager]);
+  }, [shipments, tabShipments, session, statusFilter, wnFilter, isAdminOrManager]);
+
+  function toggleExpanded(k: string) {
+    setExpanded(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
+  }
 
   function key(s: ShipmentRow) { return `${s.shipmentId}|${s.tab}`; }
 
@@ -818,7 +895,28 @@ function ShippingPageInner() {
     </div>
   );
 
-  const sections: SectionType[] = ['shipments', 'cancellation', 'incomplete', 'replacement', 'refund', 'usps'];
+  const syncLine = (
+    <div className="flex items-center gap-2 text-[11px] text-slate-400">
+      {!whatnotOn ? (
+        <span>Whatnot isn&apos;t connected (no WHATNOT_API_KEY) — showing the shipment sheet only.</span>
+      ) : (
+        <>
+          {sync?.running
+            ? <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />Checking Whatnot…</span>
+            : <span>Whatnot updated {ago(sync?.refreshedAt ?? null)}</span>}
+          {(sync?.pendingContents ?? 0) > 0 && <span>· reading items for {sync?.pendingContents} shipments</span>}
+          {sync?.error && <span className="text-red-500" title={sync.error}>· last check failed</span>}
+          <button onClick={() => load(tabRef.current, { refresh: true })} disabled={sync?.running}
+            className="ml-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 font-bold text-slate-500 dark:text-slate-300 hover:border-slate-400 disabled:opacity-40 transition-colors">
+            Refresh
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const sections: SectionType[] = ['shipments', 'cancellation', 'incomplete', 'replacement', 'refund', 'usps',
+    ...(isAdminOrManager ? ['accountability' as const] : [])];
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
@@ -873,9 +971,10 @@ function ShippingPageInner() {
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Non-shipments sections */}
-          {activeSection !== 'shipments' && (
+          {activeSection !== 'shipments' && activeSection !== 'accountability' && (
             <ClaimsSection type={activeSection} isAdminOrManager={isAdminOrManager} />
           )}
+          {activeSection === 'accountability' && isAdminOrManager && <Accountability />}
 
           {/* Shipments section */}
           {activeSection === 'shipments' && (
@@ -890,7 +989,7 @@ function ShippingPageInner() {
                       <div className="flex flex-wrap items-center gap-3 mb-4">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => prevTab && setSelectedTab(prevTab)}
+                            onClick={() => prevTab && goTo(prevTab)}
                             disabled={!prevTab}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                           >
@@ -901,7 +1000,7 @@ function ShippingPageInner() {
                             {selectedTab || '—'}
                           </div>
                           <button
-                            onClick={() => nextTab && setSelectedTab(nextTab)}
+                            onClick={() => nextTab && goTo(nextTab)}
                             disabled={!nextTab}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                           >
@@ -917,6 +1016,20 @@ function ShippingPageInner() {
                             </button>
                           ))}
                         </div>
+                      </div>
+
+                      {/* What Whatnot says about them, and how fresh that is */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 -mt-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mr-1">Whatnot</span>
+                          {(['all', 'needs-label', 'ready', 'shipped'] as WnFilter[]).map(f => (
+                            <button key={f} onClick={() => setWnFilter(f)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${wnFilter === f ? 'bg-slate-900 dark:bg-white border-slate-900 dark:border-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'}`}>
+                              {WN_FILTER_LABEL[f]}{f !== 'all' && ` (${wnCounts[f]})`}
+                            </button>
+                          ))}
+                        </div>
+                        {syncLine}
                       </div>
 
                       {/* Auto-assign panel */}
@@ -957,11 +1070,29 @@ function ShippingPageInner() {
                   )}
 
                   {!isAdminOrManager && (
-                    <div className="mb-4">
-                      <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1">My Assigned Shipments</h2>
-                      <p className="text-xs text-slate-400">Shipments assigned to you</p>
+                    <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1">My Assigned Shipments</h2>
+                        <p className="text-xs text-slate-400">Shipments assigned to you. Make the label here so it&apos;s recorded as yours.</p>
+                      </div>
+                      {syncLine}
                     </div>
                   )}
+
+                  {/* Report a problem */}
+                  {reportFor && (() => {
+                    const r = shipments.find(x => key(x) === reportFor);
+                    if (!r) return null;
+                    return (
+                      <ReportProblemModal
+                        shipmentId={r.shipmentId} buyer={r.wn?.buyer ?? null} handler={r.handler}
+                        assignee={r.assignment ? { username: r.assignment.assignedTo, name: r.assignment.assignedToName } : null}
+                        lines={r.wn?.lines ?? null}
+                        people={users.map(u => ({ username: u.username, name: u.name, role: u.role }))}
+                        onClose={() => setReportFor(null)}
+                        onSaved={() => { setReportFor(null); load(); }} />
+                    );
+                  })()}
 
                   {/* Ping modal */}
                   {pingTarget && (
@@ -1010,9 +1141,13 @@ function ShippingPageInner() {
                       <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                       </svg>
-                      <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">No shipments found</p>
+                      <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">
+                        {whatnotOn && sync?.running && tabs.length === 0 ? 'Getting shipments from Whatnot…' : 'No shipments found'}
+                      </p>
                       <p className="text-slate-400 text-xs mt-1">
-                        {isAdminOrManager ? 'Try a different date or filter' : 'No shipments assigned to you yet'}
+                        {!isAdminOrManager ? 'No shipments assigned to you yet'
+                          : whatnotOn && sync?.running && tabs.length === 0 ? 'The first load takes a few seconds.'
+                          : 'Try a different date or filter'}
                       </p>
                     </div>
                   ) : (
@@ -1022,8 +1157,10 @@ function ShippingPageInner() {
                           <thead>
                             <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                               {editMode && <th className="py-3 pl-4 pr-2 w-10"><input type="checkbox" checked={selected.size === displayed.length && displayed.length > 0} onChange={toggleAll} className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" /></th>}
-                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Shipment #</th>
+                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Shipment</th>
                               <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
+                              <th className="text-right text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Items</th>
+                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Whatnot / Label</th>
                               <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
                               {isAdminOrManager
                                 ? <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Assigned To / Assign</th>
@@ -1040,23 +1177,69 @@ function ShippingPageInner() {
                               const isPinged = s.assignment?.pinged;
                               const isResolved = s.assignment?.status === 'resolved';
                               const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session?.username;
+                              const open = expanded.has(k);
+                              const canMake = isAdminOrManager || s.assignment?.assignedTo === session?.username;
+                              const canPrint = canMake || s.events.some(e => e.kind === 'label-requested' && e.by === session?.username);
+                              const colCount = (editMode ? 1 : 0) + 7;
 
                               return (
-                                <tr key={k}
-                                  className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : selected.has(k) ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+                                <Fragment key={k}>
+                                <tr
+                                  className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : selected.has(k) ? 'bg-red-50/50 dark:bg-red-900/10' : open ? 'bg-slate-50/80 dark:bg-slate-700/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
 
                                   {editMode && (
-                                    <td className="py-3 pl-4 pr-2">
+                                    <td className="py-3 pl-4 pr-2 align-top">
                                       <input type="checkbox" checked={selected.has(k)} onChange={() => toggleSelect(k)} className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
                                     </td>
                                   )}
 
-                                  <td className="py-3 px-4">
-                                    <span className="font-mono text-xs text-slate-800 dark:text-slate-200 font-bold select-all">{s.shipmentId}</span>
+                                  <td className="py-3 px-4 align-top">
+                                    {s.wn?.buyer && (
+                                      <a href={s.wn.url} target="_blank" rel="noopener noreferrer"
+                                        className="block text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">{s.wn.buyer}</a>
+                                    )}
+                                    <span className={`font-mono select-all ${s.wn?.buyer ? 'text-[11px] text-slate-400' : 'text-xs text-slate-800 dark:text-slate-200 font-bold'}`}>
+                                      {s.wn?.buyer ? `#${s.shipmentId}` : s.shipmentId}
+                                    </span>
+                                    <button onClick={() => toggleExpanded(k)} aria-expanded={open}
+                                      className="flex items-center gap-1 mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                                      <svg className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                                      {open ? 'Collapse' : 'Expand'}
+                                    </button>
                                   </td>
-                                  <td className="py-3 px-4 text-xs text-slate-400">{s.tab}</td>
+                                  <td className="py-3 px-4 align-top text-xs text-slate-400 whitespace-nowrap">
+                                    {s.tab}
+                                    {s.wn?.createdAt && <span className="block text-[10px]">{timeOf(s.wn.createdAt)}</span>}
+                                  </td>
+                                  <td className="py-3 px-4 align-top text-right whitespace-nowrap">
+                                    {s.wn?.itemCount != null ? (
+                                      <button onClick={() => toggleExpanded(k)} className="text-right group">
+                                        <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 tabular-nums group-hover:underline">
+                                          {s.wn.itemCount} {s.wn.itemCount === 1 ? 'item' : 'items'}
+                                        </span>
+                                        {(s.wn.orderCount ?? 0) > 1 && <span className="block text-[10px] text-slate-500">{s.wn.orderCount} orders</span>}
+                                        <span className="block text-[10px] text-slate-400 tabular-nums">{usd(s.wn.value ?? 0)}</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-xs text-slate-300 dark:text-slate-600">{s.wn ? '…' : '—'}</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 align-top">
+                                    {s.wn ? (
+                                      <>
+                                        <WnStatus wn={s.wn} />
+                                        <LabelActions shipmentId={s.shipmentId} wn={s.wn} events={s.events}
+                                          canMake={canMake} canPrint={canPrint} onChanged={() => load()} />
+                                        {s.handler?.how === 'label' && (
+                                          <p className="text-[10px] text-slate-400 mt-1">Label by <span className="font-bold text-slate-500 dark:text-slate-300">{s.handler.name}</span></p>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400">Not in the Whatnot list</span>
+                                    )}
+                                  </td>
 
-                                  <td className="py-3 px-4">
+                                  <td className="py-3 px-4 align-top">
                                     {s.assignment ? (
                                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.assignment.status]}`}>
                                         {STATUS_LABEL[s.assignment.status]}
@@ -1066,10 +1249,15 @@ function ShippingPageInner() {
                                         Unassigned
                                       </span>
                                     )}
+                                    {s.problems.some(p => !p.dismissed) && (
+                                      <span className="block mt-1 text-[10px] font-bold text-red-600 dark:text-red-400">
+                                        {s.problems.filter(p => !p.dismissed).length} problem{s.problems.filter(p => !p.dismissed).length === 1 ? '' : 's'}
+                                      </span>
+                                    )}
                                   </td>
 
                                   {isAdminOrManager && (
-                                    <td className="py-3 px-4">
+                                    <td className="py-3 px-4 align-top">
                                       {s.assignment && (
                                         <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                                           {s.assignment.assignedToName}
@@ -1097,7 +1285,7 @@ function ShippingPageInner() {
                                   )}
 
                                   {!isAdminOrManager && (
-                                    <td className="py-3 px-4">
+                                    <td className="py-3 px-4 align-top">
                                       {isPinged && (
                                         <div className="flex items-center gap-1.5 mb-1">
                                           <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
@@ -1108,7 +1296,7 @@ function ShippingPageInner() {
                                     </td>
                                   )}
 
-                                  <td className="py-3 px-4">
+                                  <td className="py-3 px-4 align-top">
                                     <div className="flex items-center gap-1.5 justify-end flex-wrap">
                                       {isResolved ? (
                                         <>
@@ -1161,6 +1349,16 @@ function ShippingPageInner() {
                                     </div>
                                   </td>
                                 </tr>
+                                {open && (
+                                  <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/30">
+                                    <td colSpan={colCount} className="px-4 sm:px-6 py-4">
+                                      <ShipmentDetails shipmentId={s.shipmentId} wn={s.wn} handler={s.handler}
+                                        events={s.events} problems={s.problems} isManager={isAdminOrManager}
+                                        onReport={() => setReportFor(k)} onChanged={() => load()} />
+                                    </td>
+                                  </tr>
+                                )}
+                                </Fragment>
                               );
                             })}
                           </tbody>

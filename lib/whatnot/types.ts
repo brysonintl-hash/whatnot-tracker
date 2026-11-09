@@ -173,7 +173,11 @@ export type WnVariant = {
 
 // ─── Shipments ──────────────────────────────────────────────────────────────
 
-/** Observed: 'created'. Later states exist but were not sampled. */
+/**
+ * From the published spec: created (needs a label), label_generated,
+ * dropped_off, in_transit, delivered, failed, cancelled and three
+ * cancelled_* variants. Kept a string so a new state doesn't break parsing.
+ */
 export type WnShipmentStatus = string;
 
 export type WnShipment = {
@@ -211,13 +215,18 @@ export type WnShipment = {
   updated_at: string;
 };
 
+/** One line in a parcel. Says which order item it is, not what was sold. */
 export type WnShipmentItem = {
+  /** Not the order-item id. */
   id: string;
   shipment_id: string;
-  order_id: string;
-  product_id: string;
-  variant_id: string;
-  quantity: number;
+  order_id: string | null;
+  order_item_id: string | null;
+  dimension_profile: WnDimensionProfile | null;
+  hazardous_material: string | null;
+  country_of_origin: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 // ─── Account ────────────────────────────────────────────────────────────────
