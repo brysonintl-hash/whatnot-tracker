@@ -13,6 +13,7 @@ import { join } from 'path';
 import type {
   WnOrder, WnOrderItem, WnShow, WnShowAnalytics, WnShipment, WnProduct, WnVariant,
 } from './types';
+import type { Bundle } from './bundles';
 
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data');
 const DIR = join(DATA_DIR, 'whatnot');
@@ -231,6 +232,29 @@ export function clearHostAssignment(showId: string): void {
   write('hostAssignments.json', all);
 }
 
+// ─── Kit breakouts ──────────────────────────────────────────────────────────
+//
+// Which combo kits we buy and what comes out of them. Entirely ours — Whatnot
+// has no concept of a kit being broken into parts, and the inventory sheet
+// records the kit's cost but not how to divide it.
+
+export const getBundles = (): Bundle[] => read<Bundle[]>('bundles.json', []);
+
+export function putBundle(b: Bundle): Bundle[] {
+  const all = getBundles();
+  const i = all.findIndex(x => x.id === b.id);
+  if (i === -1) all.push(b);
+  else all[i] = b;
+  write('bundles.json', all);
+  return all;
+}
+
+export function deleteBundle(id: string): Bundle[] {
+  const all = getBundles().filter(b => b.id !== id);
+  write('bundles.json', all);
+  return all;
+}
+
 // ─── Sync bookkeeping ───────────────────────────────────────────────────────
 
 export type SyncState = {
@@ -269,5 +293,6 @@ export function storeStats(): Record<string, number> {
     shipments: getShipments().length,
     catalogProducts: Object.keys(getCatalog()).length,
     hostsAssigned: Object.keys(getHostAssignments()).length,
+    bundles: getBundles().length,
   };
 }
