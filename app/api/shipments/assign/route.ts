@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import {
   upsertAssignment, removeAssignment, updateStatus,
-  bulkAssign, pingShipment, acknowledgePing, getAssignments, updateNotes,
+  bulkAssign, pingShipment, acknowledgePing, getAssignments, updateNotes, claimIfFree,
+  type ShipmentAssignment,
 } from '@/lib/shipmentStore';
+import { buildRows, isAvailable, packingOrder } from '@/lib/shipmentRows';
+import { canSelfAssign } from '@/lib/shipmentAccess';
 import { updateShipmentInSheet } from '@/lib/sheets';
 
 export async function POST(req: NextRequest) {
@@ -67,7 +70,61 @@ export async function POST(req: NextRequest) {
   if (action === 'acknowledge') {
     const { shipmentId, tab } = body;
     if (!shipmentId || !tab) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    const a = getAssignments().find(x => x.shipmentId === shipmentId && x.tab === tab);
+    const isAdmin = session.role === 'admin' || session.role === 'manager';
+    if (a && !isAdmin && a.assignedTo !== session.username) return NextResponse.json({ error: 'That shipment isn\'t yours.' }, { status: 403 });
     acknowledgePing(shipmentId, tab);
+    return NextResponse.json({ success: true });
+  }
+
+  // === TAKE IT MYSELF ===
+  // Shippers and hosts take work nobody has. One parcel by id, or the next N
+  // in packing order — still needing a label, oldest first — skipping any
+  // Whatnot is holding up (a cancel request, missing customs info).
+  if (action === 'claim' || action === 'claim-next') {
+    if (!canSelfAssign(session)) return NextResponse.json({ error: 'Only shippers and hosts can take shipments themselves.' }, { status: 403 });
+    const rows = await buildRows();
+    const mine = (shipmentId: string, tab: string): ShipmentAssignment => ({
+      shipmentId, tab, assignedTo: session.username, assignedToName: session.name, assignedToRole: session.role,
+      assignedBy: session.username, assignedAt: new Date().toISOString(), status: 'pending', notes: '',
+      pinged: false, pingMessage: '', pingAt: '',
+    });
+
+    if (action === 'claim') {
+      const { shipmentId, tab } = body;
+      const row = rows.find(r => r.shipmentId === shipmentId && r.tab === tab);
+      if (!row) return NextResponse.json({ error: 'That shipment isn\'t on the list any more — refresh.' }, { status: 404 });
+      if (!row.assignment && !isAvailable(row)) return NextResponse.json({ error: 'That shipment has already shipped or was cancelled.' }, { status: 409 });
+      const holder = claimIfFree(mine(shipmentId, tab));
+      if (holder.assignedTo !== session.username) {
+        return NextResponse.json({ error: `${holder.assignedToName} already has this one.`, code: 'taken' }, { status: 409 });
+      }
+      return NextResponse.json({ success: true, claimed: [shipmentId] });
+    }
+
+    const count = Math.min(50, Math.max(1, parseInt(body.count, 10) || 0));
+    const pool = rows
+      .filter(r => isAvailable(r) && r.wn?.status === 'created' && !r.wn.requiredActions.length)
+      .sort(packingOrder);
+    const claimed: string[] = [];
+    for (const r of pool) {
+      if (claimed.length >= count) break;
+      if (claimIfFree(mine(r.shipmentId, r.tab)).assignedTo === session.username) claimed.push(r.shipmentId);
+    }
+    return NextResponse.json({ success: true, claimed });
+  }
+
+  // === GIVE IT BACK ===
+  // Only before starting: once someone has begun (or made the label), a
+  // manager moves it, so the record of who handled it stays straight.
+  if (action === 'release') {
+    const { shipmentId, tab } = body;
+    const a = getAssignments().find(x => x.shipmentId === shipmentId && x.tab === tab);
+    if (!a || a.assignedTo !== session.username) return NextResponse.json({ error: 'That shipment isn\'t yours.' }, { status: 403 });
+    if (a.status !== 'pending') {
+      return NextResponse.json({ error: 'You\'ve already started this one. Ask a manager to move it.' }, { status: 409 });
+    }
+    removeAssignment(shipmentId, tab);
     return NextResponse.json({ success: true });
   }
 
@@ -122,6 +179,14 @@ export async function PATCH(req: NextRequest) {
 
   const { shipmentId, tab, status } = await req.json();
   if (!shipmentId || !tab || !status) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  if (!['pending', 'in-progress', 'resolved'].includes(status)) return NextResponse.json({ error: 'Unknown status' }, { status: 400 });
+
+  // Managers move anything; everyone else only their own.
+  const held = getAssignments().find(x => x.shipmentId === shipmentId && x.tab === tab);
+  const isAdmin = session.role === 'admin' || session.role === 'manager';
+  if (held && !isAdmin && held.assignedTo !== session.username) {
+    return NextResponse.json({ error: 'That shipment isn\'t yours.' }, { status: 403 });
+  }
 
   const ok = updateStatus(shipmentId, tab, status);
   if (!ok) return NextResponse.json({ error: 'Assignment not found' }, { status: 404 });

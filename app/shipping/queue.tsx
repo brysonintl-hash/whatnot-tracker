@@ -32,6 +32,9 @@ function wnBucket(r: ShipmentRow): WnFilter | null {
   return null;
 }
 
+/** Still to be packed: no label yet, or labelled but not dropped off. */
+const openWork = (r: ShipmentRow) => !r.wn || r.wn.status === 'created' || r.wn.status === 'label_generated';
+
 function ago(iso: string | null): string {
   if (!iso) return 'not yet';
   const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
@@ -85,6 +88,8 @@ export default function ShipmentQueue({
   const tabRef = useRef('');
   const [sync, setSync] = useState<QueueSync | null>(null);
   const [whatnotOn, setWhatnotOn] = useState(true);
+  // Shippers and hosts may take unclaimed shipments themselves.
+  const [canTake, setCanTake] = useState(false);
   const [loading, setLoading] = useState(true);
   const [people, setPeople] = useState<Person[]>([]);
 
@@ -100,6 +105,7 @@ export default function ShipmentQueue({
         setTabs(Array.isArray(data.tabs) ? data.tabs : []);
         setSync(data.sync ?? null);
         setWhatnotOn(data.whatnot !== false);
+        setCanTake(Boolean(data.selfAssign));
         if (typeof data.tab === 'string') { tabRef.current = data.tab; setTab(data.tab); }
       }
     } catch { /* keep what's on screen; the next poll tries again */ }
@@ -125,26 +131,35 @@ export default function ShipmentQueue({
   const [wnFilter, setWnFilter] = useState<WnFilter | null>(null);
   const [extra, setExtra] = useState<Extra>(NO_EXTRA);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortKey>('newest');
+  // Managers browse a day newest-first; packers want the most urgent first.
+  const [sort, setSort] = useState<SortKey>(isManager ? 'newest' : 'packing');
   const [compact, setCompact] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersBtn = useRef<HTMLButtonElement>(null);
   const extraCount = Object.entries(extra).filter(([k, v]) => (k === 'assignee' ? Boolean(v) : v)).length;
 
+  // A shipper's list holds their own shipments and the ones nobody has
+  // taken. "All" means theirs; "Available" means the rest.
+  const mineRows = useMemo(
+    () => (isManager ? rows : rows.filter(r => r.assignment?.assignedTo === session.username)),
+    [rows, isManager, session.username]);
   const counts = useMemo(() => {
-    const c = { all: rows.length, unassigned: 0, pending: 0, 'in-progress': 0, resolved: 0, 'needs-label': 0, ready: 0, shipped: 0 };
-    for (const r of rows) {
-      if (!r.assignment) c.unassigned++; else c[r.assignment.status]++;
+    const c = { all: mineRows.length, unassigned: 0, pending: 0, 'in-progress': 0, resolved: 0, 'needs-label': 0, ready: 0, shipped: 0 };
+    for (const r of rows) if (!r.assignment) c.unassigned++;
+    for (const r of mineRows) if (r.assignment) c[r.assignment.status]++;
+    const base = isManager ? rows : statusFilter === 'unassigned' ? rows.filter(r => !r.assignment) : mineRows;
+    for (const r of base) {
       const b = wnBucket(r);
       if (b) c[b]++;
     }
     return c;
-  }, [rows]);
+  }, [rows, mineRows, isManager, statusFilter]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase().replace(/^#/, '');
     return rows.filter(r => {
       if (statusFilter === 'unassigned' && r.assignment) return false;
+      if (!isManager && statusFilter === 'all' && !r.assignment) return false;
       if (statusFilter !== 'all' && statusFilter !== 'unassigned' && r.assignment?.status !== statusFilter) return false;
       if (wnFilter && wnBucket(r) !== wnFilter) return false;
       if (extra.cancel && !r.wn?.requiredActions.includes('order_pending_cancellation')) return false;
@@ -160,9 +175,12 @@ export default function ShipmentQueue({
       ].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     }).sort(sorter(sort));
-  }, [rows, statusFilter, wnFilter, extra, search, sort]);
+  }, [rows, statusFilter, wnFilter, extra, search, sort, isManager]);
 
-  const filtered = statusFilter !== 'all' || wnFilter || extraCount > 0 || search.trim();
+  // For a shipper, My Shipments vs Available is a choice of list, not a filter.
+  const viewChosen = isManager ? statusFilter !== 'all' : statusFilter !== 'all' && statusFilter !== 'unassigned';
+  const filtered = viewChosen || wnFilter || extraCount > 0 || search.trim();
+  const baseCount = isManager ? rows.length : statusFilter === 'unassigned' ? counts.unassigned : counts.all;
   function clearFilters() { setStatusFilter('all'); setWnFilter(null); setExtra(NO_EXTRA); setSearch(''); }
 
   // ── Days ──
@@ -334,6 +352,76 @@ export default function ShipmentQueue({
     load();
   }
 
+  // ── Taking work (shippers and hosts) ──
+  async function claim(body: object): Promise<{ ok: boolean; claimed: string[]; error?: string }> {
+    const res = await fetch('/api/shipments/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    return { ok: res.ok, claimed: Array.isArray(d.claimed) ? d.claimed : [], error: d.error };
+  }
+
+  async function take(r: ShipmentRow) {
+    const k = key(r);
+    setAssigning(k);
+    const res = await claim({ action: 'claim', shipmentId: r.shipmentId, tab: r.tab });
+    setAssigning(null);
+    if (res.ok) {
+      const now = new Date().toISOString();
+      patchRow(k, x => ({
+        ...x, assignment: {
+          shipmentId: x.shipmentId, tab: x.tab, assignedTo: session.username, assignedToName: session.name, assignedToRole: session.role,
+          assignedBy: session.username, assignedAt: now, status: 'pending', notes: '', pinged: false, pingMessage: '', pingAt: '',
+        },
+      }));
+      toast({ text: `${r.wn?.buyer ?? `#${r.shipmentId}`} is yours — it's under My Shipments.` });
+    } else {
+      toast({ tone: 'error', text: res.error || 'Couldn\'t take it.' });
+    }
+    load();
+  }
+
+  const [takeCount, setTakeCount] = useState('');
+  const [taking, setTaking] = useState(false);
+  async function takeNext() {
+    const n = parseInt(takeCount, 10);
+    if (!n || n <= 0) return;
+    setTaking(true);
+    const res = await claim({ action: 'claim-next', count: n });
+    setTaking(false);
+    if (!res.ok) toast({ tone: 'error', text: res.error || 'Couldn\'t take shipments.' });
+    else if (!res.claimed.length) toast({ tone: 'info', text: 'Nothing left to take that needs a label.' });
+    else {
+      toast({ text: `You took ${plural(res.claimed.length, 'shipment')}${res.claimed.length < n ? ` (that's all that was left)` : ''}.` });
+      setTakeCount('');
+      setStatusFilter('all');
+    }
+    load();
+  }
+
+  async function takeSelected() {
+    const picks = rows.filter(r => selected.has(key(r)) && takeable(r));
+    setBulkSaving(true);
+    let got = 0;
+    for (const r of picks) if ((await claim({ action: 'claim', shipmentId: r.shipmentId, tab: r.tab })).ok) got++;
+    setBulkSaving(false);
+    toast({ text: got === picks.length ? `You took ${plural(got, 'shipment')}.` : `You took ${got} of ${picks.length} — someone else got the rest first.` });
+    setSelected(new Set());
+    onExitEdit();
+    load();
+  }
+
+  async function giveBack(r: ShipmentRow) {
+    const res = await fetch('/api/shipments/assign', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'release', shipmentId: r.shipmentId, tab: r.tab }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) {
+      patchRow(key(r), x => ({ ...x, assignment: null }));
+      toast({ text: 'Given back — it\'s in Available again.' });
+    } else toast({ tone: 'error', text: d.error || 'Couldn\'t give it back.' });
+    load();
+  }
+
   async function setProblem(p: Problem, dismissed: boolean) {
     await fetch('/api/shipments/problems', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, dismissed }) });
     load();
@@ -396,7 +484,8 @@ export default function ShipmentQueue({
   }
 
   // ── Per-row permissions and menu ──
-  const canMake = (r: ShipmentRow) => isManager || r.assignment?.assignedTo === session.username;
+  const takeable = (r: ShipmentRow) => !isManager && canTake && !r.assignment && openWork(r);
+  const canMake = (r: ShipmentRow) => isManager || r.assignment?.assignedTo === session.username || takeable(r);
   const canPrint = (r: ShipmentRow) => canMake(r) || r.events.some(e => e.kind === 'label-requested' && e.by === session.username);
   const peopleOptions: Option[] = people.map(p => ({ value: p.username, label: `${p.name} (${p.role})` }));
 
@@ -405,12 +494,16 @@ export default function ShipmentQueue({
     const items: MenuItem[] = [];
     const wn = r.wn;
     const asking = Boolean(phase[r.shipmentId] || recentRequest(r));
+    if (takeable(r)) {
+      items.push({ label: 'Take it', icon: <I.user className="w-4 h-4" />, tone: 'primary', hint: 'Assigns it to you', onSelect: () => take(r) });
+    }
     if (wn && wn.status === 'created' && !wn.pickup && canMake(r)) {
       const blocked = wn.requiredActions.length > 0;
       items.push({
-        label: asking ? 'Making label…' : 'Generate Label', icon: <I.tag className="w-4 h-4" />, tone: 'primary',
+        label: asking ? 'Making label…' : 'Generate Label', icon: <I.tag className="w-4 h-4" />, tone: takeable(r) ? undefined : 'primary',
         disabled: blocked || asking, onSelect: () => makeLabel(r),
-        hint: blocked ? 'Whatnot needs something sorted first' : asking ? 'Whatnot is working on it' : 'Uses the saved box and service; your name goes on it',
+        hint: blocked ? 'Whatnot needs something sorted first' : asking ? 'Whatnot is working on it'
+          : takeable(r) ? 'Takes it and makes the label in one go' : 'Uses the saved box and service; your name goes on it',
       });
     }
     if (wn?.hasLabel && canPrint(r)) {
@@ -438,6 +531,7 @@ export default function ShipmentQueue({
       if (a.status === 'pending') items.push({ label: 'Start', icon: <I.play className="w-4 h-4" />, onSelect: () => setStatus(r, 'in-progress') });
       if (a.status !== 'resolved') items.push({ label: 'Mark resolved', icon: <I.checkCircle className="w-4 h-4" />, onSelect: () => setStatus(r, 'resolved') });
       if (a.pinged) items.push({ label: 'Acknowledge follow-up', icon: <I.megaphone className="w-4 h-4" />, hint: a.pingMessage || undefined, onSelect: () => acknowledge(r) });
+      if (a.status === 'pending' && canTake) items.push('separator', { label: 'Give back', icon: <I.left className="w-4 h-4" />, hint: 'Puts it back in Available for someone else', onSelect: () => giveBack(r) });
     }
     return items;
   }
@@ -465,6 +559,16 @@ export default function ShipmentQueue({
       </Tip>
     );
     if (!isManager) {
+      if (takeable(r)) {
+        return (
+          <Tip content="Assigns it to you. You can give it back until you start it." className="w-full">
+            <button onClick={() => take(r)} disabled={assigning === k}
+              className="h-10 w-full inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50">
+              {assigning === k ? <Spinner /> : <I.user className="w-4 h-4" />}Take it
+            </button>
+          </Tip>
+        );
+      }
       return <div className="w-full">{notesInput}</div>;
     }
     return (
@@ -504,12 +608,18 @@ export default function ShipmentQueue({
   );
 
   // ── Render ──
-  const assignChips: { f: AssignFilter; label: string; tip: string }[] = [
-    { f: 'all', label: 'All', tip: isManager ? 'Every shipment on this day' : 'Everything assigned to you' },
+  const assignChips: { f: AssignFilter; label: string; tip: string }[] = isManager ? [
+    { f: 'all', label: 'All', tip: 'Every shipment on this day' },
     { f: 'unassigned', label: 'Unassigned', tip: 'Not given to anyone yet' },
     { f: 'pending', label: 'Pending', tip: 'Assigned, not started' },
     { f: 'in-progress', label: 'In Progress', tip: 'Someone is working on it — making a label counts as starting' },
     { f: 'resolved', label: 'Resolved', tip: 'Marked done' },
+  ] : [
+    { f: 'all', label: 'My Shipments', tip: 'Everything assigned to you' },
+    ...(canTake ? [{ f: 'unassigned' as const, label: 'Available', tip: 'Nobody has these yet — take the ones you\'ll pack' }] : []),
+    { f: 'pending', label: 'Pending', tip: 'Yours, not started yet' },
+    { f: 'in-progress', label: 'In Progress', tip: 'Yours, being worked on — making the label counts as starting' },
+    { f: 'resolved', label: 'Resolved', tip: 'Yours, marked done' },
   ];
   const wnChips: { f: WnFilter; label: string; tip: string; icon: JSX.Element; tone: string; on: string }[] = [
     { f: 'needs-label', label: 'Needs Label', tip: 'Whatnot hasn\'t made the label yet', icon: <I.tag className="w-4 h-4" />,
@@ -548,7 +658,7 @@ export default function ShipmentQueue({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          {assignChips.filter(c => isManager || c.f !== 'unassigned').map(({ f, label, tip }) => {
+          {assignChips.map(({ f, label, tip }) => {
             const n = f === 'all' ? counts.all : counts[f];
             const on = statusFilter === f;
             return (
@@ -628,15 +738,43 @@ export default function ShipmentQueue({
         </section>
       )}
 
+      {/* ── Take work (shippers and hosts) ── */}
+      {!isManager && canTake && counts.unassigned > 0 && (
+        <section className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-4 sm:p-5 flex flex-wrap lg:flex-nowrap items-end lg:items-center gap-4 lg:gap-6 animate-in fade-in slide-in-from-top-1 duration-300">
+          <div className="flex items-center gap-4 lg:pr-6 lg:border-r border-slate-200 dark:border-slate-700 basis-full lg:basis-auto">
+            <span className="w-14 h-14 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 grid place-items-center flex-shrink-0"><I.user className="w-7 h-7" /></span>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Take shipments</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{plural(counts.unassigned, 'shipment')} nobody has yet</p>
+            </div>
+          </div>
+          <p className="hidden xl:block flex-1 text-sm text-slate-500 dark:text-slate-400 max-w-md">
+            Takes the oldest ones that still need a label, so the closest deadlines go first. You can also take one at a time from <button onClick={() => setStatusFilter('unassigned')} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Available</button>.
+          </p>
+          <label className="w-28 xl:ml-auto">
+            <span className="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">How many</span>
+            <input type="number" min={1} max={50} value={takeCount} onChange={e => setTakeCount(e.target.value)} placeholder="Qty" className={`${input} h-11`}
+              onKeyDown={e => { if (e.key === 'Enter') takeNext(); }} />
+          </label>
+          <Tip content={!takeCount ? 'Type how many you want first.' : `Assigns you the ${takeCount} oldest shipments that still need a label. Ones Whatnot is holding up, like cancel requests, are skipped.`}>
+            <button onClick={takeNext} disabled={!takeCount || taking} className={`${btnPrimary} !h-12 !px-6 !text-base !rounded-xl`}>
+              {taking ? <Spinner className="w-5 h-5" /> : <I.bolt className="w-5 h-5" />}Take {takeCount && parseInt(takeCount, 10) > 0 ? plural(parseInt(takeCount, 10), 'shipment') : 'shipments'}
+            </button>
+          </Tip>
+        </section>
+      )}
+
       {/* ── List header ── */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto">
           <h2 className="inline text-xl font-bold text-slate-900 dark:text-white">
-            {isManager ? 'Shipments' : 'My Shipments'}{' '}
-            <span className="tabular-nums">({filtered ? `${visible.length} of ${rows.length}` : rows.length})</span>
+            {isManager ? 'Shipments' : statusFilter === 'unassigned' ? 'Available' : 'My Shipments'}{' '}
+            <span className="tabular-nums">({filtered ? `${visible.length} of ${baseCount}` : visible.length})</span>
           </h2>
           <span className="ml-3 text-sm text-slate-500 dark:text-slate-400">
-            {isManager ? 'Assign, label, and process shipments' : 'Make the label here so it\'s recorded as yours'}
+            {isManager ? 'Assign, label, and process shipments'
+              : statusFilter === 'unassigned' ? 'Nobody has these yet — take the ones you\'ll pack'
+              : 'Make the label here so it\'s recorded as yours'}
           </span>
         </div>
         <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[260px] sm:max-w-[460px]">
@@ -703,10 +841,15 @@ export default function ShipmentQueue({
             {selected.size ? `${selected.size} selected` : 'Select all shown'}
           </label>
           <div className="ml-auto flex gap-2">
+            {!isManager && canTake && statusFilter === 'unassigned' && (
+              <button onClick={takeSelected} disabled={!selected.size || bulkSaving} className="h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-40">Take selected</button>
+            )}
             {isManager && (
               <button onClick={() => bulk('bulk-unassign')} disabled={!selected.size || bulkSaving} className="h-9 px-3.5 rounded-lg bg-slate-700 dark:bg-slate-600 hover:bg-slate-600 text-white text-sm font-semibold disabled:opacity-40">Unassign</button>
             )}
-            <button onClick={() => bulk('bulk-resolve')} disabled={!selected.size || bulkSaving} className="h-9 px-3.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40">Mark resolved</button>
+            {(isManager || statusFilter !== 'unassigned') && (
+              <button onClick={() => bulk('bulk-resolve')} disabled={!selected.size || bulkSaving} className="h-9 px-3.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40">Mark resolved</button>
+            )}
             <button onClick={onExitEdit} className="h-9 px-3 rounded-lg text-slate-300 hover:text-white text-sm font-semibold">Done</button>
           </div>
         </div>
@@ -742,12 +885,21 @@ export default function ShipmentQueue({
           <div className="flex flex-col items-center justify-center text-center py-16 px-4 animate-in fade-in duration-300">
             <span className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 grid place-items-center text-slate-400 mb-4"><I.box className="w-7 h-7" /></span>
             <p className="font-semibold text-slate-700 dark:text-slate-200">
-              {whatnotOn && sync?.running && rows.length === 0 ? 'Getting shipments from Whatnot…' : filtered ? 'No shipments match' : 'No shipments found'}
+              {whatnotOn && sync?.running && rows.length === 0 ? 'Getting shipments from Whatnot…'
+                : filtered ? 'No shipments match'
+                : !isManager && statusFilter === 'unassigned' ? 'Nothing to take right now'
+                : 'No shipments found'}
             </p>
             <p className="text-sm text-slate-400 mt-1">
-              {filtered ? 'Try a different filter or search.' : !isManager ? 'Nothing is assigned to you yet.' : whatnotOn && sync?.running ? 'The first load takes a few seconds.' : 'Try a different date.'}
+              {filtered ? 'Try a different filter or search.'
+                : !isManager && statusFilter === 'unassigned' ? 'Every open shipment already has someone. Check back after the next show.'
+                : !isManager ? 'Nothing is assigned to you yet.'
+                : whatnotOn && sync?.running ? 'The first load takes a few seconds.' : 'Try a different date.'}
             </p>
             {filtered && <button onClick={clearFilters} className={`${btnGhost} mt-4`}>Clear filters</button>}
+            {!filtered && !isManager && canTake && statusFilter === 'all' && counts.unassigned > 0 && (
+              <button onClick={() => setStatusFilter('unassigned')} className={`${btnPrimary} mt-4`}>See {plural(counts.unassigned, 'available shipment')}</button>
+            )}
           </div>
         ) : (
           <div key={tab} className="p-2 space-y-1 animate-in fade-in duration-300 motion-reduce:animate-none">
@@ -823,7 +975,7 @@ export default function ShipmentQueue({
                         notes={notesOf(r)} onNotes={v => setNotes(n => ({ ...n, [k]: v }))} onNotesCommit={() => commitNotes(r)} notesState={notesState[k]}
                         onAssign={u => assign(r, u)} assigning={assigning === k}
                         onStatus={s => setStatus(r, s)} onReport={() => setReportFor(k)} onMakeLabel={() => makeLabel(r)}
-                        onProblem={setProblem} />
+                        onProblem={setProblem} onTake={takeable(r) ? () => take(r) : undefined} />
                     </Collapse>
                   </div>
                 </div>

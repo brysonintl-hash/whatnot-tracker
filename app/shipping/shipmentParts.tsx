@@ -178,9 +178,11 @@ export function StatusPill({ a }: { a: Assignment | null }) {
       </Tip>
     );
   }
-  const by = a.assignedBy && a.assignedBy !== a.assignedTo ? ` by ${a.assignedBy}` : '';
+  const self = a.assignedBy === a.assignedTo;
   const tip = {
-    pending: `Given to ${a.assignedToName}${by} on ${dayTime(a.assignedAt)}. Not started yet.`,
+    pending: self
+      ? `${a.assignedToName} took it on ${dayTime(a.assignedAt)}. Not started yet.`
+      : `Given to ${a.assignedToName}${a.assignedBy ? ` by ${a.assignedBy}` : ''} on ${dayTime(a.assignedAt)}. Not started yet.`,
     'in-progress': `${a.assignedToName} is working on it.`,
     resolved: `${a.assignedToName} marked it done.`,
   }[a.status];
@@ -306,7 +308,7 @@ export const btnGhost = `${btnBase} border border-slate-200 dark:border-slate-60
 
 export function ShipmentPanel({
   row, isManager, canMake, canPrint, phase, labelError, people, notes, onNotes, onNotesCommit, notesState,
-  onAssign, assigning, onStatus, onReport, onMakeLabel, onProblem,
+  onAssign, assigning, onStatus, onReport, onMakeLabel, onProblem, onTake,
 }: {
   row: ShipmentRow; isManager: boolean; canMake: boolean; canPrint: boolean;
   phase?: LabelPhase; labelError?: string; people: Option[];
@@ -315,6 +317,8 @@ export function ShipmentPanel({
   onStatus: (s: Assignment['status']) => void;
   onReport: () => void; onMakeLabel: () => void;
   onProblem: (p: Problem, dismissed: boolean) => void;
+  /** Set when a shipper can take this parcel themselves. */
+  onTake?: () => void;
 }) {
   const { wn, assignment: a } = row;
   const [lines, setLines] = useState<Line[] | null>(wn?.lines ?? null);
@@ -442,6 +446,13 @@ export function ShipmentPanel({
             {isManager ? (
               <Select label="Assign to" value={a?.assignedTo ?? ''} options={people} onChange={onAssign}
                 placeholder="— Assign to —" icon={I.user} busy={assigning} />
+            ) : onTake ? (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Nobody has this shipment yet.</p>
+                <Tip content="Assigns it to you. You can give it back until you start it.">
+                  <button onClick={onTake} className={btnPrimary}><I.user className="w-4 h-4" />Take it</button>
+                </Tip>
+              </div>
             ) : (
               <p className="text-sm text-slate-700 dark:text-slate-200"><span className="text-slate-400">Assigned to </span><b>{a?.assignedToName ?? '—'}</b></p>
             )}

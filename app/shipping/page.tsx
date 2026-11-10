@@ -563,6 +563,8 @@ type Attention = { id: string; buyer: string; why: string; urgent: boolean };
 function attentionOf(rows: ShipmentRow[], me: string, isManager: boolean): Attention[] {
   const out: Attention[] = [];
   for (const r of rows) {
+    // A shipper's list also holds work nobody has taken; their bell is about theirs.
+    if (!isManager && r.assignment?.assignedTo !== me) continue;
     const buyer = r.wn?.buyer ?? `#${r.shipmentId}`;
     for (const a of r.wn?.requiredActions ?? []) out.push({ id: r.shipmentId, buyer, why: ACTION_TEXT[a]?.label ?? a.replace(/_/g, ' '), urgent: true });
     if (r.wn?.overdue) out.push({ id: r.shipmentId, buyer, why: 'Overdue — past its drop-off day', urgent: true });
@@ -673,13 +675,13 @@ function ShippingPageInner() {
         {/* Header */}
         <header className="h-16 lg:h-[72px] bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0">
           <div className="flex items-center gap-4 min-w-0">
-            <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">Shipments</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white tracking-tight truncate">Shipments</h1>
             <span className="hidden sm:block w-px h-7 bg-slate-700" />
             <span className="hidden sm:flex items-center gap-2 text-sm text-slate-300 truncate">
               <I.calendar className="w-[18px] h-[18px] text-slate-400" />{today}
             </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             {onShipments && (
               <>
                 <Tip content={attention.length ? `${attention.length} thing${attention.length === 1 ? '' : 's'} need attention on this list` : 'Nothing needs attention right now'} align="end">
@@ -725,7 +727,7 @@ function ShippingPageInner() {
                 </button>
               </Tip>
             )}
-            <span className="h-10 px-4 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 text-sm font-semibold capitalize grid place-items-center">{session.role}</span>
+            <span className="hidden sm:grid h-10 px-4 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 text-sm font-semibold capitalize place-items-center">{session.role}</span>
           </div>
         </header>
 

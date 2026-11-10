@@ -79,6 +79,20 @@ export function bulkAssign(
   write(all);
 }
 
+/**
+ * Give a parcel to someone only if nobody has it — under any day. Check and
+ * write happen in one synchronous step, so two people taking the same parcel
+ * at once can't both get it. Returns whoever holds it afterwards.
+ */
+export function claimIfFree(entry: ShipmentAssignment): ShipmentAssignment {
+  const all = read();
+  const held = all.find(a => a.shipmentId === entry.shipmentId);
+  if (held) return held;
+  all.push(entry);
+  write(all);
+  return entry;
+}
+
 export function removeAssignment(shipmentId: string, tab: string): void {
   write(read().filter(a => !(a.shipmentId === shipmentId && a.tab === tab)));
 }
