@@ -76,11 +76,11 @@ export default function Accountability() {
   const ruledOut = (data?.problems ?? []).filter(p => p.dismissed).length;
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">Who handled what — and how often it went wrong</h2>
-          <p className="text-xs text-slate-400 mt-0.5 max-w-2xl">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Who handled what — and how often it went wrong</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
             A shipment&apos;s handler is whoever made its label on this site. If the label was made in Whatnot instead,
             it&apos;s whoever the shipment was assigned to. Problems count against the handler.
           </p>
@@ -88,7 +88,7 @@ export default function Accountability() {
         <div className="flex gap-1">
           {WINDOWS.map(w => (
             <button key={w} onClick={() => setDays(w)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${days === w ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}>
+              className={`h-10 px-4 rounded-xl text-sm font-semibold border transition-colors ${days === w ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'}`}>
               {w} days
             </button>
           ))}
@@ -97,7 +97,7 @@ export default function Accountability() {
 
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : ''}`}>
+      <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

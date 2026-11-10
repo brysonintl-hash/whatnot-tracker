@@ -1,55 +1,16 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef, Fragment, Suspense } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
-import {
-  WnStatus, LabelActions, ShipmentDetails, ReportProblemModal, usd, timeOf,
-  type WnView, type Handler, type LedgerEvent, type Problem,
-} from './shipmentParts';
+import ShipmentQueue from './queue';
 import Accountability from './accountability';
+import { I, Popover, Tip, Toasts } from './ui';
+import { ACTION_TEXT, type ShipmentRow } from './shipmentParts';
 
 type Session = { username: string; role: Role; name: string };
-
-type Assignment = {
-  shipmentId: string; tab: string;
-  assignedTo: string; assignedToName: string; assignedToRole: string;
-  assignedBy: string; assignedAt: string;
-  status: 'pending' | 'in-progress' | 'resolved';
-  notes: string;
-  pinged: boolean; pingMessage: string; pingAt: string;
-};
-
-type ShipmentRow = {
-  shipmentId: string; tab: string; assignment: Assignment | null;
-  /** The parcel as Whatnot has it; null for a sheet row Whatnot hasn't listed. */
-  wn: WnView | null;
-  handler: Handler | null;
-  events: LedgerEvent[];
-  problems: Problem[];
-};
-type TabInfo = { tab: string; total: number; unassigned: number; needsLabel: number };
-type QueueSync = { refreshedAt: string | null; running: boolean; error: string | null; pendingContents: number };
-type WnFilter = 'all' | 'needs-label' | 'ready' | 'shipped';
-const WN_FILTER_LABEL: Record<WnFilter, string> = { all: 'Any', 'needs-label': 'Needs Label', ready: 'Ready to Ship', shipped: 'Shipped' };
-function wnBucket(r: ShipmentRow): WnFilter | null {
-  const st = r.wn?.status;
-  if (!st) return null;
-  if (st === 'created') return 'needs-label';
-  if (st === 'label_generated') return 'ready';
-  if (st === 'dropped_off' || st === 'in_transit' || st === 'delivered') return 'shipped';
-  return null;
-}
-function ago(iso: string | null): string {
-  if (!iso) return 'not yet';
-  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m} min ago`;
-  return `${Math.round(m / 60)} h ago`;
-}
-type User = { username: string; name: string; role: Role };
 
 type ClaimRecord = {
   rowIndex: number;
@@ -87,13 +48,6 @@ const SECTION_LABELS: Record<SectionType, string> = {
 const USPS_STATUSES = ['Under Review', 'Approved'];
 const CLAIM_STATUSES = ['Open', 'In Progress', 'Resolved'];
 const INCOMPLETE_STATUSES = ['Reported', 'Sending Missing Items', 'Shipped', 'Resolved'];
-
-const STATUS_STYLE: Record<string, string> = {
-  pending: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
-  'in-progress': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-  resolved: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
-};
-const STATUS_LABEL: Record<string, string> = { pending: 'Pending', 'in-progress': 'In Progress', resolved: 'Resolved' };
 
 const emptyClaimForm = {
   orderNumber: '', dateOrder: '', modelNumber: '', itemName: '',
@@ -601,25 +555,37 @@ function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 
 
 // â"€â"€â"€ Main Shipping Page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
+// ─── Needs attention ───────────────────────────────────────────────────────
+
+type Attention = { id: string; buyer: string; why: string; urgent: boolean };
+
+/** What the bell lists: parcels Whatnot is holding up, late ones, and follow-ups. */
+function attentionOf(rows: ShipmentRow[], me: string, isManager: boolean): Attention[] {
+  const out: Attention[] = [];
+  for (const r of rows) {
+    const buyer = r.wn?.buyer ?? `#${r.shipmentId}`;
+    for (const a of r.wn?.requiredActions ?? []) out.push({ id: r.shipmentId, buyer, why: ACTION_TEXT[a]?.label ?? a.replace(/_/g, ' '), urgent: true });
+    if (r.wn?.overdue) out.push({ id: r.shipmentId, buyer, why: 'Overdue — past its drop-off day', urgent: true });
+    const a = r.assignment;
+    if (a?.pinged && a.status !== 'resolved' && (isManager || a.assignedTo === me)) {
+      out.push({ id: r.shipmentId, buyer, why: `Follow-up${isManager ? ` to ${a.assignedToName}` : ''}: ${a.pingMessage || 'please check this one'}`, urgent: false });
+    }
+  }
+  return out;
+}
+
 function ShippingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   useTheme();
   const [session, setSession] = useState<Session | null>(null);
-  const [shipments, setShipments] = useState<ShipmentRow[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('');
-  const [tabs, setTabs] = useState<TabInfo[]>([]);
-  const [sync, setSync] = useState<QueueSync | null>(null);
-  const [whatnotOn, setWhatnotOn] = useState(true);
-  const [wnFilter, setWnFilter] = useState<WnFilter>('all');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [reportFor, setReportFor] = useState<string | null>(null);
-  const tabRef = useRef('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unassigned' | 'pending' | 'in-progress' | 'resolved'>('all');
   const [activeSection, setActiveSection] = useState<SectionType>('shipments');
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
+  const [editMode, setEditMode] = useState(false);
+  const [rows, setRows] = useState<ShipmentRow[]>([]);
+  const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   // Sync active section with ?tab= URL param whenever it changes
   useEffect(() => {
@@ -631,100 +597,11 @@ function ShippingPageInner() {
     }
   }, [searchParams]);
 
-  // Auto-assign state
-  const [autoUser, setAutoUser] = useState('');
-  const [autoCount, setAutoCount] = useState('');
-  const [autoNotes, setAutoNotes] = useState('');
-  const [autoSaving, setAutoSaving] = useState(false);
-
-  // Single-assign state per row
-  const [assigning, setAssigning] = useState<string | null>(null);
-  const [assignForm, setAssignForm] = useState<Record<string, { username: string; name: string; role: string; notes: string }>>({});
-
-  // Ping state
-  const [pingTarget, setPingTarget] = useState<string | null>(null);
-  const [pingMsg, setPingMsg] = useState('');
-  const [pingSaving, setPingSaving] = useState(false);
-
-  // Bulk edit state
-  const [editMode, setEditMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkSaving, setBulkSaving] = useState(false);
-
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-  function downloadCSV() {
-    const myShipments = shipments.filter(s =>
-      s.assignment?.assignedTo === session?.username && s.assignment?.status !== 'resolved'
-    );
-    const rows = [
-      ['Shipment #', 'Date', 'Status', 'Notes', 'Assigned By', 'Assigned At'],
-      ...myShipments.map(s => [
-        s.shipmentId, s.tab,
-        s.assignment?.status || '',
-        (s.assignment?.notes || '').replace(/,/g, ' '),
-        s.assignment?.assignedBy || '',
-        s.assignment?.assignedAt ? new Date(s.assignment.assignedAt).toLocaleDateString() : '',
-      ]),
-    ];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `my-shipments-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-  }
-
-  async function load(tab: string = tabRef.current, opts: { refresh?: boolean } = {}) {
-    const qs = new URLSearchParams();
-    if (tab) qs.set('tab', tab);
-    if (opts.refresh) qs.set('refresh', '1');
-    try {
-      const res = await fetch(`/api/shipments?${qs}`);
-      const data = await res.json();
-      if (res.ok) {
-        setShipments(Array.isArray(data.rows) ? data.rows : []);
-        setTabs(Array.isArray(data.tabs) ? data.tabs : []);
-        setSync(data.sync ?? null);
-        setWhatnotOn(data.whatnot !== false);
-        if (data.tab !== undefined) { tabRef.current = data.tab; setSelectedTab(data.tab); }
-      }
-    } catch { /* keep what's on screen; the next poll tries again */ }
-    setLoading(false);
-  }
-
-  async function loadUsers() {
-    try {
-      const uData = await (await fetch('/api/users')).json();
-      setUsers(Array.isArray(uData) ? uData.filter((u: User) => u.role === 'host' || u.role === 'shipper') : []);
-    } catch { /* the assign menu stays empty; assigning still works from the API */ }
-  }
-
-  function goTo(tab: string) {
-    tabRef.current = tab;
-    setSelectedTab(tab);
-    setExpanded(new Set());
-    setSelected(new Set());
-    load(tab);
-  }
-
-  // Whatnot changes under us all day, so keep the list current while the page
-  // is in view: every few seconds while a refresh is filling in, else every minute.
-  const syncBusy = Boolean(sync?.running || (sync?.pendingContents ?? 0) > 0);
-  useEffect(() => {
-    if (activeSection !== 'shipments') return;
-    const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, syncBusy ? 5000 : 60000);
-    return () => clearInterval(t);
-  }, [activeSection, syncBusy]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(s => {
       if (!s) { router.push('/login'); return; }
       setSession(s);
-      // The team list is admin-only; asking as anyone else is a 403.
-      if (s.role === 'admin') loadUsers();
     });
-    load();
     // Prefetch unresolved counts for badge display
     (['cancellation', 'incomplete', 'replacement', 'refund', 'usps'] as const).forEach(t => {
       fetch(`/api/claims?type=${t}`)
@@ -736,157 +613,47 @@ function ShippingPageInner() {
         })
         .catch(() => {});
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Newest first, as the server sorts them.
-  const allTabs = useMemo(() => tabs.map(t => t.tab), [tabs]);
-
-  const currentTabIdx = allTabs.indexOf(selectedTab);
-  const prevTab = currentTabIdx < allTabs.length - 1 ? allTabs[currentTabIdx + 1] : null;
-  const nextTab = currentTabIdx > 0 ? allTabs[currentTabIdx - 1] : null;
-
+  const onRows = useCallback((r: ShipmentRow[]) => setRows(r), []);
   const isAdminOrManager = session?.role === 'admin' || session?.role === 'manager';
+  const sections: SectionType[] = ['shipments', 'cancellation', 'incomplete', 'replacement', 'refund', 'usps',
+    ...(isAdminOrManager ? ['accountability' as const] : [])];
 
-  // The server already sends just the selected day to managers.
-  const tabShipments = useMemo(() =>
-    selectedTab ? shipments.filter(s => s.tab === selectedTab) : [],
-    [shipments, selectedTab]);
-  const wnCounts = useMemo(() => {
-    const c: Record<WnFilter, number> = { all: tabShipments.length, 'needs-label': 0, ready: 0, shipped: 0 };
-    for (const r of tabShipments) { const b = wnBucket(r); if (b) c[b]++; }
-    return c;
-  }, [tabShipments]);
+  // The underline slides between tabs rather than jumping.
+  const tabRefs = useRef<Partial<Record<SectionType, HTMLButtonElement | null>>>({});
+  const [underline, setUnderline] = useState<{ left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = tabRefs.current[activeSection];
+      if (el) setUnderline({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [activeSection, session]);
 
-  const unassignedInTab = useMemo(() => tabShipments.filter(s => !s.assignment), [tabShipments]);
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const attention = session ? attentionOf(rows, session.username, isAdminOrManager) : [];
 
-  const displayed = useMemo(() => {
-    if (!session) return [];
-    if (isAdminOrManager) {
-      return tabShipments.filter(s => {
-        if (wnFilter !== 'all' && wnBucket(s) !== wnFilter) return false;
-        if (statusFilter === 'all') return true;
-        if (statusFilter === 'unassigned') return !s.assignment;
-        return s.assignment?.status === statusFilter;
-      });
-    }
-    return shipments.filter(s => s.assignment?.assignedTo === session.username);
-  }, [shipments, tabShipments, session, statusFilter, wnFilter, isAdminOrManager]);
-
-  function toggleExpanded(k: string) {
-    setExpanded(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
-  }
-
-  function key(s: ShipmentRow) { return `${s.shipmentId}|${s.tab}`; }
-
-  function getForm(s: ShipmentRow) {
-    const k = key(s);
-    if (assignForm[k]) return assignForm[k];
-    if (s.assignment) return { username: s.assignment.assignedTo, name: s.assignment.assignedToName, role: s.assignment.assignedToRole, notes: s.assignment.notes };
-    return { username: '', name: '', role: '', notes: '' };
-  }
-
-  async function autoAssign() {
-    const count = parseInt(autoCount);
-    if (!autoUser || !count || count <= 0) return;
-    const user = users.find(u => u.username === autoUser);
-    if (!user) return;
-    const pool = unassignedInTab.slice(0, count);
-    if (!pool.length) { alert('No unassigned shipments available.'); return; }
-    setAutoSaving(true);
-    await fetch('/api/shipments/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'auto-assign',
-        items: pool.map(s => ({ shipmentId: s.shipmentId, tab: s.tab })),
-        assignedTo: user.username,
-        assignedToName: user.name,
-        assignedToRole: user.role,
-        notes: autoNotes,
-      }),
-    });
-    setAutoSaving(false); setAutoCount(''); setAutoNotes('');
-    load();
-  }
-
-  async function saveAssignment(s: ShipmentRow) {
-    const k = key(s);
-    const form = assignForm[k];
-    if (!form?.username) return;
-    setAssigning(k);
-    await fetch('/api/shipments/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipmentId: s.shipmentId, tab: s.tab, assignedTo: form.username, assignedToName: form.name, assignedToRole: form.role, notes: form.notes }),
-    });
-    setAssigning(null);
-    setAssignForm(f => { const n = { ...f }; delete n[k]; return n; });
-    load();
-  }
-
-  async function unassign(s: ShipmentRow) {
-    if (!confirm('Remove assignment?')) return;
-    await fetch('/api/shipments/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipmentId: s.shipmentId, tab: s.tab, remove: true }),
-    });
-    load();
-  }
-
-  async function updateStatus(s: ShipmentRow, status: string) {
-    await fetch('/api/shipments/assign', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipmentId: s.shipmentId, tab: s.tab, status }),
-    });
-    load();
-  }
-
-  async function sendPing(s: ShipmentRow) {
-    setPingSaving(true);
-    await fetch('/api/shipments/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'ping', shipmentId: s.shipmentId, tab: s.tab, pingMessage: pingMsg }),
-    });
-    setPingSaving(false); setPingTarget(null); setPingMsg('');
-    load();
-  }
-
-  async function acknowledge(s: ShipmentRow) {
-    await fetch('/api/shipments/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'acknowledge', shipmentId: s.shipmentId, tab: s.tab }),
-    });
-    load();
-  }
-
-  function toggleSelect(k: string) {
-    setSelected(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
-  }
-
-  function toggleAll() {
-    const all = displayed.map(s => key(s));
-    if (selected.size === all.length) setSelected(new Set()); else setSelected(new Set(all));
-  }
-
-  function keyToItem(k: string) {
-    const idx = k.indexOf('|');
-    return { shipmentId: k.slice(0, idx), tab: k.slice(idx + 1) };
-  }
-
-  async function bulkAction(action: 'bulk-resolve' | 'bulk-unassign') {
-    const items = Array.from(selected).map(keyToItem);
-    setBulkSaving(true);
-    await fetch('/api/shipments/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, items }),
-    });
-    setBulkSaving(false); setSelected(new Set()); setEditMode(false);
-    load();
+  function downloadCSV() {
+    const mine = rows.filter(s => s.assignment?.assignedTo === session?.username && s.assignment?.status !== 'resolved');
+    const csvRows = [
+      ['Shipment #', 'Buyer', 'Date', 'Items', 'Whatnot', 'Status', 'Notes', 'Assigned By', 'Assigned At'],
+      ...mine.map(s => [
+        s.shipmentId, s.wn?.buyer ?? '', s.tab, String(s.wn?.itemCount ?? ''), s.wn?.statusLabel ?? '',
+        s.assignment?.status || '',
+        (s.assignment?.notes || '').replace(/,/g, ' '),
+        s.assignment?.assignedBy || '',
+        s.assignment?.assignedAt ? new Date(s.assignment.assignedAt).toLocaleDateString() : '',
+      ]),
+    ];
+    const csv = csvRows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `my-shipments-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
   }
 
   if (!session) return (
@@ -895,484 +662,111 @@ function ShippingPageInner() {
     </div>
   );
 
-  const syncLine = (
-    <div className="flex items-center gap-2 text-[11px] text-slate-400">
-      {!whatnotOn ? (
-        <span>Whatnot isn&apos;t connected (no WHATNOT_API_KEY) — showing the shipment sheet only.</span>
-      ) : (
-        <>
-          {sync?.running
-            ? <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />Checking Whatnot…</span>
-            : <span>Whatnot updated {ago(sync?.refreshedAt ?? null)}</span>}
-          {(sync?.pendingContents ?? 0) > 0 && <span>· reading items for {sync?.pendingContents} shipments</span>}
-          {sync?.error && <span className="text-red-500" title={sync.error}>· last check failed</span>}
-          <button onClick={() => load(tabRef.current, { refresh: true })} disabled={sync?.running}
-            className="ml-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 font-bold text-slate-500 dark:text-slate-300 hover:border-slate-400 disabled:opacity-40 transition-colors">
-            Refresh
-          </button>
-        </>
-      )}
-    </div>
-  );
-
-  const sections: SectionType[] = ['shipments', 'cancellation', 'incomplete', 'replacement', 'refund', 'usps',
-    ...(isAdminOrManager ? ['accountability' as const] : [])];
+  const onShipments = activeSection === 'shipments';
+  const headerBtn = 'inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold transition-colors';
 
   return (
+    <Toasts>
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar role={session.role} userName={session.name} />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0 shadow-sm">
-          <div>
-            <h1 className="text-lg font-black text-white">Shipments</h1>
-            <p className="text-xs text-slate-400 hidden sm:block">{today}</p>
+        <header className="h-16 lg:h-[72px] bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 pl-14 pr-4 sm:pl-6 sm:pr-6 flex-shrink-0">
+          <div className="flex items-center gap-4 min-w-0">
+            <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">Shipments</h1>
+            <span className="hidden sm:block w-px h-7 bg-slate-700" />
+            <span className="hidden sm:flex items-center gap-2 text-sm text-slate-300 truncate">
+              <I.calendar className="w-[18px] h-[18px] text-slate-400" />{today}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            {!isAdminOrManager && (
-              <button onClick={downloadCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-emerald-400 hover:text-emerald-600 transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                <span className="hidden sm:inline">Download CSV</span>
-              </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {onShipments && (
+              <>
+                <Tip content={attention.length ? `${attention.length} thing${attention.length === 1 ? '' : 's'} need attention on this list` : 'Nothing needs attention right now'} align="end">
+                  <button ref={bellRef} onClick={() => setBellOpen(o => !o)} aria-label="Needs attention" aria-expanded={bellOpen}
+                    className={`relative w-10 h-10 grid place-items-center rounded-xl transition-colors ${bellOpen ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                    <I.bell className="w-[22px] h-[22px]" />
+                    {attention.length > 0 && <span className="absolute top-2 right-2.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-slate-900 animate-in zoom-in-50 duration-200" />}
+                  </button>
+                </Tip>
+                <Popover open={bellOpen} onClose={() => setBellOpen(false)} anchor={bellRef} align="end" className="w-80 p-2">
+                  <p className="px-2 pt-1 pb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Needs attention</p>
+                  {attention.length === 0 && <p className="px-2 pb-2 text-sm text-slate-500">All clear on this list.</p>}
+                  <ul className="max-h-80 overflow-y-auto">
+                    {attention.map((a, i) => (
+                      <li key={`${a.id}-${i}`}>
+                        <button onClick={() => { setFocus({ id: a.id, n: Date.now() }); setBellOpen(false); }}
+                          className="w-full flex items-start gap-2.5 px-2 py-2 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                          <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${a.urgent ? 'bg-red-500' : 'bg-amber-500'}`} />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-slate-900 dark:text-white truncate">{a.buyer}</span>
+                            <span className="block text-xs text-slate-500 dark:text-slate-400">{a.why}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </Popover>
+              </>
             )}
-            {activeSection === 'shipments' && (
-              <button
-                onClick={() => { setEditMode(m => !m); setSelected(new Set()); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${editMode ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                {editMode ? 'Cancel' : 'Edit'}
-              </button>
+            {!isAdminOrManager && onShipments && (
+              <Tip content="Your unresolved shipments as a spreadsheet" align="end">
+                <button onClick={downloadCSV} className={`${headerBtn} bg-white/10 text-white hover:bg-white/20`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  <span className="hidden sm:inline">CSV</span>
+                </button>
+              </Tip>
             )}
-            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-full font-bold capitalize">{session.role}</span>
+            {onShipments && (
+              <Tip content={editMode ? 'Leave select mode' : 'Select several shipments to resolve or unassign at once'} align="end">
+                <button onClick={() => setEditMode(m => !m)} aria-pressed={editMode}
+                  className={`${headerBtn} ${editMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-slate-900 hover:bg-slate-100'}`}>
+                  <I.edit className="w-4 h-4" />{editMode ? 'Done' : 'Edit'}
+                </button>
+              </Tip>
+            )}
+            <span className="h-10 px-4 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 text-sm font-semibold capitalize grid place-items-center">{session.role}</span>
           </div>
         </header>
 
         {/* Section tabs */}
-        <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 flex gap-1 overflow-x-auto flex-shrink-0">
-          {sections.map(s => (
-            <button
-              key={s}
-              onClick={() => setActiveSection(s)}
-              className={`flex items-center gap-1.5 px-3 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${activeSection === s
-                ? 'border-red-500 text-red-600 dark:text-red-400'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-            >
-              {s === 'shipments' && !isAdminOrManager ? 'Assigned Shipments' : SECTION_LABELS[s]}
-              {s !== 'shipments' && (sectionCounts[s] ?? 0) > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-black rounded-full">
-                  {sectionCounts[s]}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {/* Non-shipments sections */}
-          {activeSection !== 'shipments' && activeSection !== 'accountability' && (
-            <ClaimsSection type={activeSection} isAdminOrManager={isAdminOrManager} />
+        <nav role="tablist" aria-label="Shipments sections" className="relative bg-slate-900 border-b border-slate-800 px-2 sm:px-4 flex gap-1 overflow-x-auto flex-shrink-0">
+          {sections.map(s => {
+            const on = activeSection === s;
+            return (
+              <button key={s} ref={el => { tabRefs.current[s] = el; }} role="tab" aria-selected={on}
+                onClick={() => setActiveSection(s)}
+                className={`relative flex items-center gap-2 px-4 h-14 text-[15px] font-semibold whitespace-nowrap transition-colors duration-200 ${on ? 'text-white' : 'text-slate-400 hover:text-slate-100'}`}>
+                {s === 'shipments' && !isAdminOrManager ? 'Assigned Shipments' : SECTION_LABELS[s]}
+                {s !== 'shipments' && s !== 'accountability' && (sectionCounts[s] ?? 0) > 0 && (
+                  <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold grid place-items-center">{sectionCounts[s]}</span>
+                )}
+              </button>
+            );
+          })}
+          {underline && (
+            <span aria-hidden="true" className="absolute bottom-0 h-[3px] rounded-t-full bg-blue-500 transition-[left,width] duration-300 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none"
+              style={{ left: underline.left, width: underline.width }} />
           )}
-          {activeSection === 'accountability' && isAdminOrManager && <Accountability />}
+        </nav>
 
-          {/* Shipments section */}
-          {activeSection === 'shipments' && (
-            <>
-              {loading ? (
-                <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Loading shipments...</div>
-              ) : (
-                <>
-                  {isAdminOrManager && (
-                    <>
-                      {/* Date + filter bar */}
-                      <div className="flex flex-wrap items-center gap-3 mb-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => prevTab && goTo(prevTab)}
-                            disabled={!prevTab}
-                            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                            Prev
-                          </button>
-                          <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-900 dark:text-white min-w-[80px] text-center">
-                            {selectedTab || '—'}
-                          </div>
-                          <button
-                            onClick={() => nextTab && goTo(nextTab)}
-                            disabled={!nextTab}
-                            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          >
-                            Next
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                          </button>
-                        </div>
-                        <div className="flex gap-1 flex-wrap">
-                          {(['all', 'unassigned', 'pending', 'in-progress', 'resolved'] as const).map(f => (
-                            <button key={f} onClick={() => setStatusFilter(f)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${statusFilter === f ? 'bg-red-500 border-red-500 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-red-400'}`}>
-                              {f === 'all' ? `All (${tabShipments.length})` : f === 'unassigned' ? `Unassigned (${unassignedInTab.length})` : STATUS_LABEL[f]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* What Whatnot says about them, and how fresh that is */}
-                      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 -mt-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mr-1">Whatnot</span>
-                          {(['all', 'needs-label', 'ready', 'shipped'] as WnFilter[]).map(f => (
-                            <button key={f} onClick={() => setWnFilter(f)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${wnFilter === f ? 'bg-slate-900 dark:bg-white border-slate-900 dark:border-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'}`}>
-                              {WN_FILTER_LABEL[f]}{f !== 'all' && ` (${wnCounts[f]})`}
-                            </button>
-                          ))}
-                        </div>
-                        {syncLine}
-                      </div>
-
-                      {/* Auto-assign panel */}
-                      {unassignedInTab.length > 0 && (
-                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-4 mb-4">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            Auto-Assign
-                            <span className="text-xs font-normal text-slate-400">{unassignedInTab.length} unassigned</span>
-                          </h3>
-                          <div className="flex flex-wrap items-end gap-3">
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Qty</label>
-                              <input type="number" min="1" max={unassignedInTab.length} value={autoCount} onChange={e => setAutoCount(e.target.value)} placeholder="qty"
-                                className="w-20 text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400" />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">To</label>
-                              <select value={autoUser} onChange={e => setAutoUser(e.target.value)}
-                                className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-400">
-                                <option value="">— select —</option>
-                                {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
-                              </select>
-                            </div>
-                            <div className="flex-1 min-w-[120px]">
-                              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Notes</label>
-                              <input type="text" value={autoNotes} onChange={e => setAutoNotes(e.target.value)} placeholder="optional"
-                                className="w-full text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400" />
-                            </div>
-                            <button onClick={autoAssign} disabled={!autoUser || !autoCount || autoSaving}
-                              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40">
-                              {autoSaving ? 'Assigning...' : `Assign ${autoCount || '?'}`}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {!isAdminOrManager && (
-                    <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-                      <div>
-                        <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1">My Assigned Shipments</h2>
-                        <p className="text-xs text-slate-400">Shipments assigned to you. Make the label here so it&apos;s recorded as yours.</p>
-                      </div>
-                      {syncLine}
-                    </div>
-                  )}
-
-                  {/* Report a problem */}
-                  {reportFor && (() => {
-                    const r = shipments.find(x => key(x) === reportFor);
-                    if (!r) return null;
-                    return (
-                      <ReportProblemModal
-                        shipmentId={r.shipmentId} buyer={r.wn?.buyer ?? null} handler={r.handler}
-                        assignee={r.assignment ? { username: r.assignment.assignedTo, name: r.assignment.assignedToName } : null}
-                        lines={r.wn?.lines ?? null}
-                        people={users.map(u => ({ username: u.username, name: u.name, role: u.role }))}
-                        onClose={() => setReportFor(null)}
-                        onSaved={() => { setReportFor(null); load(); }} />
-                    );
-                  })()}
-
-                  {/* Ping modal */}
-                  {pingTarget && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPingTarget(null)}>
-                      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-                        <h3 className="font-black text-white mb-1">Follow Up / Ping</h3>
-                        <p className="text-xs text-slate-400 mb-4">Send a follow-up message</p>
-                        <textarea value={pingMsg} onChange={e => setPingMsg(e.target.value)} placeholder="Type your message..." rows={3}
-                          className="w-full text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4" />
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => setPingTarget(null)} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
-                          <button onClick={() => { const s = displayed.find(s => key(s) === pingTarget); if (s) sendPing(s); }} disabled={pingSaving}
-                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50">
-                            {pingSaving ? 'Sending...' : 'Send Ping'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bulk action bar */}
-                  {editMode && (
-                    <div className="flex items-center gap-3 mb-4 bg-slate-900 dark:bg-slate-700 rounded-xl px-4 py-3 flex-wrap">
-                      <span className="text-white text-xs font-bold">{selected.size} selected</span>
-                      <div className="flex gap-2 ml-auto flex-wrap">
-                        {isAdminOrManager && selected.size > 0 && (
-                          <button onClick={() => bulkAction('bulk-unassign')} disabled={bulkSaving}
-                            className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
-                            {bulkSaving ? '...' : `Unassign (${selected.size})`}
-                          </button>
-                        )}
-                        {selected.size > 0 && (
-                          <button onClick={() => bulkAction('bulk-resolve')} disabled={bulkSaving}
-                            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
-                            {bulkSaving ? '...' : `Resolve (${selected.size})`}
-                          </button>
-                        )}
-                        <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-bold rounded-lg">Clear</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Table */}
-                  {displayed.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 text-center">
-                      <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                      </svg>
-                      <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">
-                        {whatnotOn && sync?.running && tabs.length === 0 ? 'Getting shipments from Whatnot…' : 'No shipments found'}
-                      </p>
-                      <p className="text-slate-400 text-xs mt-1">
-                        {!isAdminOrManager ? 'No shipments assigned to you yet'
-                          : whatnotOn && sync?.running && tabs.length === 0 ? 'The first load takes a few seconds.'
-                          : 'Try a different date or filter'}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                              {editMode && <th className="py-3 pl-4 pr-2 w-10"><input type="checkbox" checked={selected.size === displayed.length && displayed.length > 0} onChange={toggleAll} className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" /></th>}
-                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Shipment</th>
-                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Date</th>
-                              <th className="text-right text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Items</th>
-                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Whatnot / Label</th>
-                              <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Status</th>
-                              {isAdminOrManager
-                                ? <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Assigned To / Assign</th>
-                                : <th className="text-left text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4">Notes</th>
-                              }
-                              <th className="py-3 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-wide">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {displayed.map(s => {
-                              const k = key(s);
-                              const form = getForm(s);
-                              const isSaving = assigning === k;
-                              const isPinged = s.assignment?.pinged;
-                              const isResolved = s.assignment?.status === 'resolved';
-                              const isMyShipment = !isAdminOrManager && s.assignment?.assignedTo === session?.username;
-                              const open = expanded.has(k);
-                              const canMake = isAdminOrManager || s.assignment?.assignedTo === session?.username;
-                              const canPrint = canMake || s.events.some(e => e.kind === 'label-requested' && e.by === session?.username);
-                              const colCount = (editMode ? 1 : 0) + 7;
-
-                              return (
-                                <Fragment key={k}>
-                                <tr
-                                  className={`border-b border-slate-50 dark:border-slate-700/50 transition-colors ${isPinged ? 'bg-amber-50/60 dark:bg-amber-900/10' : selected.has(k) ? 'bg-red-50/50 dark:bg-red-900/10' : open ? 'bg-slate-50/80 dark:bg-slate-700/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
-
-                                  {editMode && (
-                                    <td className="py-3 pl-4 pr-2 align-top">
-                                      <input type="checkbox" checked={selected.has(k)} onChange={() => toggleSelect(k)} className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer" />
-                                    </td>
-                                  )}
-
-                                  <td className="py-3 px-4 align-top">
-                                    {s.wn?.buyer && (
-                                      <a href={s.wn.url} target="_blank" rel="noopener noreferrer"
-                                        className="block text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">{s.wn.buyer}</a>
-                                    )}
-                                    <span className={`font-mono select-all ${s.wn?.buyer ? 'text-[11px] text-slate-400' : 'text-xs text-slate-800 dark:text-slate-200 font-bold'}`}>
-                                      {s.wn?.buyer ? `#${s.shipmentId}` : s.shipmentId}
-                                    </span>
-                                    <button onClick={() => toggleExpanded(k)} aria-expanded={open}
-                                      className="flex items-center gap-1 mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                                      <svg className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                                      {open ? 'Collapse' : 'Expand'}
-                                    </button>
-                                  </td>
-                                  <td className="py-3 px-4 align-top text-xs text-slate-400 whitespace-nowrap">
-                                    {s.tab}
-                                    {s.wn?.createdAt && <span className="block text-[10px]">{timeOf(s.wn.createdAt)}</span>}
-                                  </td>
-                                  <td className="py-3 px-4 align-top text-right whitespace-nowrap">
-                                    {s.wn?.itemCount != null ? (
-                                      <button onClick={() => toggleExpanded(k)} className="text-right group">
-                                        <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 tabular-nums group-hover:underline">
-                                          {s.wn.itemCount} {s.wn.itemCount === 1 ? 'item' : 'items'}
-                                        </span>
-                                        {(s.wn.orderCount ?? 0) > 1 && <span className="block text-[10px] text-slate-500">{s.wn.orderCount} orders</span>}
-                                        <span className="block text-[10px] text-slate-400 tabular-nums">{usd(s.wn.value ?? 0)}</span>
-                                      </button>
-                                    ) : (
-                                      <span className="text-xs text-slate-300 dark:text-slate-600">{s.wn ? '…' : '—'}</span>
-                                    )}
-                                  </td>
-                                  <td className="py-3 px-4 align-top">
-                                    {s.wn ? (
-                                      <>
-                                        <WnStatus wn={s.wn} />
-                                        <LabelActions shipmentId={s.shipmentId} wn={s.wn} events={s.events}
-                                          canMake={canMake} canPrint={canPrint} onChanged={() => load()} />
-                                        {s.handler?.how === 'label' && (
-                                          <p className="text-[10px] text-slate-400 mt-1">Label by <span className="font-bold text-slate-500 dark:text-slate-300">{s.handler.name}</span></p>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400">Not in the Whatnot list</span>
-                                    )}
-                                  </td>
-
-                                  <td className="py-3 px-4 align-top">
-                                    {s.assignment ? (
-                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.assignment.status]}`}>
-                                        {STATUS_LABEL[s.assignment.status]}
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600">
-                                        Unassigned
-                                      </span>
-                                    )}
-                                    {s.problems.some(p => !p.dismissed) && (
-                                      <span className="block mt-1 text-[10px] font-bold text-red-600 dark:text-red-400">
-                                        {s.problems.filter(p => !p.dismissed).length} problem{s.problems.filter(p => !p.dismissed).length === 1 ? '' : 's'}
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  {isAdminOrManager && (
-                                    <td className="py-3 px-4 align-top">
-                                      {s.assignment && (
-                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                          {s.assignment.assignedToName}
-                                          <span className="ml-1 text-[10px] font-normal text-slate-400">({s.assignment.assignedToRole})</span>
-                                          {s.assignment.notes && <span className="ml-1 text-[10px] text-slate-400">· {s.assignment.notes}</span>}
-                                        </p>
-                                      )}
-                                      {isPinged && !isResolved && (
-                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-1">📣 {s.assignment?.pingMessage || 'Follow up'}</p>
-                                      )}
-                                      {!isResolved && (
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <select value={form.username}
-                                            onChange={e => { const sel = users.find(u => u.username === e.target.value); setAssignForm(f => ({ ...f, [k]: { username: e.target.value, name: sel?.name || '', role: sel?.role || '', notes: form.notes } })); }}
-                                            className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500">
-                                            <option value="">— assign —</option>
-                                            {users.map(u => <option key={u.username} value={u.username}>{u.name} ({u.role})</option>)}
-                                          </select>
-                                          <input type="text" placeholder="Notes" value={form.notes}
-                                            onChange={e => setAssignForm(f => ({ ...f, [k]: { ...form, notes: e.target.value } }))}
-                                            className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 w-24" />
-                                        </div>
-                                      )}
-                                    </td>
-                                  )}
-
-                                  {!isAdminOrManager && (
-                                    <td className="py-3 px-4 align-top">
-                                      {isPinged && (
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                          <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-                                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{s.assignment?.pingMessage || 'Follow-up requested'}</span>
-                                        </div>
-                                      )}
-                                      <span className="text-xs text-slate-500 dark:text-slate-400">{s.assignment?.notes || '—'}</span>
-                                    </td>
-                                  )}
-
-                                  <td className="py-3 px-4 align-top">
-                                    <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                      {isResolved ? (
-                                        <>
-                                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ Resolved</span>
-                                          {isAdminOrManager && (
-                                            <button onClick={() => unassign(s)} className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">Remove</button>
-                                          )}
-                                        </>
-                                      ) : (
-                                        <>
-                                          {isAdminOrManager && assignForm[k]?.username && (
-                                            <button onClick={() => saveAssignment(s)} disabled={isSaving}
-                                              className="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50">
-                                              {isSaving ? '...' : s.assignment ? 'Update' : 'Assign'}
-                                            </button>
-                                          )}
-                                          {isAdminOrManager && s.assignment && (
-                                            <select value={s.assignment.status} onChange={e => updateStatus(s, e.target.value)}
-                                              className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-lg px-1.5 py-1 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none">
-                                              <option value="pending">Pending</option>
-                                              <option value="in-progress">In Progress</option>
-                                              <option value="resolved">Resolved</option>
-                                            </select>
-                                          )}
-                                          {isAdminOrManager && s.assignment && (
-                                            <button onClick={() => { setPingTarget(k); setPingMsg(''); }}
-                                              className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${isPinged ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-amber-400 hover:text-amber-600'}`}>
-                                              {isPinged ? '📣 Pinged' : 'Follow Up'}
-                                            </button>
-                                          )}
-                                          {isAdminOrManager && s.assignment && (
-                                            <button onClick={() => unassign(s)} className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent">Remove</button>
-                                          )}
-                                          {isMyShipment && (
-                                            <>
-                                              {s.assignment?.status === 'pending' && (
-                                                <button onClick={() => updateStatus(s, 'in-progress')}
-                                                  className="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold rounded-lg transition-colors">Start</button>
-                                              )}
-                                              <button onClick={() => updateStatus(s, 'resolved')}
-                                                className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors">Resolve</button>
-                                              {isPinged && (
-                                                <button onClick={() => acknowledge(s)}
-                                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors">Acknowledge</button>
-                                              )}
-                                            </>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                                {open && (
-                                  <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/30">
-                                    <td colSpan={colCount} className="px-4 sm:px-6 py-4">
-                                      <ShipmentDetails shipmentId={s.shipmentId} wn={s.wn} handler={s.handler}
-                                        events={s.events} problems={s.problems} isManager={isAdminOrManager}
-                                        onReport={() => setReportFor(k)} onChanged={() => load()} />
-                                    </td>
-                                  </tr>
-                                )}
-                                </Fragment>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Kept mounted while hidden, so filters and open rows survive a trip to another tab. */}
+          <div hidden={!onShipments} className="animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none">
+            <ShipmentQueue session={session} isManager={isAdminOrManager} editMode={editMode}
+              onExitEdit={() => setEditMode(false)} onRows={onRows} focus={focus} />
+          </div>
+          {!onShipments && (
+            <div key={activeSection} className="animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none">
+              {activeSection === 'accountability'
+                ? isAdminOrManager && <Accountability />
+                : <ClaimsSection type={activeSection} isAdminOrManager={isAdminOrManager} />}
+            </div>
           )}
         </main>
       </div>
     </div>
+    </Toasts>
   );
 }
 

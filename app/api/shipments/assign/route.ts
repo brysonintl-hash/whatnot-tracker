@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import {
   upsertAssignment, removeAssignment, updateStatus,
-  bulkAssign, pingShipment, acknowledgePing, getAssignments,
+  bulkAssign, pingShipment, acknowledgePing, getAssignments, updateNotes,
 } from '@/lib/shipmentStore';
 import { updateShipmentInSheet } from '@/lib/sheets';
 
@@ -68,6 +68,20 @@ export async function POST(req: NextRequest) {
     const { shipmentId, tab } = body;
     if (!shipmentId || !tab) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     acknowledgePing(shipmentId, tab);
+    return NextResponse.json({ success: true });
+  }
+
+  // === NOTES ===
+  // Managers on any shipment; the assignee on their own. Only the note
+  // changes — re-posting the assignment would reset its status to pending.
+  if (action === 'notes') {
+    const { shipmentId, tab, notes } = body;
+    if (!shipmentId || !tab || typeof notes !== 'string') return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    const a = getAssignments().find(x => x.shipmentId === shipmentId && x.tab === tab);
+    if (!a) return NextResponse.json({ error: 'Assign the shipment first' }, { status: 404 });
+    const isAdmin = session.role === 'admin' || session.role === 'manager';
+    if (!isAdmin && a.assignedTo !== session.username) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    updateNotes(shipmentId, tab, notes.slice(0, 500));
     return NextResponse.json({ success: true });
   }
 

@@ -92,6 +92,15 @@ export function updateStatus(shipmentId: string, tab: string, status: ShipmentAs
   return true;
 }
 
+export function updateNotes(shipmentId: string, tab: string, notes: string): boolean {
+  const all = read();
+  const idx = all.findIndex(a => a.shipmentId === shipmentId && a.tab === tab);
+  if (idx === -1) return false;
+  all[idx] = { ...all[idx], notes };
+  write(all);
+  return true;
+}
+
 export function pingShipment(shipmentId: string, tab: string, message: string): boolean {
   const all = read();
   const idx = all.findIndex(a => a.shipmentId === shipmentId && a.tab === tab);
