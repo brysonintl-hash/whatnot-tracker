@@ -48,7 +48,7 @@ const SHIPMENTS_NAV: NavItem = {
   label: 'Shipments',
   icon: I.ship,
   children: [
-    { href: '/shipping', label: 'Assign Shipments', icon: I.ship },
+    { href: '/shipping', label: 'Shipments', icon: I.ship },
     { href: '/shipping?tab=cancellation', label: 'Cancellations', icon: I.clip },
     { href: '/shipping?tab=incomplete', label: 'Incomplete Orders', icon: I.clip },
     { href: '/shipping?tab=replacement', label: 'Replacements', icon: I.clip },
@@ -206,8 +206,7 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   const sections = NAV[effectiveRole] ?? [];
   const [pendingUserCount, setPendingUserCount] = useState(0);
   const [pendingTaskCount, setPendingTaskCount] = useState(0);
-  const [shipmentCount, setShipmentCount] = useState(0);
-  const [shipCounts, setShipCounts] = useState<{ shipments: number; claims: Record<string, number>; total: number } | null>(null);
+  const [shipCounts, setShipCounts] = useState<{ claims: Record<string, number>; total: number } | null>(null);
   const [newCustomerCount, setNewCustomerCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -233,7 +232,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
   };
   function childCount(href: string): number {
     if (!shipCounts) return 0;
-    if (href === '/shipping') return shipCounts.shipments;
     const key = CHILD_COUNT_KEY[href];
     return key ? (shipCounts.claims?.[key] ?? 0) : 0;
   }
@@ -291,19 +289,6 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
             setPendingTaskCount(tasks.filter(t => t.status === 'open' && (t.urgent || t.followUp)).length);
           }
         })
-        .catch(() => {});
-    };
-    fetchCount();
-    const t = setInterval(fetchCount, 30000);
-    return () => clearInterval(t);
-  }, [role]);
-
-  useEffect(() => {
-    if (role !== 'host' && role !== 'shipper') return;
-    const fetchCount = () => {
-      fetch('/api/shipments/mycount')
-        .then(r => r.json())
-        .then(d => setShipmentCount(d.count || 0))
         .catch(() => {});
     };
     fetchCount();
@@ -438,11 +423,8 @@ export default function Sidebar({ role, userName }: { role: Role; userName: stri
                   newCustomerCount > 0 ? `${newCustomerCount} new customer${newCustomerCount === 1 ? '' : 's'}` : '',
                 ].filter(Boolean).join(' · ');
                 const pendingsBadge = isPendings && pendingTaskCount > 0;
-                // Hosts and shippers see their own open assignments; admins and
-                // managers see everything still open under Shipments.
-                const ownShipments = (role === 'host' || role === 'shipper') ? shipmentCount : 0;
-                const teamShipments = (role === 'admin' || role === 'manager') ? (shipCounts?.total ?? 0) : 0;
-                const shipmentsTotal = ownShipments + teamShipments;
+                // Admins and managers see the claims still open under Shipments.
+                const shipmentsTotal = (role === 'admin' || role === 'manager') ? (shipCounts?.total ?? 0) : 0;
                 const shipmentsBadge = isShipments && shipmentsTotal > 0;
                 const messagesBadge = isMessages && unreadMessageCount > 0;
                 const hasBadge = usersBadge || pendingsBadge || shipmentsBadge || messagesBadge;

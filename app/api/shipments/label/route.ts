@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { whatnot, hasToken, WhatnotError } from '@/lib/whatnot/client';
 import * as wnStore from '@/lib/whatnot/store';
-import { statusLabel, tabOf } from '@/lib/whatnot/shipQueue';
-import { claimIfFree, getAssignments, removeAssignment, upsertAssignment, updateStatus } from '@/lib/shipmentStore';
+import { statusLabel } from '@/lib/whatnot/shipQueue';
 import { getLedger, recordEvent } from '@/lib/shipmentLedger';
-import { canHandle, isManager, validShipmentId } from '@/lib/shipmentAccess';
+import { canLabel, validShipmentId } from '@/lib/shipmentAccess';
 import type { WnShipment } from '@/lib/whatnot/types';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +52,11 @@ function shape(s: WnShipment) {
   };
 }
 
-/** Make the label: same as Generate Label in Seller Hub, with a name on it. */
+/**
+ * Make the label: same as Generate Label in Seller Hub, with a name on it.
+ * Whoever makes it is the shipment's handler — that's what Accountability
+ * counts — so there's no separate assigning step.
+ */
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -61,9 +64,7 @@ export async function POST(req: NextRequest) {
 
   const { shipmentId } = await req.json().catch(() => ({}));
   if (!validShipmentId(shipmentId)) return NextResponse.json({ error: 'Not a Whatnot shipment id' }, { status: 400 });
-  if (!canHandle(session, shipmentId)) {
-    return NextResponse.json({ error: 'This shipment is assigned to someone else. Ask a manager to move it to you.' }, { status: 403 });
-  }
+  if (!canLabel(session)) return NextResponse.json({ error: 'Your account can\'t make shipping labels.' }, { status: 403 });
   if (inFlight.has(shipmentId)) {
     return NextResponse.json({ error: 'This label is already being requested.', code: 'busy' }, { status: 409 });
   }
@@ -107,47 +108,14 @@ export async function POST(req: NextRequest) {
 
     const at = new Date().toISOString();
 
-    // A shipper making the label on a parcel nobody has takes it first, so
-    // two people can't both label the same box. If the label then fails,
-    // the parcel goes back to the pool.
-    let tookIt: { shipmentId: string; tab: string } | null = null;
-    if (!isManager(session) && !getAssignments().some(a => a.shipmentId === shipmentId)) {
-      const tab = fresh.created_at ? tabOf(fresh.created_at) : tabOf(at);
-      const holder = claimIfFree({
-        shipmentId, tab, assignedTo: session.username, assignedToName: session.name, assignedToRole: session.role,
-        assignedBy: session.username, assignedAt: at, status: 'pending', notes: '',
-        pinged: false, pingMessage: '', pingAt: '',
-      });
-      if (holder.assignedTo !== session.username) {
-        return NextResponse.json({ error: `${holder.assignedToName} just took this shipment.`, code: 'taken' }, { status: 409 });
-      }
-      tookIt = { shipmentId, tab };
-    }
-
     try {
       await whatnot.generateLabel(shipmentId);
     } catch (e) {
       const r = refusal(e);
       recordEvent({ shipmentId, kind: 'label-failed', by: session.username, byName: session.name, at, note: r.error });
-      if (tookIt) removeAssignment(tookIt.shipmentId, tookIt.tab);
       return NextResponse.json({ error: r.error }, { status: r.status });
     }
     recordEvent({ shipmentId, kind: 'label-requested', by: session.username, byName: session.name, at });
-
-    // Whoever makes the label owns the parcel: hand it to them if nobody has
-    // it, and mark it started if it was waiting.
-    const existing = getAssignments().find(a => a.shipmentId === shipmentId);
-    if (!existing) {
-      upsertAssignment({
-        shipmentId, tab: fresh.created_at ? tabOf(fresh.created_at) : tabOf(at),
-        assignedTo: session.username, assignedToName: session.name, assignedToRole: session.role,
-        assignedBy: session.username, assignedAt: at,
-        status: 'in-progress', notes: '',
-        pinged: false, pingMessage: '', pingAt: '',
-      });
-    } else if (existing.status === 'pending') {
-      updateStatus(existing.shipmentId, existing.tab, 'in-progress');
-    }
 
     return NextResponse.json({ ok: true, queued: true });
   } finally {
@@ -161,7 +129,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const id = req.nextUrl.searchParams.get('id');
   if (!validShipmentId(id)) return NextResponse.json({ error: 'Not a Whatnot shipment id' }, { status: 400 });
-  if (!canHandle(session, id, { print: true })) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!canLabel(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   try {
     const fresh = await whatnot.getShipment(id);
     wnStore.putShipments([fresh]);

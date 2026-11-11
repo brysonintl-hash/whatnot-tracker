@@ -36,7 +36,7 @@ type ClaimRecord = {
 type SectionType = 'shipments' | 'cancellation' | 'incomplete' | 'replacement' | 'refund' | 'usps' | 'accountability';
 
 const SECTION_LABELS: Record<SectionType, string> = {
-  shipments: 'Assign Shipments',
+  shipments: 'Shipments',
   cancellation: 'Cancellations',
   incomplete: 'Incomplete Orders',
   replacement: 'Replacements',
@@ -559,19 +559,13 @@ function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 
 
 type Attention = { id: string; buyer: string; why: string; urgent: boolean };
 
-/** What the bell lists: parcels Whatnot is holding up, late ones, and follow-ups. */
-function attentionOf(rows: ShipmentRow[], me: string, isManager: boolean): Attention[] {
+/** What the bell lists: shipments Whatnot is holding up, and late ones. */
+function attentionOf(rows: ShipmentRow[]): Attention[] {
   const out: Attention[] = [];
   for (const r of rows) {
-    // A shipper's list also holds work nobody has taken; their bell is about theirs.
-    if (!isManager && r.assignment?.assignedTo !== me) continue;
-    const buyer = r.wn?.buyer ?? `#${r.shipmentId}`;
-    for (const a of r.wn?.requiredActions ?? []) out.push({ id: r.shipmentId, buyer, why: ACTION_TEXT[a]?.label ?? a.replace(/_/g, ' '), urgent: true });
-    if (r.wn?.overdue) out.push({ id: r.shipmentId, buyer, why: 'Overdue — past its drop-off day', urgent: true });
-    const a = r.assignment;
-    if (a?.pinged && a.status !== 'resolved' && (isManager || a.assignedTo === me)) {
-      out.push({ id: r.shipmentId, buyer, why: `Follow-up${isManager ? ` to ${a.assignedToName}` : ''}: ${a.pingMessage || 'please check this one'}`, urgent: false });
-    }
+    const buyer = r.wn.buyer ?? `#${r.shipmentId}`;
+    for (const a of r.wn.requiredActions) out.push({ id: r.shipmentId, buyer, why: ACTION_TEXT[a]?.label ?? a.replace(/_/g, ' '), urgent: true });
+    if (r.wn.overdue) out.push({ id: r.shipmentId, buyer, why: 'Overdue — past its drop-off day', urgent: true });
   }
   return out;
 }
@@ -583,7 +577,6 @@ function ShippingPageInner() {
   const [session, setSession] = useState<Session | null>(null);
   const [activeSection, setActiveSection] = useState<SectionType>('shipments');
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
-  const [editMode, setEditMode] = useState(false);
   const [rows, setRows] = useState<ShipmentRow[]>([]);
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
@@ -636,27 +629,7 @@ function ShippingPageInner() {
   }, [activeSection, session]);
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const attention = session ? attentionOf(rows, session.username, isAdminOrManager) : [];
-
-  function downloadCSV() {
-    const mine = rows.filter(s => s.assignment?.assignedTo === session?.username && s.assignment?.status !== 'resolved');
-    const csvRows = [
-      ['Shipment #', 'Buyer', 'Date', 'Items', 'Whatnot', 'Status', 'Notes', 'Assigned By', 'Assigned At'],
-      ...mine.map(s => [
-        s.shipmentId, s.wn?.buyer ?? '', s.tab, String(s.wn?.itemCount ?? ''), s.wn?.statusLabel ?? '',
-        s.assignment?.status || '',
-        (s.assignment?.notes || '').replace(/,/g, ' '),
-        s.assignment?.assignedBy || '',
-        s.assignment?.assignedAt ? new Date(s.assignment.assignedAt).toLocaleDateString() : '',
-      ]),
-    ];
-    const csv = csvRows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `my-shipments-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-  }
+  const attention = attentionOf(rows);
 
   if (!session) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
@@ -711,22 +684,6 @@ function ShippingPageInner() {
                 </Popover>
               </>
             )}
-            {!isAdminOrManager && onShipments && (
-              <Tip content="Your unresolved shipments as a spreadsheet" align="end">
-                <button onClick={downloadCSV} className={`${headerBtn} bg-white/10 text-white hover:bg-white/20`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  <span className="hidden sm:inline">CSV</span>
-                </button>
-              </Tip>
-            )}
-            {onShipments && (
-              <Tip content={editMode ? 'Leave select mode' : 'Select several shipments to resolve or unassign at once'} align="end">
-                <button onClick={() => setEditMode(m => !m)} aria-pressed={editMode}
-                  className={`${headerBtn} ${editMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-slate-900 hover:bg-slate-100'}`}>
-                  <I.edit className="w-4 h-4" />{editMode ? 'Done' : 'Edit'}
-                </button>
-              </Tip>
-            )}
             <span className="hidden sm:grid h-10 px-4 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 text-sm font-semibold capitalize place-items-center">{session.role}</span>
           </div>
         </header>
@@ -739,7 +696,7 @@ function ShippingPageInner() {
               <button key={s} ref={el => { tabRefs.current[s] = el; }} role="tab" aria-selected={on}
                 onClick={() => setActiveSection(s)}
                 className={`relative flex items-center gap-2 px-4 h-14 text-[15px] font-semibold whitespace-nowrap transition-colors duration-200 ${on ? 'text-white' : 'text-slate-400 hover:text-slate-100'}`}>
-                {s === 'shipments' && !isAdminOrManager ? 'Assigned Shipments' : SECTION_LABELS[s]}
+                {SECTION_LABELS[s]}
                 {s !== 'shipments' && s !== 'accountability' && (sectionCounts[s] ?? 0) > 0 && (
                   <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold grid place-items-center">{sectionCounts[s]}</span>
                 )}
@@ -755,8 +712,7 @@ function ShippingPageInner() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {/* Kept mounted while hidden, so filters and open rows survive a trip to another tab. */}
           <div hidden={!onShipments} className="animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none">
-            <ShipmentQueue session={session} isManager={isAdminOrManager} editMode={editMode}
-              onExitEdit={() => setEditMode(false)} onRows={onRows} focus={focus} />
+            <ShipmentQueue session={session} isManager={isAdminOrManager} onRows={onRows} focus={focus} />
           </div>
           {!onShipments && (
             <div key={activeSection} className="animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none">

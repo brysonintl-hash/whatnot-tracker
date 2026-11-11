@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAssignments } from '@/lib/shipmentStore';
 import { addError, getLedger, handlerOf, isErrorType, setDismissed } from '@/lib/shipmentLedger';
 import { isManager, validShipmentId } from '@/lib/shipmentAccess';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Report a problem with a shipment. It counts against the shipment's handler
- * unless the manager names someone else — e.g. the packer when someone else
- * made the label.
+ * Report a problem with a shipment. It counts against whoever made the label
+ * unless the manager names someone else — e.g. when the label was made in
+ * Whatnot, or someone else packed the box.
  */
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -23,11 +22,10 @@ export async function POST(req: NextRequest) {
   let who = typeof against === 'string' ? against.trim() : '';
   let whoName = typeof againstName === 'string' ? againstName.trim() : '';
   if (!who) {
-    const events = getLedger().events.filter(e => e.shipmentId === shipmentId);
-    const h = handlerOf(events, getAssignments().find(a => a.shipmentId === shipmentId));
+    const h = handlerOf(getLedger().events.filter(e => e.shipmentId === shipmentId));
     if (!h) {
       return NextResponse.json({
-        error: 'Nobody made this label here and it isn\'t assigned to anyone. Choose whose error it was.',
+        error: 'Nobody made this label on the site, so choose whose error it was.',
         code: 'no-handler',
       }, { status: 400 });
     }

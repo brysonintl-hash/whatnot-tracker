@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { whatnot } from '@/lib/whatnot/client';
 import * as wnStore from '@/lib/whatnot/store';
 import { recordEvent } from '@/lib/shipmentLedger';
-import { canHandle, validShipmentId } from '@/lib/shipmentAccess';
+import { canLabel, validShipmentId } from '@/lib/shipmentAccess';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (!session) return page('Please sign in again, then print from the Shipments page.', 401);
   const id = req.nextUrl.searchParams.get('id');
   if (!validShipmentId(id)) return page('That isn\'t a Whatnot shipment.', 400);
-  if (!canHandle(session, id, { print: true })) return page('Only the person this shipment is assigned to, or a manager, can print its label.', 403);
+  if (!canLabel(session)) return page('Your account can\'t print shipping labels.', 403);
 
   let fresh;
   try {

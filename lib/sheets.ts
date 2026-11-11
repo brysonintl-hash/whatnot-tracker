@@ -115,8 +115,6 @@ async function fetchSalesFromSheets(auth: NonNullable<ReturnType<typeof getAuth>
   return allOrders;
 }
 
-export type ShipmentRecord = { shipmentId: string; tab: string };
-
 // ─── Claim Records (Cancellations / Incomplete / Replacement / Refund / USPS) ─
 
 export type ClaimRecord = {
@@ -425,71 +423,6 @@ async function fetchClaimCounts(auth: ReturnType<typeof getAuth>): Promise<Claim
 }
 
 // ─── Write assignment back to SHIPMENT RECORDS Google Sheet ──────────────────
-
-export async function updateShipmentInSheet(tab: string, shipmentId: string, assignedName: string, status: string): Promise<void> {
-  const auth = getAuth();
-  const spreadsheetId = process.env.SHIPMENT_SHEET_ID;
-  if (!auth || !spreadsheetId) return;
-  try {
-    const sheets = google.sheets({ version: 'v4', auth });
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A:A` });
-    const rows = res.data.values || [];
-    const rowIdx = rows.findIndex(r => r[0]?.toString() === shipmentId);
-    if (rowIdx === -1) return;
-    const rowNumber = rowIdx + 1;
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        valueInputOption: 'USER_ENTERED',
-        data: [
-          { range: `'${tab}'!B${rowNumber}`, values: [[assignedName]] },
-          { range: `'${tab}'!C${rowNumber}`, values: [[status]] },
-        ],
-      },
-    });
-  } catch (e) {
-    console.error('updateShipmentInSheet error:', e);
-  }
-}
-
-export async function getShipmentData(): Promise<ShipmentRecord[]> {
-  const auth = getAuth();
-  const spreadsheetId = process.env.SHIPMENT_SHEET_ID;
-  if (!auth || !spreadsheetId) return [];
-
-  try {
-    const sheets = google.sheets({ version: 'v4', auth });
-    const meta = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheetNames = (meta.data.sheets || [])
-      .map(s => s.properties?.title || '')
-      .filter(Boolean);
-
-    const all: ShipmentRecord[] = [];
-    const BATCH = 50;
-
-    for (let i = 0; i < sheetNames.length; i += BATCH) {
-      const batch = sheetNames.slice(i, i + BATCH);
-      const ranges = batch.map(tab => `'${tab}'!A1:A2000`);
-      const batchRes = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges });
-
-      (batchRes.data.valueRanges || []).forEach((vr, idx) => {
-        const tab = batch[idx];
-        const rows = vr.values || [];
-        rows.forEach(row => {
-          const val = (row[0] || '').toString().trim();
-          if (val && val.toLowerCase() !== 'shipment' && /^\d+$/.test(val)) {
-            all.push({ shipmentId: val, tab });
-          }
-        });
-      });
-    }
-
-    return all;
-  } catch (e) {
-    console.error('getShipmentData error:', e);
-    return [];
-  }
-}
 
 export async function getInventoryData(): Promise<InventoryItem[]> {
   if (isDemo()) return sampleInventory;

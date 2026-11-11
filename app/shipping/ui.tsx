@@ -161,6 +161,9 @@ export function Popover({
     const down = (e: MouseEvent) => {
       const t = e.target as Node;
       if (layer.current?.contains(t) || anchor.current?.contains(t)) return;
+      // A picker opened from inside this layer renders in its own layer;
+      // choosing from it isn't a click outside.
+      if (t instanceof Element && t.closest('[data-floating]')) return;
       onClose();
     };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { onClose(); anchor.current?.focus(); } };
@@ -171,7 +174,7 @@ export function Popover({
 
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
-    <div ref={layer} role={role}
+    <div ref={layer} role={role} data-floating=""
       style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}
       className={`fixed z-[70] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl shadow-slate-900/10 dark:shadow-black/40
         ${pos ? `animate-in fade-in zoom-in-95 duration-150 ${pos.side === 'bottom' ? 'slide-in-from-top-1 origin-top' : 'slide-in-from-bottom-1 origin-bottom'}` : 'opacity-0'} motion-reduce:animate-none ${className}`}>

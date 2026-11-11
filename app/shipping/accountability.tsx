@@ -1,6 +1,7 @@
 'use client';
 
-// Who handled how many shipments, and how often one came back with a problem.
+// Who made how many labels, and how often one of those shipments came back
+// with a problem.
 
 import { useEffect, useState } from 'react';
 import { ERROR_TYPES, type ErrorType } from '@/lib/shipmentProblems';
@@ -10,7 +11,6 @@ type PersonScore = {
   username: string;
   name: string;
   handled: number;
-  labels: number;
   errors: number;
   rate: number | null;
   byType: Partial<Record<ErrorType, number>>;
@@ -79,10 +79,10 @@ export default function Accountability() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Who handled what — and how often it went wrong</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Who made the labels — and how often it went wrong</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-            A shipment&apos;s handler is whoever made its label on this site. If the label was made in Whatnot instead,
-            it&apos;s whoever the shipment was assigned to. Problems count against the handler.
+            Every label made on this site is recorded under the person who made it. Problems with a shipment count
+            against whoever made its label. Labels made directly in Whatnot have no name, so they aren&apos;t counted.
           </p>
         </div>
         <div className="flex gap-1">
@@ -102,22 +102,21 @@ export default function Accountability() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                {['Person', 'Shipments handled', 'Labels made here', 'Problems', 'Problem rate', 'Most common', 'Last problem'].map((h, i) => (
-                  <th key={h} className={`text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4 ${i > 0 && i < 5 ? 'text-right' : 'text-left'}`}>{h}</th>
+                {['Person', 'Labels made', 'Problems', 'Problem rate', 'Most common', 'Last problem'].map((h, i) => (
+                  <th key={h} className={`text-[10px] text-slate-400 font-bold uppercase tracking-wide py-3 px-4 ${i > 0 && i < 4 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data && data.people.length === 0 && (
-                <tr><td colSpan={7} className="py-10 px-4 text-center text-xs text-slate-400">
-                  Nobody has handled a shipment in this window yet. Handlers are recorded from the moment someone makes a label here or a shipment is assigned.
+                <tr><td colSpan={6} className="py-10 px-4 text-center text-xs text-slate-400">
+                  Nobody has made a label on the site in this window yet. Each label is recorded under whoever makes it.
                 </td></tr>
               )}
               {data?.people.map(p => (
                 <tr key={p.username} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                   <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-100">{p.name}</td>
                   <td className="py-3 px-4 text-right tabular-nums text-slate-700 dark:text-slate-200">{p.handled}</td>
-                  <td className="py-3 px-4 text-right tabular-nums text-slate-500 dark:text-slate-400">{p.labels}</td>
                   <td className={`py-3 px-4 text-right tabular-nums font-bold ${p.errors ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>{p.errors}</td>
                   <td className="py-3 px-4 text-right tabular-nums">
                     {p.rate == null ? <span className="text-slate-400">—</span> : (
@@ -136,7 +135,6 @@ export default function Accountability() {
                 <tr className="bg-slate-50 dark:bg-slate-900/50 text-xs">
                   <td className="py-2.5 px-4 font-bold text-slate-500">Team</td>
                   <td className="py-2.5 px-4 text-right tabular-nums text-slate-500">{team.handled}</td>
-                  <td />
                   <td className="py-2.5 px-4 text-right tabular-nums text-slate-500">{team.errors}</td>
                   <td className="py-2.5 px-4 text-right tabular-nums text-slate-500">{teamRate == null ? '—' : pct(teamRate)}</td>
                   <td colSpan={2} className="py-2.5 px-4 text-slate-400">A rate in red is above the team&apos;s.</td>
@@ -187,7 +185,7 @@ export default function Accountability() {
         )}
         {data && data.unattributed > 0 && (
           <p className="text-[11px] text-slate-400 mt-2">
-            {data.unattributed} order{data.unattributed === 1 ? '' : 's'} from Incomplete Orders / Replacements went out in a shipment nobody was recorded handling, so {data.unattributed === 1 ? 'it isn\'t' : 'they aren\'t'} counted against anyone.
+            {data.unattributed} order{data.unattributed === 1 ? '' : 's'} from Incomplete Orders / Replacements went out in a shipment whose label wasn&apos;t made on the site, so {data.unattributed === 1 ? 'it isn\'t' : 'they aren\'t'} counted against anyone.
           </p>
         )}
       </div>

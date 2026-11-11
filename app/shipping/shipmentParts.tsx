@@ -2,7 +2,7 @@
 
 // The pieces of a shipment row: its pills and cells (each explaining itself
 // on hover), and the opened-up panel showing what's in the box, the parcel's
-// details, and who has it.
+// details, and who made the label.
 
 import { useEffect, useState } from 'react';
 import { ERROR_TYPES, type ErrorType } from '@/lib/shipmentProblems';
@@ -45,16 +45,8 @@ export type WnView = {
   value: number | null;
 };
 
-export type Assignment = {
-  shipmentId: string; tab: string;
-  assignedTo: string; assignedToName: string; assignedToRole: string;
-  assignedBy: string; assignedAt: string;
-  status: 'pending' | 'in-progress' | 'resolved';
-  notes: string;
-  pinged: boolean; pingMessage: string; pingAt: string;
-};
-
-export type Handler = { username: string; name: string; how: 'label' | 'assigned'; at: string };
+/** Whoever made the label on this site. */
+export type Handler = { username: string; name: string; at: string };
 export type LedgerEvent = { shipmentId: string; kind: 'label-requested' | 'label-failed' | 'printed'; by: string; byName: string; at: string; note?: string };
 export type Problem = {
   id: string; shipmentId: string; orderId: string | null; type: ErrorType; note: string;
@@ -64,9 +56,9 @@ export type Problem = {
 };
 
 export type ShipmentRow = {
-  shipmentId: string; tab: string; assignment: Assignment | null;
-  /** The parcel as Whatnot has it; null for a sheet row Whatnot hasn't listed. */
-  wn: WnView | null;
+  shipmentId: string;
+  tab: string;
+  wn: WnView;
   handler: Handler | null;
   events: LedgerEvent[];
   problems: Problem[];
@@ -103,14 +95,14 @@ export const ACTION_TEXT: Record<string, { label: string; tip: string }> = {
   package_review_required: { label: 'Package review', tip: 'Whatnot wants the package weight or size checked before it will make a label.' },
 };
 
-export const STATUS_LABEL: Record<Assignment['status'], string> = { pending: 'Pending', 'in-progress': 'In Progress', resolved: 'Resolved' };
-
 /** The latest request still within the window Whatnot usually takes. */
 export function recentRequest(row: ShipmentRow): LedgerEvent | null {
-  if (row.wn?.status !== 'created') return null;
+  if (row.wn.status !== 'created') return null;
   const e = row.events.filter(x => x.kind === 'label-requested').sort((a, b) => b.at.localeCompare(a.at))[0];
   return e && Date.now() - Date.parse(e.at) < 10 * 60_000 ? e : null;
 }
+
+export const needsLabel = (wn: WnView) => wn.status === 'created' && !wn.pickup;
 
 // ─── Pills ─────────────────────────────────────────────────────────────────
 
@@ -127,13 +119,6 @@ const LABEL_TONE: Record<string, string> = {
 
 export function LabelPill({ row, phase }: { row: ShipmentRow; phase?: LabelPhase }) {
   const wn = row.wn;
-  if (!wn) {
-    return (
-      <Tip content="This shipment is on the shipment sheet but isn't in the recent Whatnot list, so its label status is unknown.">
-        <span className={`${pill} bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300`}>Not in Whatnot</span>
-      </Tip>
-    );
-  }
   const asked = recentRequest(row);
   if (phase || asked) {
     return (
@@ -142,12 +127,12 @@ export function LabelPill({ row, phase }: { row: ShipmentRow; phase?: LabelPhase
       </Tip>
     );
   }
-  const labelBy = row.handler?.how === 'label' ? row.handler.name : null;
+  const by = row.handler ? ` by ${row.handler.name}` : ' in Whatnot';
   const tips: Record<string, string> = {
     created: wn.pickup
       ? 'Local pickup — no shipping label needed.'
-      : 'Whatnot hasn\'t made a shipping label yet. Open the row or use ⋯ → Generate Label. Whatnot may still add more of this buyer\'s wins until the label is made.',
-    label_generated: `Label made${labelBy ? ` by ${labelBy}` : ''}. Not scanned by USPS yet.${wn.tracking ? ` Tracking ${wn.tracking}.` : ''} Print it from ⋯.`,
+      : 'No label yet. Check the items, then Generate Label — your name goes on the shipment. Whatnot may still add more of this buyer\'s wins until the label is made.',
+    label_generated: `Label made${by}. Not scanned by USPS yet.${wn.tracking ? ` Tracking ${wn.tracking}.` : ''}`,
     dropped_off: `Dropped off.${wn.tracking ? ` Tracking ${wn.tracking}.` : ''}`,
     in_transit: `On its way to the buyer.${wn.tracking ? ` Tracking ${wn.tracking}.` : ''}`,
     delivered: 'Delivered to the buyer.',
@@ -163,44 +148,46 @@ export function LabelPill({ row, phase }: { row: ShipmentRow; phase?: LabelPhase
   );
 }
 
-const STATUS_TONE: Record<string, string> = {
-  none: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:ring-blue-800',
-  pending: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800',
-  'in-progress': 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-800',
-  resolved: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800',
-};
+const AVATAR_TONES = ['bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-800', 'bg-rose-100 text-rose-700', 'bg-cyan-100 text-cyan-700'];
+/** The same person always gets the same colour. */
+function avatarTone(username: string): string {
+  let h = 0;
+  for (const c of username) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+}
 
-export function StatusPill({ a }: { a: Assignment | null }) {
-  if (!a) {
+/** Who made the label — the person this shipment counts for on Accountability. */
+export function LabelByCell({ row }: { row: ShipmentRow }) {
+  const h = row.handler;
+  if (h) {
     return (
-      <Tip content="Nobody has this shipment yet. Pick someone under Assigned To, or make the label yourself and it's yours.">
-        <span className={`${pill} ${STATUS_TONE.none}`}>Unassigned</span>
+      <Tip content={`${h.name} made this label on ${dayTime(h.at)}. Any problem with this shipment counts against them.`} align="start">
+        <span className="inline-flex items-center gap-2.5 min-w-0">
+          <span className={`w-8 h-8 rounded-full grid place-items-center text-xs font-bold flex-shrink-0 ${avatarTone(h.username)}`}>
+            {h.name.trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-900 dark:text-white truncate">{h.name}</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">{timeOf(h.at)}</span>
+          </span>
+        </span>
       </Tip>
     );
   }
-  const self = a.assignedBy === a.assignedTo;
-  const tip = {
-    pending: self
-      ? `${a.assignedToName} took it on ${dayTime(a.assignedAt)}. Not started yet.`
-      : `Given to ${a.assignedToName}${a.assignedBy ? ` by ${a.assignedBy}` : ''} on ${dayTime(a.assignedAt)}. Not started yet.`,
-    'in-progress': `${a.assignedToName} is working on it.`,
-    resolved: `${a.assignedToName} marked it done.`,
-  }[a.status];
-  return (
-    <Tip content={a.pinged && a.status !== 'resolved' ? `${tip} Follow-up sent: “${a.pingMessage || 'Follow up'}”` : tip}>
-      <span className={`${pill} ${STATUS_TONE[a.status]}`}>
-        {a.pinged && a.status !== 'resolved' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
-        {STATUS_LABEL[a.status]}
-      </span>
-    </Tip>
-  );
+  if (row.wn.hasLabel) {
+    return (
+      <Tip content="The label was made directly in Whatnot, so no name was recorded. Make labels here so they count for whoever made them.">
+        <span className="text-sm text-slate-400 italic">Made in Whatnot</span>
+      </Tip>
+    );
+  }
+  return <span className="text-sm text-slate-300 dark:text-slate-600">—</span>;
 }
 
 const chip = 'inline-flex items-center gap-1 h-6 px-2 rounded-md text-xs font-semibold whitespace-nowrap';
 
 /** Due date plus anything about the parcel that changes how it's handled. */
-export function DueCell({ wn }: { wn: WnView | null }) {
-  if (!wn) return <span className="text-slate-300 dark:text-slate-600">—</span>;
+export function DueCell({ wn }: { wn: WnView }) {
   const open = wn.status === 'created' || wn.status === 'label_generated';
   const today = wn.dropoffDue && dayKey(new Date(wn.dropoffDue)) === dayKey(new Date());
   return (
@@ -234,8 +221,7 @@ export function DueCell({ wn }: { wn: WnView | null }) {
 }
 
 /** "2 items · 2 orders · $39.00", with the item list on hover. */
-export function ItemsCell({ wn, onOpen }: { wn: WnView | null; onOpen: () => void }) {
-  if (!wn) return <span className="text-slate-300 dark:text-slate-600">—</span>;
+export function ItemsCell({ wn, onOpen }: { wn: WnView; onOpen: () => void }) {
   if (!wn.lines || wn.itemCount == null) {
     return (
       <Tip content="Still reading the items from Whatnot — they'll show up in a moment.">
@@ -304,28 +290,23 @@ const card = 'rounded-xl border border-slate-200/80 dark:border-slate-700 bg-whi
 const cardTitle = 'flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[15px] font-bold text-slate-900 dark:text-white';
 const btnBase = 'inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 export const btnPrimary = `${btnBase} bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-600/20`;
+export const btnDark = `${btnBase} bg-slate-900 hover:bg-slate-700 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200`;
 export const btnGhost = `${btnBase} border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700`;
 
 export function ShipmentPanel({
-  row, isManager, canMake, canPrint, phase, labelError, people, notes, onNotes, onNotesCommit, notesState,
-  onAssign, assigning, onStatus, onReport, onMakeLabel, onProblem, onTake,
+  row, isManager, canMake, phase, labelError, onReport, onMakeLabel, onProblem,
 }: {
-  row: ShipmentRow; isManager: boolean; canMake: boolean; canPrint: boolean;
-  phase?: LabelPhase; labelError?: string; people: Option[];
-  notes: string; onNotes: (v: string) => void; onNotesCommit: () => void; notesState?: 'saving' | 'saved';
-  onAssign: (username: string) => void; assigning: boolean;
-  onStatus: (s: Assignment['status']) => void;
+  row: ShipmentRow; isManager: boolean; canMake: boolean;
+  phase?: LabelPhase; labelError?: string;
   onReport: () => void; onMakeLabel: () => void;
   onProblem: (p: Problem, dismissed: boolean) => void;
-  /** Set when a shipper can take this parcel themselves. */
-  onTake?: () => void;
 }) {
-  const { wn, assignment: a } = row;
-  const [lines, setLines] = useState<Line[] | null>(wn?.lines ?? null);
+  const { wn } = row;
+  const [lines, setLines] = useState<Line[] | null>(wn.lines);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!wn || wn.lines) { setLines(wn?.lines ?? null); return; }
+    if (wn.lines) { setLines(wn.lines); return; }
     let live = true;
     fetch(`/api/shipments/contents?id=${row.shipmentId}`)
       .then(async r => {
@@ -337,16 +318,14 @@ export function ShipmentPanel({
     return () => { live = false; };
     // Re-run when the contents arrive from a poll, not on every new row object.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.shipmentId, wn?.lines, Boolean(wn)]);
+  }, [row.shipmentId, wn.lines]);
 
   const units = lines?.reduce((n, l) => n + l.quantity, 0) ?? 0;
   const orders = lines ? new Set(lines.map(l => l.orderId).filter(Boolean)).size : 0;
-  const service = wn ? serviceText(wn) : null;
-  const needsLabel = wn?.status === 'created' && !wn.pickup;
-  const blocked = Boolean(wn?.requiredActions.length);
+  const service = serviceText(wn);
+  const blocked = wn.requiredActions.length > 0;
   const asking = Boolean(phase || recentRequest(row));
   const timeline = [...row.events].sort((x, y) => x.at.localeCompare(y.at));
-  const canEditNotes = isManager || Boolean(a && canMake);
 
   const detail = (Icon: (p: { className?: string }) => JSX.Element, k: string, v: React.ReactNode, mono = false) => (
     <div className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700/60 last:border-0">
@@ -357,7 +336,7 @@ export function ShipmentPanel({
   );
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_minmax(0,1.35fr)] px-3 pb-3 sm:px-4 sm:pb-4">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] px-3 pb-3 sm:px-4 sm:pb-4">
       {/* Items */}
       <section className={card}>
         <h4 className={cardTitle}>
@@ -366,8 +345,7 @@ export function ShipmentPanel({
         </h4>
         <div className="mt-3">
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          {!wn && <p className="text-sm text-slate-400">This shipment is on the shipment sheet but not in the recent Whatnot list, so there are no item details for it.</p>}
-          {wn && !lines && !error && (
+          {!lines && !error && (
             <div className="space-y-2">{[0, 1].map(i => <div key={i} className="h-16 rounded-lg bg-slate-100 dark:bg-slate-700/50 animate-pulse" />)}</div>
           )}
           {lines && (
@@ -402,141 +380,95 @@ export function ShipmentPanel({
       <section className={`${card} flex flex-col`}>
         <h4 className={cardTitle}><I.box className="w-5 h-5 text-slate-500" />Shipment Details</h4>
         <div className="mt-2 flex-1">
-          {wn?.buyerName && detail(I.user, 'Buyer', wn.buyerName)}
-          {wn?.weight && detail(I.weight, 'Weight', wn.weight)}
-          {wn?.dims && detail(I.box, 'Box', wn.dims)}
+          {wn.buyerName && detail(I.user, 'Buyer', wn.buyerName)}
+          {wn.weight && detail(I.weight, 'Weight', wn.weight)}
+          {wn.dims && detail(I.box, 'Box', wn.dims)}
           {service && detail(I.truck, 'Shipping', service)}
-          {wn?.tracking && detail(I.tag, 'Tracking', wn.tracking, true)}
+          {wn.tracking && detail(I.tag, 'Tracking', wn.tracking, true)}
           {detail(I.hash, 'Shipment #', `#${row.shipmentId}`, true)}
         </div>
-        {wn && (
-          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap gap-2">
-            {needsLabel && canMake && (
-              <Tip content={blocked ? 'Whatnot needs something sorted on this shipment first — see the red tag.' : 'Same as Generate Label in Whatnot, using the shipment\'s saved box and service. Your name goes on it.'}>
-                <button onClick={onMakeLabel} disabled={blocked || asking} className={btnPrimary}>
-                  {asking ? <><Spinner />Making label…</> : <><I.tag className="w-4 h-4" />Generate Label</>}
-                </button>
-              </Tip>
-            )}
-            {wn.hasLabel && canPrint && (
-              <>
-                <Tip content="Opens the label with Whatnot's packing slip, so you can check the box against it.">
-                  <a href={`/api/shipments/label/print?id=${row.shipmentId}`} target="_blank" rel="noopener noreferrer" className={btnPrimary}>
-                    <I.printer className="w-4 h-4" />Print label
-                  </a>
-                </Tip>
-                <Tip content="Just the 4×6 label, for a thermal printer.">
-                  <a href={`/api/shipments/label/print?id=${row.shipmentId}&doc=label`} target="_blank" rel="noopener noreferrer" className={btnGhost}>Label only</a>
-                </Tip>
-              </>
-            )}
-            <Tip content="Open this shipment in Whatnot Seller Hub">
-              <a href={wn.url} target="_blank" rel="noopener noreferrer" className={btnGhost}><I.external className="w-4 h-4" />Whatnot</a>
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap gap-2">
+          {needsLabel(wn) && canMake && (
+            <Tip content={blocked ? 'Whatnot needs something sorted on this shipment first — see the red tag.' : 'Same as Generate Label in Whatnot, using the shipment\'s saved box and service. Your name is recorded on the shipment.'}>
+              <button onClick={onMakeLabel} disabled={blocked || asking} className={btnPrimary}>
+                {asking ? <><Spinner />Making label…</> : <><I.tag className="w-4 h-4" />Generate Label</>}
+              </button>
             </Tip>
-            {labelError && <p className="basis-full text-sm text-red-600 dark:text-red-400 leading-snug animate-in fade-in duration-200">{labelError}</p>}
-          </div>
-        )}
+          )}
+          {wn.hasLabel && canMake && (
+            <>
+              <Tip content="Opens the label with Whatnot's packing slip, so you can check the box against it.">
+                <a href={`/api/shipments/label/print?id=${row.shipmentId}`} target="_blank" rel="noopener noreferrer" className={btnDark}>
+                  <I.printer className="w-4 h-4" />Print label
+                </a>
+              </Tip>
+              <Tip content="Just the 4×6 label, for a thermal printer.">
+                <a href={`/api/shipments/label/print?id=${row.shipmentId}&doc=label`} target="_blank" rel="noopener noreferrer" className={btnGhost}>Label only</a>
+              </Tip>
+            </>
+          )}
+          <Tip content="Open this shipment in Whatnot Seller Hub">
+            <a href={wn.url} target="_blank" rel="noopener noreferrer" className={btnGhost}><I.external className="w-4 h-4" />Whatnot</a>
+          </Tip>
+          {labelError && <p className="basis-full text-sm text-red-600 dark:text-red-400 leading-snug animate-in fade-in duration-200">{labelError}</p>}
+        </div>
       </section>
 
-      {/* Who has it */}
-      <section className={card}>
-        <h4 className={cardTitle}><I.user className="w-5 h-5 text-slate-500" />Assignment</h4>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          <div className="space-y-4 min-w-0">
-            {isManager ? (
-              <Select label="Assign to" value={a?.assignedTo ?? ''} options={people} onChange={onAssign}
-                placeholder="— Assign to —" icon={I.user} busy={assigning} />
-            ) : onTake ? (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-500 dark:text-slate-400">Nobody has this shipment yet.</p>
-                <Tip content="Assigns it to you. You can give it back until you start it.">
-                  <button onClick={onTake} className={btnPrimary}><I.user className="w-4 h-4" />Take it</button>
-                </Tip>
-              </div>
+      {/* Who made the label, and what went wrong */}
+      <section className={`${card} flex flex-col gap-4`}>
+        <div>
+          <h4 className={cardTitle}><I.user className="w-5 h-5 text-slate-500" />Label made by</h4>
+          <div className="mt-3">
+            {row.handler ? (
+              <LabelByCell row={row} />
+            ) : wn.hasLabel ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">Made in Whatnot — no name was recorded.</p>
             ) : (
-              <p className="text-sm text-slate-700 dark:text-slate-200"><span className="text-slate-400">Assigned to </span><b>{a?.assignedToName ?? '—'}</b></p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">No label yet. Whoever makes it here is recorded on this shipment.</p>
             )}
-            {a && (isManager || canMake) && (
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Status</p>
-                <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 text-xs font-semibold">
-                  {(['pending', 'in-progress', 'resolved'] as const).map(s => (
-                    <button key={s} onClick={() => s !== a.status && onStatus(s)} aria-pressed={a.status === s}
-                      className={`px-2.5 py-1.5 rounded-md transition-all duration-200 ${a.status === s ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
-                      {STATUS_LABEL[s]}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {timeline.length > 0 && (
+              <ul className="mt-3 space-y-0.5">
+                {timeline.map((e, i) => (
+                  <li key={i} className={`text-xs ${e.kind === 'label-failed' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {e.byName} {EVENT_TEXT[e.kind]}{e.note && e.kind === 'printed' ? ` (${e.note})` : ''} · {dayTime(e.at)}
+                  </li>
+                ))}
+              </ul>
             )}
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">Handled by</p>
-              {row.handler ? (
-                <Tip content={row.handler.how === 'label'
-                  ? 'Made the label on this site, so problems with this shipment count against them.'
-                  : 'The label wasn\'t made on this site, so problems count against whoever it was assigned to.'}>
-                  <p className="text-sm text-slate-800 dark:text-slate-100">
-                    <b>{row.handler.name}</b>
-                    <span className="text-slate-400"> · {row.handler.how === 'label' ? 'made the label here' : 'assigned'}</span>
-                  </p>
-                </Tip>
-              ) : <p className="text-sm text-slate-400">Nobody yet</p>}
-              {timeline.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5">
-                  {timeline.map((e, i) => (
-                    <li key={i} className={`text-xs ${e.kind === 'label-failed' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                      {e.byName} {EVENT_TEXT[e.kind]}{e.note && e.kind === 'printed' ? ` (${e.note})` : ''} · {dayTime(e.at)}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           </div>
+        </div>
 
-          <div className="space-y-4 min-w-0">
-            <div className="relative">
-              <textarea value={notes} onChange={e => onNotes(e.target.value)} onBlur={onNotesCommit} rows={3}
-                disabled={!canEditNotes} aria-label="Notes" placeholder={a ? 'Notes for this shipment' : 'Notes (saved when assigned)'}
-                className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 resize-none transition-[border-color,box-shadow] focus:outline-none focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/15 disabled:opacity-60" />
-              {notesState && (
-                <span className="absolute right-2.5 bottom-2.5 text-[11px] text-slate-400 flex items-center gap-1 animate-in fade-in duration-200">
-                  {notesState === 'saving' ? <><Spinner className="w-3 h-3" />Saving</> : <><I.check className="w-3 h-3 text-emerald-500" />Saved</>}
-                </span>
-              )}
-            </div>
-            <div className="rounded-xl border border-slate-200/80 dark:border-slate-700 p-3.5">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                  <I.alert className="w-[18px] h-[18px] text-red-500" />Problems
-                </span>
-                {isManager && (
-                  <Tip content="Log a mistake on this shipment. It counts on the Accountability tab.">
-                    <button onClick={onReport} className="whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400 underline underline-offset-2 decoration-red-300 hover:decoration-red-600">Report a problem</button>
-                  </Tip>
-                )}
-              </div>
-              {row.problems.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">None reported.</p>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {row.problems.map(p => (
-                    <li key={p.id} className={`text-sm rounded-lg px-2.5 py-2 transition-opacity ${p.dismissed ? 'bg-slate-50 dark:bg-slate-900/50 opacity-60' : 'bg-red-50 dark:bg-red-900/20'}`}>
-                      <p className="font-semibold text-slate-900 dark:text-white">{ERROR_TYPES[p.type]} <span className="font-normal text-slate-500">· {p.againstName}</span></p>
-                      {p.note && <p className="text-slate-600 dark:text-slate-300">{p.note}</p>}
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {dayTime(p.reportedAt)}{p.dismissed ? ' · ruled out' : ''}
-                        {isManager && (
-                          <button onClick={() => onProblem(p, !p.dismissed)} className="ml-2 font-semibold hover:text-slate-700 dark:hover:text-slate-200">
-                            {p.dismissed ? 'Count it again' : 'Not their fault'}
-                          </button>
-                        )}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        <div className="rounded-xl border border-slate-200/80 dark:border-slate-700 p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <I.alert className="w-[18px] h-[18px] text-red-500" />Problems
+            </span>
+            {isManager && (
+              <Tip content="Log a mistake on this shipment. It counts on the Accountability tab.">
+                <button onClick={onReport} className="whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400 underline underline-offset-2 decoration-red-300 hover:decoration-red-600">Report a problem</button>
+              </Tip>
+            )}
           </div>
+          {row.problems.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">None reported.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {row.problems.map(p => (
+                <li key={p.id} className={`text-sm rounded-lg px-2.5 py-2 transition-opacity ${p.dismissed ? 'bg-slate-50 dark:bg-slate-900/50 opacity-60' : 'bg-red-50 dark:bg-red-900/20'}`}>
+                  <p className="font-semibold text-slate-900 dark:text-white">{ERROR_TYPES[p.type]} <span className="font-normal text-slate-500">· {p.againstName}</span></p>
+                  {p.note && <p className="text-slate-600 dark:text-slate-300">{p.note}</p>}
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {dayTime(p.reportedAt)}{p.dismissed ? ' · ruled out' : ''}
+                    {isManager && (
+                      <button onClick={() => onProblem(p, !p.dismissed)} className="ml-2 font-semibold hover:text-slate-700 dark:hover:text-slate-200">
+                        {p.dismissed ? 'Count it again' : 'Not their fault'}
+                      </button>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
     </div>
@@ -550,19 +482,18 @@ export function ReportProblemModal({
 }: {
   row: ShipmentRow; people: Person[]; onClose: () => void; onSaved: (text: string) => void;
 }) {
-  const { handler, assignment: a } = row;
+  const { handler } = row;
   const [type, setType] = useState<ErrorType | ''>('');
   const [note, setNote] = useState('');
   const [orderId, setOrderId] = useState('');
-  // Whose error: the handler by default, but the packer may be someone else.
+  // Whose error: whoever made the label by default, but the packer may be someone else.
   const choices = new Map<string, string>();
   if (handler) choices.set(handler.username, handler.name);
-  if (a) choices.set(a.assignedTo, a.assignedToName);
   for (const p of people) if (!choices.has(p.username)) choices.set(p.username, p.name);
-  const [against, setAgainst] = useState(handler?.username ?? a?.assignedTo ?? '');
+  const [against, setAgainst] = useState(handler?.username ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const orders = Array.from(new Set((row.wn?.lines ?? []).map(l => l.orderId).filter((x): x is string => Boolean(x))));
+  const orders = Array.from(new Set((row.wn.lines ?? []).map(l => l.orderId).filter((x): x is string => Boolean(x))));
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[role="listbox"]')) onClose(); };
@@ -587,7 +518,7 @@ export function ReportProblemModal({
   const label = 'block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5';
   const field = 'w-full text-sm px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-[3px] focus:ring-blue-500/15';
   const whoOptions: Option[] = Array.from(choices.entries()).map(([u, n]) => ({
-    value: u, label: n, sub: handler?.username === u ? 'handled it' : a?.assignedTo === u ? 'assigned' : undefined,
+    value: u, label: n, sub: handler?.username === u ? 'made the label' : undefined,
   }));
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-[2px] p-4 animate-in fade-in duration-150" onClick={onClose}>
@@ -598,7 +529,7 @@ export function ReportProblemModal({
           <span className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/30 grid place-items-center text-red-500 flex-shrink-0"><I.alert className="w-5 h-5" /></span>
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Report a problem</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">#{row.shipmentId}{row.wn?.buyer ? ` to ${row.wn.buyer}` : ''}. It counts on the Accountability tab.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">#{row.shipmentId}{row.wn.buyer ? ` to ${row.wn.buyer}` : ''}. It counts on the Accountability tab.</p>
           </div>
         </div>
 
@@ -614,7 +545,9 @@ export function ReportProblemModal({
 
         <span className={label}>Whose error</span>
         <Select label="Whose error" value={against} options={whoOptions} onChange={setAgainst} placeholder="— Choose —" icon={I.user} />
-        <p className="text-xs text-slate-400 mt-1.5 mb-5">Defaults to whoever handled the shipment.</p>
+        <p className="text-xs text-slate-400 mt-1.5 mb-5">
+          {handler ? 'Defaults to whoever made the label.' : 'Nobody made this label on the site — choose who packed it.'}
+        </p>
 
         {orders.length > 1 && (
           <>

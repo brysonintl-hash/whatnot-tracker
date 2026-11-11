@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getClaims } from '@/lib/sheets';
-import { getAssignments } from '@/lib/shipmentStore';
 import * as wnStore from '@/lib/whatnot/store';
 import { getContents } from '@/lib/whatnot/shipQueue';
 import {
@@ -13,8 +12,8 @@ import { isManager } from '@/lib/shipmentAccess';
 export const dynamic = 'force-dynamic';
 
 /**
- * Who handled how many shipments in the window, and how many of those came
- * back with a problem — reported here, or logged on the Incomplete Orders
+ * Who made how many labels in the window, and how many of those shipments
+ * came back with a problem — reported here, or logged on the Incomplete Orders
  * and Replacements tabs against an order we can trace to a shipment.
  */
 export async function GET(req: NextRequest) {
@@ -25,14 +24,9 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
 
   const ledger = getLedger();
-  const events = eventsByShipment(ledger.events);
-  const firstAssignment = new Map<string, ReturnType<typeof getAssignments>[number]>();
-  for (const a of getAssignments()) if (!firstAssignment.has(a.shipmentId)) firstAssignment.set(a.shipmentId, a);
-
-  const ids = new Set<string>([...Array.from(events.keys()), ...Array.from(firstAssignment.keys())]);
   const handlers = new Map<string, Handler>();
-  for (const id of Array.from(ids)) {
-    const h = handlerOf(events.get(id) ?? [], firstAssignment.get(id));
+  for (const [id, events] of Array.from(eventsByShipment(ledger.events).entries())) {
+    const h = handlerOf(events);
     if (h) handlers.set(id, h);
   }
 

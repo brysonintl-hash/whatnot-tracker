@@ -6,13 +6,12 @@
 //     whoever was signed in. The person who made the label is the parcel's
 //     handler.
 //   • problems — a wrong item, a missing item, a bad label… pinned on the
-//     handler at the moment it's reported, so reassigning the parcel later
-//     doesn't move the blame.
+//     handler when it's reported.
 //
-// A label made straight in Whatnot leaves no name behind, so for those the
-// handler falls back to whoever the parcel was assigned to here. Problems the
-// team already logs on the Incomplete Orders and Replacements tabs are linked
-// in by order number, so nobody has to report the same thing twice.
+// A label made straight in Whatnot leaves no name behind, so those parcels
+// have no handler. Problems the team already logs on the Incomplete Orders
+// and Replacements tabs are linked in by order number, so nobody has to
+// report the same thing twice.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
@@ -120,26 +119,14 @@ export function setDismissed(id: string, by: string, dismissed: boolean): boolea
 
 // ─── Handler ───────────────────────────────────────────────────────────────
 
-export type Handler = {
-  username: string;
-  name: string;
-  /** label: made the label here. assigned: label made elsewhere, so the assignee. */
-  how: 'label' | 'assigned';
-  at: string;
-};
+export type Handler = { username: string; name: string; at: string };
 
-export type AssignmentRef = { assignedTo: string; assignedToName: string; assignedAt: string } | null | undefined;
-
-/** The first person to make the label here; failing that, whoever it was assigned to. */
-export function handlerOf(events: LedgerEvent[], assignment: AssignmentRef): Handler | null {
+/** The first person to make the label here. A label made in Whatnot has none. */
+export function handlerOf(events: LedgerEvent[]): Handler | null {
   const first = events
     .filter(e => e.kind === 'label-requested')
     .sort((a, b) => a.at.localeCompare(b.at))[0];
-  if (first) return { username: first.by, name: first.byName, how: 'label', at: first.at };
-  if (assignment?.assignedTo) {
-    return { username: assignment.assignedTo, name: assignment.assignedToName || assignment.assignedTo, how: 'assigned', at: assignment.assignedAt };
-  }
-  return null;
+  return first ? { username: first.by, name: first.byName, at: first.at } : null;
 }
 
 export function eventsByShipment(events: LedgerEvent[]): Map<string, LedgerEvent[]> {
@@ -209,10 +196,8 @@ export function claimErrors(
 export type PersonScore = {
   username: string;
   name: string;
-  /** Parcels this person is the handler of, in the window. */
+  /** Labels this person made here, in the window. */
   handled: number;
-  /** Of those, labels they made here. */
-  labels: number;
   errors: number;
   /** errors / handled, or null when they handled nothing. */
   rate: number | null;
@@ -229,7 +214,7 @@ export function scoreboard(
   const person = (username: string, name: string) => {
     let p = people.get(username);
     if (!p) {
-      p = { username, name, handled: 0, labels: 0, errors: 0, rate: null, byType: {}, lastErrorAt: null };
+      p = { username, name, handled: 0, errors: 0, rate: null, byType: {}, lastErrorAt: null };
       people.set(username, p);
     }
     if (name && p.name === p.username) p.name = name;
@@ -240,7 +225,6 @@ export function scoreboard(
     if (handler.at < since) continue;
     const p = person(handler.username, handler.name);
     p.handled++;
-    if (handler.how === 'label') p.labels++;
   }
   for (const e of errors) {
     if (e.dismissed || !e.against || !e.reportedAt || e.reportedAt < since) continue;
