@@ -4,9 +4,9 @@
 // on hover), and the opened-up panel showing what's in the box, the parcel's
 // details, and who made the label.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ERROR_TYPES, type ErrorType } from '@/lib/shipmentProblems';
-import { I, Select, Spinner, Tip, type Option } from './ui';
+import { I, Select, Spinner, Tip, useToast, type Option } from './ui';
 
 // ─── Shapes from /api/shipments ────────────────────────────────────────────
 
@@ -294,16 +294,62 @@ export const btnDark = `${btnBase} bg-slate-900 hover:bg-slate-700 text-white da
 export const btnGhost = `${btnBase} border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700`;
 
 export function ShipmentPanel({
-  row, isManager, canMake, phase, labelError, onReport, onMakeLabel, onProblem,
+  row, isManager, canMake, phase, labelError, onReport, onMakeLabel, onProblem, onReload,
 }: {
   row: ShipmentRow; isManager: boolean; canMake: boolean;
   phase?: LabelPhase; labelError?: string;
   onReport: () => void; onMakeLabel: () => void;
   onProblem: (p: Problem, dismissed: boolean) => void;
+  onReload: () => void;
 }) {
   const { wn } = row;
   const [lines, setLines] = useState<Line[] | null>(wn.lines);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  // Whatnot's API can't change a parcel's box or weight, and its Generate
+  // Label uses whatever is saved there. So Change opens the parcel in Whatnot,
+  // and coming back to this tab reads it again to pick up the new size.
+  const [pkgWatch, setPkgWatch] = useState(false);
+  const [pkgChecking, setPkgChecking] = useState(false);
+  const pkgBefore = useRef({ weight: wn.weight, dims: wn.dims });
+  const pkgBusy = useRef(false);
+
+  const checkPkg = useCallback(async () => {
+    if (pkgBusy.current) return;
+    pkgBusy.current = true;
+    setPkgChecking(true);
+    try {
+      const r = await fetch(`/api/shipments/label?id=${row.shipmentId}`);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast({ tone: 'error', text: d.error || 'Couldn\'t read the shipment from Whatnot.' }); return; }
+      const was = pkgBefore.current;
+      if (d.weight !== was.weight || d.dims !== was.dims) {
+        setPkgWatch(false);
+        toast({ text: `Updated from Whatnot: ${[d.dims, d.weight].filter(Boolean).join(', ') || 'no size set'}` });
+        onReload();
+      }
+    } catch {
+      toast({ tone: 'error', text: 'Network error — check your connection and try again.' });
+    } finally {
+      pkgBusy.current = false;
+      setPkgChecking(false);
+    }
+  }, [row.shipmentId, toast, onReload]);
+
+  useEffect(() => {
+    if (!pkgWatch) return;
+    const back = () => { if (document.visibilityState === 'visible') checkPkg(); };
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('focus', back);
+    // Someone who wandered off doesn't need it checked forever.
+    const stop = setTimeout(() => setPkgWatch(false), 30 * 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', back);
+      window.removeEventListener('focus', back);
+      clearTimeout(stop);
+    };
+  }, [pkgWatch, checkPkg]);
 
   useEffect(() => {
     if (wn.lines) { setLines(wn.lines); return; }
@@ -327,13 +373,27 @@ export function ShipmentPanel({
   const asking = Boolean(phase || recentRequest(row));
   const timeline = [...row.events].sort((x, y) => x.at.localeCompare(y.at));
 
-  const detail = (Icon: (p: { className?: string }) => JSX.Element, k: string, v: React.ReactNode, mono = false) => (
+  const detail = (Icon: (p: { className?: string }) => JSX.Element, k: string, v: React.ReactNode, mono = false, action?: React.ReactNode) => (
     <div className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700/60 last:border-0">
       <Icon className="w-[18px] h-[18px] text-slate-400 flex-shrink-0" />
       <span className="w-24 flex-shrink-0 text-sm text-slate-500 dark:text-slate-400">{k}</span>
       <span className={`text-sm text-slate-800 dark:text-slate-100 min-w-0 break-words ${mono ? 'font-mono select-all' : ''}`}>{v}</span>
+      {action}
     </div>
   );
+
+  // Only before the label is bought: after that the size is on the label.
+  const canChangePkg = needsLabel(wn) && canMake;
+  const changePkg = canChangePkg && (
+    <Tip wide className="ml-auto flex-shrink-0" content="Whatnot only lets you change the box size or weight on its own site. This opens the shipment there — change it and save, then come back to this tab. The new size loads here, and Generate Label uses it.">
+      <a href={wn.url} target="_blank" rel="noopener noreferrer"
+        onClick={() => { pkgBefore.current = { weight: wn.weight, dims: wn.dims }; setPkgWatch(true); }}
+        className="-my-1 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+        <I.edit className="w-3.5 h-3.5" />Change
+      </a>
+    </Tip>
+  );
+  const notSet = <span className="text-slate-400 italic">Not set</span>;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] px-3 pb-3 sm:px-4 sm:pb-4">
@@ -381,8 +441,18 @@ export function ShipmentPanel({
         <h4 className={cardTitle}><I.box className="w-5 h-5 text-slate-500" />Shipment Details</h4>
         <div className="mt-2 flex-1">
           {wn.buyerName && detail(I.user, 'Buyer', wn.buyerName)}
-          {wn.weight && detail(I.weight, 'Weight', wn.weight)}
-          {wn.dims && detail(I.box, 'Box', wn.dims)}
+          {(wn.weight || canChangePkg) && detail(I.weight, 'Weight', wn.weight ?? notSet, false, changePkg)}
+          {(wn.dims || canChangePkg) && detail(I.box, 'Box', wn.dims ? <span className="whitespace-nowrap">{wn.dims}</span> : notSet, false, changePkg)}
+          {pkgWatch && (
+            <div className="my-2 flex items-start gap-2.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 px-3 py-2.5 text-[13px] leading-snug text-blue-900 dark:text-blue-100 animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none">
+              {pkgChecking ? <Spinner className="w-4 h-4 mt-px flex-shrink-0" /> : <I.external className="w-4 h-4 mt-px flex-shrink-0 text-blue-500" />}
+              <span className="flex-1">{pkgChecking ? 'Checking Whatnot for the new size…' : 'Change the box or weight in Whatnot and save. It updates here when you come back to this tab.'}</span>
+              <button onClick={checkPkg} disabled={pkgChecking} className="font-semibold text-blue-700 dark:text-blue-300 hover:underline disabled:opacity-50 whitespace-nowrap">Check now</button>
+              <Tip content="Stop waiting for a change">
+                <button onClick={() => setPkgWatch(false)} aria-label="Stop waiting for a change" className="-m-1 p-1 rounded text-blue-400 hover:text-blue-700 dark:hover:text-blue-200"><I.x className="w-3.5 h-3.5" /></button>
+              </Tip>
+            </div>
+          )}
           {service && detail(I.truck, 'Shipping', service)}
           {wn.tracking && detail(I.tag, 'Tracking', wn.tracking, true)}
           {detail(I.hash, 'Shipment #', `#${row.shipmentId}`, true)}

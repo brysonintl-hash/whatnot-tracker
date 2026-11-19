@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { whatnot, hasToken, WhatnotError } from '@/lib/whatnot/client';
 import * as wnStore from '@/lib/whatnot/store';
-import { statusLabel } from '@/lib/whatnot/shipQueue';
+import { packageOf, statusLabel } from '@/lib/whatnot/shipQueue';
 import { getLedger, recordEvent } from '@/lib/shipmentLedger';
 import { canLabel, validShipmentId } from '@/lib/shipmentAccess';
 import type { WnShipment } from '@/lib/whatnot/types';
@@ -49,6 +49,8 @@ function shape(s: WnShipment) {
     statusLabel: statusLabel(s.status),
     hasLabel: Boolean(s.documents?.label_url || s.documents?.bundled_url),
     tracking: s.tracking?.tracking_code ?? null,
+    // Box and weight are changed in Whatnot; the panel reads them back here.
+    ...packageOf(s),
   };
 }
 

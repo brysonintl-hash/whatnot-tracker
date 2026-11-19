@@ -314,6 +314,16 @@ export function statusLabel(status: string): string {
 const UNIT: Record<string, string> = { ounce: 'oz', pound: 'lb', gram: 'g', kilogram: 'kg', inch: 'in', centimeter: 'cm' };
 const unit = (u: string) => UNIT[u] ?? u;
 
+/** "7 oz" and "12 × 12 × 12 in" — the box and weight the label will be bought for. */
+export function packageOf(s: Pick<WnShipment, 'weight' | 'dimensions'>): { weight: string | null; dims: string | null } {
+  return {
+    weight: s.weight ? `${s.weight.value} ${unit(s.weight.unit)}` : null,
+    dims: s.dimensions
+      ? `${s.dimensions.length} × ${s.dimensions.width} × ${s.dimensions.height} ${unit(s.dimensions.unit)}`
+      : null,
+  };
+}
+
 /**
  * Whatnot sends the due *date* as seller-local midnight and says plainly it
  * isn't the overdue cutoff, so a parcel counts as late only once that whole
@@ -338,10 +348,7 @@ export function viewOf(s: WnShipment, c: ShipmentContents | undefined, now = Dat
     overdue: isOverdue(s, now),
     requiredActions: s.required_actions ?? [],
     pickup: s.fulfillment_method === 'pickup',
-    weight: s.weight ? `${s.weight.value} ${unit(s.weight.unit)}` : null,
-    dims: s.dimensions
-      ? `${s.dimensions.length} × ${s.dimensions.width} × ${s.dimensions.height} ${unit(s.dimensions.unit)}`
-      : null,
+    ...packageOf(s),
     carrier: s.tracking?.carrier ?? null,
     service: s.tracking?.service ?? null,
     tracking: s.tracking?.tracking_code ?? null,

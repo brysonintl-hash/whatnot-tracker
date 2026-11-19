@@ -11,7 +11,7 @@
 import { whatnot, hasToken } from '../whatnot/client';
 import * as wnStore from '../whatnot/store';
 import {
-  fulfillmentAlerts, milestoneAlerts, bigSaleAlerts, mailAlerts, cancellationAlerts, renderDigest, renderCancellations,
+  fulfillmentAlerts, milestoneAlerts, bigSaleAlerts, mailAlerts, cancellationAlerts, renderDigest, renderCancellations, renderShipping,
   applyQuietHours, PENDING_CANCELLATION, type Alert, type MailThread, type CancellationDetail,
 } from './alerts';
 import { configFromEnv, sendMessage, type TelegramConfig } from './client';
@@ -151,8 +151,8 @@ async function recentMail(senders: string[], max = 15): Promise<MailThread[]> {
 /**
  * Turn alerts into the messages to post.
  *
- * Cancellation requests get their own message in their own layout, posted
- * first; everything else shares one digest.
+ * Cancellation requests and parcels each get their own message in their own
+ * layout, cancellations first; everything else shares one digest.
  */
 function compose(
   alerts: Alert[],
@@ -160,12 +160,17 @@ function compose(
   heading?: string,
 ): { text: string; silent: boolean }[] {
   const cancels = alerts.filter(a => a.stream === 'cancellations');
-  const rest = alerts.filter(a => a.stream !== 'cancellations');
+  const parcels = alerts.filter(a => a.stream === 'fulfillment' && a.ship);
+  const rest = alerts.filter(a => a.stream !== 'cancellations' && !(a.stream === 'fulfillment' && a.ship));
   const out: { text: string; silent: boolean }[] = [];
+  const lead = (text: string) => (heading && !out.length ? `<i>${heading}</i>\n\n${text}` : text);
 
   if (cancels.length) {
-    const text = renderCancellations(cancels, pendingTotal);
-    out.push({ text: heading ? `<i>${heading}</i>\n\n${text}` : text, silent: false });
+    out.push({ text: lead(renderCancellations(cancels, pendingTotal)), silent: false });
+  }
+  if (parcels.length) {
+    // Names link to the shipment on the site, where the label gets a name on it.
+    out.push({ text: lead(renderShipping(parcels, process.env.APP_URL || null)), silent: false });
   }
   if (rest.length) {
     const h = rest.length > 1 ? `${rest.length} updates` : undefined;

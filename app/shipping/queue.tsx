@@ -86,10 +86,11 @@ export default function ShipmentQueue({
   const [loading, setLoading] = useState(true);
   const [people, setPeople] = useState<Person[]>([]);
 
-  const load = useCallback(async (t: string = tabRef.current, opts: { refresh?: boolean } = {}) => {
+  const load = useCallback(async (t: string = tabRef.current, opts: { refresh?: boolean; shipment?: string } = {}) => {
     const qs = new URLSearchParams();
     if (t) qs.set('tab', t);
     if (opts.refresh) qs.set('refresh', '1');
+    if (opts.shipment) qs.set('shipment', opts.shipment);
     try {
       const res = await fetch(`/api/shipments?${qs}`);
       const data = await res.json();
@@ -188,17 +189,30 @@ export default function ShipmentQueue({
   const [flash, setFlash] = useState<string | null>(null);
   const toggle = (id: string) => setExpanded(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
-  // The bell asks for a row: open it, bring it into view, and mark it briefly.
+  // The bell or a Telegram link asks for a row: open it, bring it into view,
+  // and mark it briefly. A link's parcel may be on another day, so that day is
+  // asked for once; after that, a parcel that isn't there is left alone.
+  const focusDone = useRef<number | null>(null);
+  const focusAsked = useRef<number | null>(null);
   useEffect(() => {
-    if (!focus || !rows.some(x => x.shipmentId === focus.id)) return;
+    if (!focus || loading || focusDone.current === focus.n) return;
+    if (!rows.some(x => x.shipmentId === focus.id)) {
+      if (focusAsked.current !== focus.n) { focusAsked.current = focus.n; load(undefined, { shipment: focus.id }); }
+      return;
+    }
+    focusDone.current = focus.n;
     setView('all');
     clearFilters();
     setExpanded(prev => new Set(prev).add(focus.id));
     setFlash(focus.id);
     requestAnimationFrame(() => document.getElementById(`ship-${focus.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }, [focus, rows, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!flash) return;
     const t = setTimeout(() => setFlash(null), 1600);
     return () => clearTimeout(t);
-  }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flash]);
 
   // ── Labels ──
   const [phase, setPhase] = useState<Record<string, LabelPhase>>({});
@@ -606,7 +620,8 @@ export default function ShipmentQueue({
                     <Collapse open={open}>
                       <ShipmentPanel row={r} isManager={isManager} canMake
                         phase={ph} labelError={labelError[id]}
-                        onReport={() => setReportFor(id)} onMakeLabel={() => makeLabel(r)} onProblem={setProblem} />
+                        onReport={() => setReportFor(id)} onMakeLabel={() => makeLabel(r)} onProblem={setProblem}
+                        onReload={() => load()} />
                     </Collapse>
                   </div>
                 </div>

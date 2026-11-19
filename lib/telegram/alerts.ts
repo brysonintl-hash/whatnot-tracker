@@ -41,6 +41,19 @@ export type Alert = {
   at: string;
   /** Structured fields, for streams that have their own message layout. */
   card?: CancellationCard;
+  ship?: ShipCard;
+};
+
+/** What the shipping message needs to put one parcel in its group. */
+export type ShipCard = {
+  kind: 'overdue' | 'action' | 'duesoon' | 'nolabel';
+  buyer: string | null;
+  shipmentId: string;
+  createdAt: string | null;
+  labelled: boolean;
+  /** Hours since created (nolabel) or until the deadline (duesoon). */
+  hours: number;
+  actions?: string[];
 };
 
 export type FulfillmentThresholds = {
@@ -75,6 +88,10 @@ export function fulfillmentAlerts(
     const shipped = Boolean(s.tracking?.tracking_code);
     const labelled = Boolean(s.documents?.label_url);
     const who = s.recipient?.username ? `@${s.recipient.username}` : 'a buyer';
+    const card = (kind: ShipCard['kind'], hours = 0, actions?: string[]): ShipCard => ({
+      kind, buyer: s.recipient?.username ?? null, shipmentId: s.id,
+      createdAt: s.created_at ?? null, labelled, hours, actions,
+    });
 
     // A parcel the buyer has asked to cancel is a support question, not a
     // shipping one — cancellationAlerts reports it. Chasing its label or its
@@ -89,6 +106,7 @@ export function fulfillmentAlerts(
         title: `Shipment needs action — ${s.required_actions.join(', ')}`,
         detail: `${who} · shipment ${s.id}`,
         url: s.url, at: now,
+        ship: card('action', 0, s.required_actions),
       });
     }
 
@@ -101,6 +119,7 @@ export function fulfillmentAlerts(
           title: `Past its drop-off deadline by ${Math.abs(Math.round(hoursLeft))}h`,
           detail: `${who} · shipment ${s.id}${labelled ? '' : ' · no label yet'}`,
           url: s.url, at: now,
+          ship: card('overdue'),
         });
       } else if (hoursLeft <= th.dueSoonHours) {
         out.push({
@@ -109,6 +128,7 @@ export function fulfillmentAlerts(
           title: `Due for drop-off in ${Math.round(hoursLeft)}h`,
           detail: `${who} · shipment ${s.id}${labelled ? '' : ' · no label yet'}`,
           url: s.url, at: now,
+          ship: card('duesoon', Math.max(1, Math.ceil(hoursLeft))),
         });
       }
     }
@@ -124,6 +144,7 @@ export function fulfillmentAlerts(
           title: `No shipping label after ${Math.round(age)}h`,
           detail: `${who} · shipment ${s.id}`,
           url: s.url, at: now,
+          ship: card('nolabel', Math.floor(age)),
         });
       }
     }
@@ -393,6 +414,82 @@ export function renderCancellations(alerts: Alert[], totalPending: number): stri
     }
     lines.push(`🔗 <b>View Order:</b> <a href="${esc(c.url)}">Open in Whatnot</a>`);
   }
+  return lines.join('\n');
+}
+
+const SHIP_GROUPS: { kind: ShipCard['kind']; icon: string; title: (cards: ShipCard[]) => string }[] = [
+  { kind: 'overdue', icon: '🔴', title: () => 'Past drop-off deadline' },
+  { kind: 'action', icon: '🔴', title: () => 'Whatnot needs something first' },
+  { kind: 'duesoon', icon: '🟠', title: c => `Drop off within ${Math.max(...c.map(x => x.hours))}h` },
+  { kind: 'nolabel', icon: '🟠', title: c => `No label for ${Math.min(...c.map(x => x.hours))}h+` },
+];
+
+const ACTION_SHORT: Record<string, string> = {
+  country_of_origin_required: 'country of origin',
+  itn_required: 'ITN',
+  package_review_required: 'package review',
+};
+
+/** Past this many names a group says "+N more" — the tab has the full list. */
+const SHIP_NAMES_MAX = 12;
+
+/**
+ * Parcels that need someone, grouped by what they need, one line of buyer
+ * names each. A shipment number means nothing to the person packing; the
+ * buyer's name is what they search for. Names link to the shipment on the
+ * site, where the label is made with a name on it — and a bare "@name" would
+ * be turned into a Telegram mention of whoever owns that handle there.
+ *
+ *   📦 STACK BARGAINS | SHIPPING
+ *
+ *   🟠 No label for 6h+ (9)
+ *   joseper92500 ×2 · aaron6000 · jokcards · …
+ *
+ *   🔗 Make the labels: Open Shipments
+ */
+export function renderShipping(alerts: Alert[], site: string | null): string {
+  const cards = alerts.map(a => a.ship).filter((c): c is ShipCard => Boolean(c));
+  if (!cards.length) return '';
+  const base = site?.replace(/\/+$/, '') || null;
+
+  const lines = ['📦 <b>STACK BARGAINS | SHIPPING</b>'];
+  for (const g of SHIP_GROUPS) {
+    const group = cards
+      .filter(c => c.kind === g.kind)
+      // Waiting longest first.
+      .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+    if (!group.length) continue;
+
+    // One buyer with two parcels is one name to look for.
+    const byBuyer = new Map<string, ShipCard[]>();
+    for (const c of group) {
+      const k = c.buyer ?? `#${c.shipmentId}`;
+      byBuyer.set(k, [...(byBuyer.get(k) ?? []), c]);
+    }
+    const names = Array.from(byBuyer.entries()).map(([name, cs]) => {
+      const c = cs[0];
+      const label = base
+        ? `<a href="${esc(`${base}/shipping?shipment=${c.shipmentId}`)}">${esc(name)}</a>`
+        : esc(name);
+      const notes = [
+        cs.length > 1 ? `×${cs.length}` : null,
+        g.kind === 'action' && c.actions?.length ? `(${c.actions.map(a => ACTION_SHORT[a] ?? a.replace(/_/g, ' ')).join(', ')})` : null,
+        (g.kind === 'overdue' || g.kind === 'duesoon') && !c.labelled ? '(no label)' : null,
+      ].filter(Boolean);
+      return notes.length ? `${label} ${esc(notes.join(' '))}` : label;
+    });
+    const shown = names.slice(0, SHIP_NAMES_MAX);
+    if (names.length > shown.length) shown.push(`+${names.length - shown.length} more`);
+
+    lines.push('');
+    lines.push(`${g.icon} <b>${esc(g.title(group))}</b> (${group.length})`);
+    lines.push(shown.join(' · '));
+  }
+
+  lines.push('');
+  lines.push(base
+    ? `🔗 <b>Make the labels:</b> <a href="${esc(`${base}/shipping`)}">Open Shipments</a>`
+    : '🔗 Make the labels in the Shipments tab');
   return lines.join('\n');
 }
 

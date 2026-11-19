@@ -590,6 +590,9 @@ function ShippingPageInner() {
     } else {
       setActiveSection('shipments');
     }
+    // A Telegram alert links straight to one parcel.
+    const ship = searchParams.get('shipment');
+    if (ship && /^[1-9][0-9]{0,18}$/.test(ship)) setFocus({ id: ship, n: Date.now() });
   }, [searchParams]);
 
   useEffect(() => {

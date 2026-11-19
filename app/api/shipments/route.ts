@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
 /**
  * One day of Whatnot shipments (`?tab=11/9/26`, newest day by default), with
  * who made each label here and anything reported against it, plus a count
- * for every day so the page can step between them.
+ * for every day so the page can step between them. `?shipment=` picks the day
+ * that shipment is on, for links that point at one parcel.
  */
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -31,7 +32,9 @@ export async function GET(req: NextRequest) {
   const tabs = Array.from(tabMap.values()).sort((a, b) => tabTime(b.tab) - tabTime(a.tab));
 
   const asked = req.nextUrl.searchParams.get('tab');
-  const tab = asked && tabMap.has(asked) ? asked : tabs[0]?.tab ?? '';
+  const wanted = req.nextUrl.searchParams.get('shipment');
+  const tab = (wanted && all.find(r => r.shipmentId === wanted)?.tab)
+    || (asked && tabMap.has(asked) ? asked : tabs[0]?.tab ?? '');
   const rows = all.filter(r => r.tab === tab).sort(packingOrder);
 
   return NextResponse.json({ rows, tabs, tab, sync: queueSync(), whatnot: hasToken() });
