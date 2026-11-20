@@ -7,7 +7,7 @@ import { useTheme } from '@/lib/useTheme';
 import type { Role } from '@/lib/types';
 import ShipmentQueue from './queue';
 import Accountability from './accountability';
-import { I, Popover, Tip, Toasts } from './ui';
+import { I, Popover, Tip, Toasts, useToast } from './ui';
 import { ACTION_TEXT, type ShipmentRow } from './shipmentParts';
 
 type Session = { username: string; role: Role; name: string };
@@ -60,6 +60,21 @@ const emptyClaimForm = {
 
 type TrackResult = { status: string; description: string; city: string; state: string; date: string; time: string };
 
+/**
+ * A claim's date as a number to sort by. The sheet holds whatever was typed —
+ * 2026-10-30 from the form, 10/30/2026 by hand — so both are read; a row with
+ * no date sorts after every dated one.
+ */
+function dateValue(s?: string): number {
+  const t = (s ?? '').trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (m) return Date.UTC(m[3].length === 2 ? 2000 + +m[3] : +m[3], +m[1] - 1, +m[2]);
+  const p = Date.parse(t);
+  return Number.isNaN(p) ? -Infinity : p;
+}
+
 function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 'shipments' | 'accountability'>; isAdminOrManager: boolean }) {
   const [claims, setClaims] = useState<ClaimRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +92,17 @@ function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 
   const isUsps = type === 'usps';
   const isIncomplete = type === 'incomplete';
   const statusOptions = isUsps ? USPS_STATUSES : isIncomplete ? INCOMPLETE_STATUSES : CLAIM_STATUSES;
+  const toast = useToast();
+
+  // Finished claims live under their own tab, so the open list is what still needs doing.
+  const doneStatus = isUsps ? 'Approved' : 'Resolved';
+  const [view, setView] = useState<'open' | 'done'>('open');
+  useEffect(() => { setView('open'); }, [type]);
+  const dateOf = (c: ClaimRecord) => dateValue(isUsps ? c.dateSubmitted : c.dateOrder);
+  // Newest first; same day, the one added later first. (Two undated rows give NaN, which falls through.)
+  const sorted = [...claims].sort((a, b) => (dateOf(b) - dateOf(a)) || b.rowIndex - a.rowIndex);
+  const doneCount = sorted.filter(c => c.status === doneStatus).length;
+  const shown = sorted.filter(c => (c.status === doneStatus) === (view === 'done'));
 
   function openEdit(c: ClaimRecord) {
     setEditingIdx(c.rowIndex);
@@ -224,6 +250,10 @@ function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 
     });
     setSavingStatusIdx(null);
     setClaims(prev => prev.map(r => r.rowIndex === c.rowIndex ? { ...r, status } : r));
+    // The row leaves this tab, so say where it went.
+    if ((status === doneStatus) !== (c.status === doneStatus)) {
+      toast({ text: status === doneStatus ? `Moved to ${doneStatus}.` : 'Moved back to Open.' });
+    }
   }
 
   function statusColor(s: string) {
@@ -350,12 +380,37 @@ function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 
         )}
       </div>}
 
+      {/* Open / finished */}
+      <div role="tablist" aria-label={`${SECTION_LABELS[type]} by status`} className="inline-flex p-1 mb-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+        {(['open', 'done'] as const).map(v => {
+          const on = view === v;
+          const n = v === 'open' ? claims.length - doneCount : doneCount;
+          return (
+            <button key={v} role="tab" aria-selected={on} onClick={() => setView(v)}
+              className={`inline-flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${on
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}>
+              {v === 'open' ? 'Open' : doneStatus}
+              {!loading && (
+                <span className={`min-w-[1.5rem] px-1.5 rounded-full text-xs tabular-nums ${on
+                  ? (v === 'open' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300')
+                  : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>{n}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Records table */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-slate-400 text-sm">Loading...</div>
         ) : claims.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">No {SECTION_LABELS[type].toLowerCase()} yet</div>
+        ) : shown.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-sm">
+            {view === 'open' ? `Nothing open — every one is ${doneStatus.toLowerCase()}.` : `None ${doneStatus.toLowerCase()} yet.`}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -389,7 +444,7 @@ function ClaimsSection({ type, isAdminOrManager }: { type: Exclude<SectionType, 
                 </tr>
               </thead>
               <tbody>
-                {claims.map(c => {
+                {shown.map(c => {
                   const isEditing = editingIdx === c.rowIndex;
                   const inCls = 'text-xs px-2 py-1 border border-blue-300 dark:border-blue-600 rounded bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-full';
                   return (
