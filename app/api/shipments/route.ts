@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const rows = all.filter(r => inScope(r, scope)).sort(packingOrder);
   // Parcels whose show isn't known yet appear only under "All" until it is.
-  const unmatched = all.filter(r => !r.matched).length;
+  const unmatched = all.filter(r => !r.home).length;
 
   return NextResponse.json({ rows, scopes, scope, unmatched, sync: queueSync(), whatnot: hasToken() });
 }

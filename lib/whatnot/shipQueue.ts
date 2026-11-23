@@ -70,6 +70,12 @@ export type ShipmentLine = {
    * the next refresh fills it in.
    */
   showId?: string | null;
+  /**
+   * When the order was placed. The earliest order is the one that opened the
+   * parcel, and Seller Hub files the parcel under that order's show even
+   * after later wins are bundled in. Missing on lines read before this was kept.
+   */
+  orderAt?: string | null;
 };
 
 export type ShipmentContents = {
@@ -148,7 +154,7 @@ async function readContents(
     return { order, items };
   }));
   const byItem = new Map(orders.flatMap(({ order, items }) => items.map(i => [i.id, { order, item: i }] as const)));
-  const showOf = new Map(orders.map(({ order }) => [order.id, order.show_id ?? null]));
+  const orderOf = new Map(orders.map(({ order }) => [order.id, order]));
 
   const lines: ShipmentLine[] = [];
   for (const p of parts) {
@@ -158,7 +164,8 @@ async function readContents(
       lines.push({
         orderId: p.order_id, orderItemId: p.order_item_id, orderUrl: null,
         title: 'Item details unavailable', quantity: 1, price: 0, image: null, saleType: null,
-        showId: p.order_id ? showOf.get(p.order_id) : undefined,
+        showId: p.order_id && orderOf.has(p.order_id) ? orderOf.get(p.order_id)!.show_id ?? null : undefined,
+        orderAt: p.order_id && orderOf.has(p.order_id) ? orderOf.get(p.order_id)!.created_at ?? null : undefined,
       });
       continue;
     }
@@ -173,6 +180,7 @@ async function readContents(
       image: item.product_id ? await image(item.product_id) : null,
       saleType: order.transaction_type ?? null,
       showId: order.show_id ?? null,
+      orderAt: order.created_at ?? null,
     });
   }
   return {
@@ -281,11 +289,11 @@ export function refreshQueue(opts: { force?: boolean } = {}): Promise<void> {
 
 // ─── Which show each parcel came from ──────────────────────────────────────
 //
-// An order says which show it was won in, and contents read from now on keep
-// that. Lines read before then are filled in from the orders already stored
-// (the Telegram poll keeps those), asking Whatnot only for ones it lacks. The
-// shows themselves — title and start time, for the picker — come from the
-// same store, read once more while a show is still live or upcoming.
+// An order says which show it was won in and when, and contents read from now
+// on keep both. Lines read before then are filled in from the orders already
+// stored (the Telegram poll keeps those), asking Whatnot only for ones it
+// lacks. The shows themselves — title and start time, for the picker — come
+// from the same store, read once more while a show is still live or upcoming.
 
 /** Orders looked up per refresh for older lines; the rest wait. */
 const ORDERS_PER_RUN = 300;
@@ -296,28 +304,30 @@ const showReadAt = new Map<string, number>();
 async function fillShows(shipments: WnShipment[]): Promise<void> {
   const ids = new Set(shipments.map(s => s.id));
   const all = getContents();
-  const stale = Object.values(all).filter(c => ids.has(c.shipmentId) && c.lines.some(l => l.orderId && l.showId === undefined));
+  const lacks = (l: ShipmentLine) => Boolean(l.orderId) && (l.showId === undefined || l.orderAt === undefined);
+  const stale = Object.values(all).filter(c => ids.has(c.shipmentId) && c.lines.some(lacks));
 
   if (stale.length) {
-    const showOf = new Map<string, string | null>();
-    for (const o of store.getOrders()) showOf.set(o.id, o.show_id ?? null);
+    const orderOf = new Map<string, Pick<WnOrder, 'show_id' | 'created_at'>>();
+    for (const o of store.getOrders()) orderOf.set(o.id, o);
     const missing = Array.from(new Set(stale.flatMap(c => c.lines
-      .filter(l => l.orderId && l.showId === undefined && !showOf.has(l.orderId))
+      .filter(l => lacks(l) && !orderOf.has(l.orderId!))
       .map(l => l.orderId!)))).slice(0, ORDERS_PER_RUN);
     const fetched: WnOrder[] = [];
     await mapLimit(missing, 4, async id => {
       try { fetched.push(await whatnot.getOrder(id)); } catch { /* next refresh */ }
     });
     if (fetched.length) store.putOrders(fetched);
-    for (const o of fetched) showOf.set(o.id, o.show_id ?? null);
+    for (const o of fetched) orderOf.set(o.id, o);
 
     const changed: ShipmentContents[] = [];
     for (const c of stale) {
       let touched = false;
       const lines = c.lines.map(l => {
-        if (!l.orderId || l.showId !== undefined || !showOf.has(l.orderId)) return l;
+        const o = l.orderId ? orderOf.get(l.orderId) : undefined;
+        if (!lacks(l) || !o) return l;
         touched = true;
-        return { ...l, showId: showOf.get(l.orderId) ?? null };
+        return { ...l, showId: o.show_id ?? null, orderAt: o.created_at ?? null };
       });
       if (touched) changed.push({ ...c, lines });
     }

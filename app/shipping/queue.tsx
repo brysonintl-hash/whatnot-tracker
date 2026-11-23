@@ -14,7 +14,8 @@ import {
 
 type Session = { username: string; role: string; name: string };
 /** A show, the marketplace, or everything — what the picker lists. */
-type Scope = { id: string; kind: 'all' | 'marketplace' | 'show'; title: string; startAt: string | null; total: number; needsLabel: number };
+/** `pending`: not shipped yet — Seller Hub's "Pending Shipments" — of which `needsLabel` have no label. */
+type Scope = { id: string; kind: 'all' | 'marketplace' | 'show'; title: string; startAt: string | null; total: number; pending: number; needsLabel: number };
 type QueueSync = { refreshedAt: string | null; running: boolean; error: string | null; pendingContents: number };
 type View = 'all' | 'mine';
 type WnFilter = 'needs-label' | 'ready' | 'shipped';
@@ -411,7 +412,7 @@ export default function ShipmentQueue({
     <div className="space-y-5">
       {/* ── Filter bar ── */}
       <div className="flex flex-wrap items-center gap-2.5">
-        <Tip className="max-w-full min-w-0" content={current ? `${plural(current.total, 'shipment')} ${scopeWord(current)} · ${current.needsLabel} still need a label. Click to pick another show.` : 'Pick a show'}>
+        <Tip className="max-w-full min-w-0" content={current ? `${plural(current.total, 'shipment')} ${scopeWord(current)} · ${current.pending} not shipped yet, ${current.needsLabel} of them still need a label. Click to pick another show.` : 'Pick a show'}>
           <button ref={pickerBtn} onClick={() => setPickerOpen(o => !o)} aria-haspopup="dialog" aria-expanded={pickerOpen}
             className={`${chipBase} max-w-full min-w-0 bg-slate-900 border-slate-900 text-white hover:bg-slate-700 dark:bg-white dark:border-white dark:text-slate-900 dark:hover:bg-slate-200 shadow-sm`}>
             <I.calendar className="w-[18px] h-[18px] opacity-70 flex-shrink-0" />
@@ -436,12 +437,16 @@ export default function ShipmentQueue({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-900 dark:text-white truncate">{sc.title}</span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{scopeSub(sc)} · {plural(sc.total, 'shipment')}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {scopeSub(sc)} · {plural(sc.total, 'shipment')}
+                      {sc.needsLabel > 0 && <span className="text-orange-700 dark:text-orange-300"> · {sc.needsLabel} need label</span>}
+                    </span>
                   </span>
-                  {sc.needsLabel > 0 ? (
-                    <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-md bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 tabular-nums whitespace-nowrap">{sc.needsLabel} need label</span>
+                  {/* Seller Hub's words, so the two lists can be checked against each other. */}
+                  {sc.pending > 0 ? (
+                    <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-md bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 tabular-nums whitespace-nowrap">{sc.pending} pending</span>
                   ) : (
-                    <span className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 whitespace-nowrap"><I.check className="w-3.5 h-3.5" />All labelled</span>
+                    <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 whitespace-nowrap">Shipping complete</span>
                   )}
                 </button>
               );
