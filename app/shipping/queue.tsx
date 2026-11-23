@@ -1,6 +1,6 @@
 'use client';
 
-// Shipments: one day's Whatnot parcels. Anyone on the shipping desk can open
+// Shipments: one show's Whatnot parcels. Anyone on the shipping desk can open
 // a row to check what's in the box, make the label, and print it — and
 // whoever makes the label is recorded on that shipment.
 
@@ -13,13 +13,28 @@ import {
 } from './shipmentParts';
 
 type Session = { username: string; role: string; name: string };
-type TabInfo = { tab: string; total: number; needsLabel: number };
+/** A show, the marketplace, or everything — what the picker lists. */
+type Scope = { id: string; kind: 'all' | 'marketplace' | 'show'; title: string; startAt: string | null; total: number; needsLabel: number };
 type QueueSync = { refreshedAt: string | null; running: boolean; error: string | null; pendingContents: number };
 type View = 'all' | 'mine';
 type WnFilter = 'needs-label' | 'ready' | 'shipped';
 type SortKey = 'newest' | 'oldest' | 'due' | 'packing' | 'value' | 'buyer';
 /** `by`: a username, 'whatnot' for labels made in Whatnot, or '' for anyone. */
 type Extra = { cancel: boolean; overdue: boolean; hazmat: boolean; problems: boolean; multi: boolean; by: string };
+
+/** Rows drawn at once; "All shows" over ten days runs to a thousand or more. */
+const PAGE = 100;
+
+const showWhen = (iso: string) => {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles', timeZoneName: 'short' });
+  return `${date} · ${time}`;
+};
+const scopeSub = (sc: Scope) =>
+  sc.kind === 'all' ? 'Last 10 days' : sc.kind === 'marketplace' ? 'Orders outside a live show' : sc.startAt ? showWhen(sc.startAt) : 'Start time unknown';
+const scopeWord = (sc: Scope | undefined) =>
+  !sc || sc.kind === 'all' ? 'in the last 10 days' : sc.kind === 'marketplace' ? 'from the marketplace' : 'in this show';
 
 const NO_EXTRA: Extra = { cancel: false, overdue: false, hazmat: false, problems: false, multi: false, by: '' };
 const omit = <T,>(o: Record<string, T>, k: string) => { const n = { ...o }; delete n[k]; return n; };
@@ -78,17 +93,18 @@ export default function ShipmentQueue({
 
   // ── Data ──
   const [rows, setRows] = useState<ShipmentRow[]>([]);
-  const [tabs, setTabs] = useState<TabInfo[]>([]);
-  const [tab, setTab] = useState('');
-  const tabRef = useRef('');
+  const [scopes, setScopes] = useState<Scope[]>([]);
+  const [scope, setScope] = useState('');
+  const scopeRef = useRef('');
+  const [unmatched, setUnmatched] = useState(0);
   const [sync, setSync] = useState<QueueSync | null>(null);
   const [whatnotOn, setWhatnotOn] = useState(true);
   const [loading, setLoading] = useState(true);
   const [people, setPeople] = useState<Person[]>([]);
 
-  const load = useCallback(async (t: string = tabRef.current, opts: { refresh?: boolean; shipment?: string } = {}) => {
+  const load = useCallback(async (t: string = scopeRef.current, opts: { refresh?: boolean; shipment?: string } = {}) => {
     const qs = new URLSearchParams();
-    if (t) qs.set('tab', t);
+    if (t) qs.set('scope', t);
     if (opts.refresh) qs.set('refresh', '1');
     if (opts.shipment) qs.set('shipment', opts.shipment);
     try {
@@ -96,10 +112,11 @@ export default function ShipmentQueue({
       const data = await res.json();
       if (res.ok) {
         setRows(Array.isArray(data.rows) ? data.rows : []);
-        setTabs(Array.isArray(data.tabs) ? data.tabs : []);
+        setScopes(Array.isArray(data.scopes) ? data.scopes : []);
+        setUnmatched(typeof data.unmatched === 'number' ? data.unmatched : 0);
         setSync(data.sync ?? null);
         setWhatnotOn(data.whatnot !== false);
-        if (typeof data.tab === 'string') { tabRef.current = data.tab; setTab(data.tab); }
+        if (typeof data.scope === 'string') { scopeRef.current = data.scope; setScope(data.scope); }
       }
     } catch { /* keep what's on screen; the next poll tries again */ }
     setLoading(false);
@@ -142,7 +159,7 @@ export default function ShipmentQueue({
     return c;
   }, [rows, mine, view]);
 
-  // People who made labels on this day, for the "Label made by" filter.
+  // People who made labels here, for the "Label made by" filter.
   const makers = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of rows) if (r.handler) m.set(r.handler.username, r.handler.name);
@@ -173,16 +190,23 @@ export default function ShipmentQueue({
   const baseCount = view === 'mine' ? mine.length : rows.length;
   function clearFilters() { setWnFilter(null); setExtra(NO_EXTRA); setSearch(''); }
 
-  // ── Days ──
-  const idx = tabs.findIndex(t => t.tab === tab);
-  const prevTab = idx >= 0 && idx < tabs.length - 1 ? tabs[idx + 1].tab : null;
-  const nextTab = idx > 0 ? tabs[idx - 1].tab : null;
-  function goTo(t: string) {
-    tabRef.current = t;
-    setTab(t);
+  // ── Shows ──
+  const current = scopes.find(x => x.id === scope);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerBtn = useRef<HTMLButtonElement>(null);
+  function pickScope(id: string) {
+    setPickerOpen(false);
+    if (id === scopeRef.current) return;
+    scopeRef.current = id;
+    setScope(id);
     setExpanded(new Set());
-    load(t);
+    setLoading(true);
+    load(id);
   }
+
+  // Draw a page of rows at a time; a new show or filter starts from the top.
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => { setLimit(PAGE); }, [scope, view, wnFilter, extra, search, sort]);
 
   // ── Rows opened ──
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -380,29 +404,60 @@ export default function ShipmentQueue({
     ...makers.map(([u, n]) => ({ value: u, label: n })),
     { value: 'whatnot', label: 'Made in Whatnot' },
   ];
-  const navBtn = `${chipBase} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed`;
+  // A rule under "All" and "Marketplace", above the shows.
+  const lastFixed = scopes.some(x => x.kind === 'show') ? scopes.filter(x => x.kind !== 'show').slice(-1)[0]?.id : undefined;
 
   return (
     <div className="space-y-5">
       {/* ── Filter bar ── */}
       <div className="flex flex-wrap items-center gap-2.5">
-        <div className="flex items-center gap-2">
-          <Tip content={prevTab ? `Go to ${prevTab}` : 'No earlier day'}>
-            <button onClick={() => prevTab && goTo(prevTab)} disabled={!prevTab} className={navBtn}><I.left className="w-4 h-4" />Prev</button>
-          </Tip>
-          <Tip content={idx >= 0 ? `${plural(tabs[idx].total, 'shipment')} this day · ${tabs[idx].needsLabel} still need a label` : 'No shipments yet'}>
-            <span className={`${chipBase} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-base font-bold min-w-[130px] justify-center`}>
-              <I.calendar className="w-[18px] h-[18px] text-slate-500" />{tab || '—'}
-            </span>
-          </Tip>
-          <Tip content={nextTab ? `Go to ${nextTab}` : 'This is the newest day'}>
-            <button onClick={() => nextTab && goTo(nextTab)} disabled={!nextTab} className={navBtn}>Next<I.chevron className="w-4 h-4" /></button>
-          </Tip>
-        </div>
+        <Tip className="max-w-full min-w-0" content={current ? `${plural(current.total, 'shipment')} ${scopeWord(current)} · ${current.needsLabel} still need a label. Click to pick another show.` : 'Pick a show'}>
+          <button ref={pickerBtn} onClick={() => setPickerOpen(o => !o)} aria-haspopup="dialog" aria-expanded={pickerOpen}
+            className={`${chipBase} max-w-full min-w-0 bg-slate-900 border-slate-900 text-white hover:bg-slate-700 dark:bg-white dark:border-white dark:text-slate-900 dark:hover:bg-slate-200 shadow-sm`}>
+            <I.calendar className="w-[18px] h-[18px] opacity-70 flex-shrink-0" />
+            <span className="truncate min-w-0 max-w-[16rem] sm:max-w-[22rem]">{current?.title ?? (loading ? 'Loading shows…' : 'No shipments yet')}</span>
+            {current?.kind === 'show' && current.startAt && (
+              <span className="font-medium opacity-75 whitespace-nowrap">{showWhen(current.startAt).replace(/, \d{4}/, '')}</span>
+            )}
+            <I.chevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${pickerOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </Tip>
+        <Popover open={pickerOpen} onClose={() => setPickerOpen(false)} anchor={pickerBtn} align="start" className="w-[min(30rem,calc(100vw-2rem))] p-1.5">
+          <div role="radiogroup" aria-label="Show" className="max-h-[min(28rem,60vh)] overflow-y-auto overscroll-contain">
+            {scopes.map(sc => {
+              const on = sc.id === scope;
+              return (
+                <button key={sc.id} role="radio" aria-checked={on} onClick={() => pickScope(sc.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40
+                    ${on ? 'bg-slate-100 dark:bg-slate-700/60' : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'}
+                    ${sc.id === lastFixed ? 'mb-1.5 relative after:absolute after:left-3 after:right-3 after:-bottom-1 after:h-px after:bg-slate-100 dark:after:bg-slate-700' : ''}`}>
+                  <span className={`w-[18px] h-[18px] rounded-full border-2 grid place-items-center flex-shrink-0 transition-colors ${on ? 'border-slate-900 dark:border-white' : 'border-slate-300 dark:border-slate-500'}`}>
+                    {on && <span className="w-2 h-2 rounded-full bg-slate-900 dark:bg-white" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-slate-900 dark:text-white truncate">{sc.title}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{scopeSub(sc)} · {plural(sc.total, 'shipment')}</span>
+                  </span>
+                  {sc.needsLabel > 0 ? (
+                    <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-md bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 tabular-nums whitespace-nowrap">{sc.needsLabel} need label</span>
+                  ) : (
+                    <span className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 whitespace-nowrap"><I.check className="w-3.5 h-3.5" />All labelled</span>
+                  )}
+                </button>
+              );
+            })}
+            {scopes.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">No shipments in the last 10 days.</p>}
+          </div>
+          {unmatched > 0 && (
+            <p className="mx-1.5 mt-1.5 mb-0.5 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 text-xs text-slate-500 dark:text-slate-400 leading-snug">
+              {plural(unmatched, 'shipment')} still being matched to a show — they&apos;re under All shows &amp; marketplace until then.
+            </p>
+          )}
+        </Popover>
 
         <div className="flex flex-wrap items-center gap-2">
           {([
-            { v: 'all' as const, label: 'All', n: counts.all, tip: 'Every shipment on this day' },
+            { v: 'all' as const, label: 'All', n: counts.all, tip: `Every shipment ${scopeWord(current)}` },
             { v: 'mine' as const, label: 'My Labels', n: counts.mine, tip: 'Shipments you made the label for' },
           ]).map(({ v, label, n, tip }) => {
             const on = view === v;
@@ -442,7 +497,7 @@ export default function ShipmentQueue({
               {sync?.error && <span className="block text-red-300 mt-1">Last check failed: {sync.error}</span>}
               <span className="block text-slate-400 mt-1">Refreshes every couple of minutes while this page is open. Click to refresh now.</span>
             </>}>
-              <button onClick={() => load(tabRef.current, { refresh: true })} disabled={sync?.running}
+              <button onClick={() => load(scopeRef.current, { refresh: true })} disabled={sync?.running}
                 className="inline-flex items-center gap-2 h-11 px-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors disabled:cursor-wait">
                 <I.refresh className={`w-5 h-5 ${busy ? 'animate-spin [animation-duration:1.4s]' : ''} ${sync?.error ? 'text-red-500' : ''}`} />
                 {sync?.running ? 'Checking Whatnot…' : `Updated ${ago(sync?.refreshedAt ?? null)}`}
@@ -543,20 +598,20 @@ export default function ShipmentQueue({
             <p className="font-semibold text-slate-700 dark:text-slate-200">
               {whatnotOn && sync?.running && rows.length === 0 ? 'Getting shipments from Whatnot…'
                 : filtered ? 'No shipments match'
-                : view === 'mine' ? 'You haven\'t made any labels on this day'
+                : view === 'mine' ? `You haven't made any labels ${scopeWord(current)}`
                 : 'No shipments found'}
             </p>
             <p className="text-sm text-slate-400 mt-1">
               {filtered ? 'Try a different filter or search.'
                 : view === 'mine' ? 'Labels you make here show up in this list.'
-                : whatnotOn && sync?.running ? 'The first load takes a few seconds.' : 'Try a different date.'}
+                : whatnotOn && sync?.running ? 'The first load takes a few seconds.' : 'Try a different show.'}
             </p>
             {filtered && <button onClick={clearFilters} className={`${btnGhost} mt-4`}>Clear filters</button>}
             {!filtered && view === 'mine' && rows.length > 0 && <button onClick={() => setView('all')} className={`${btnGhost} mt-4`}>See all shipments</button>}
           </div>
         ) : (
-          <div key={tab} className="p-2 space-y-1 animate-in fade-in duration-300 motion-reduce:animate-none">
-            {visible.map(r => {
+          <div key={scope} className="p-2 space-y-1 animate-in fade-in duration-300 motion-reduce:animate-none">
+            {visible.slice(0, limit).map(r => {
               const id = r.shipmentId;
               const open = expanded.has(id);
               const ph = phase[id];
@@ -627,6 +682,14 @@ export default function ShipmentQueue({
                 </div>
               );
             })}
+            {visible.length > limit && (
+              <div className="flex flex-col items-center gap-1 py-4">
+                <button onClick={() => setLimit(l => l + PAGE)} className={btnGhost}>
+                  Show {Math.min(PAGE, visible.length - limit)} more
+                </button>
+                <span className="text-xs text-slate-400">Showing {limit} of {visible.length}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

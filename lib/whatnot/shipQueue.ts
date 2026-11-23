@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from '
 import { join } from 'path';
 import { whatnot, hasToken, mapLimit } from './client';
 import * as store from './store';
-import { money, type WnShipment } from './types';
+import { money, type WnOrder, type WnShipment, type WnShow } from './types';
 import { BUSINESS_TZ } from '../hostDay';
 
 /** How far back the queue lists parcels. A label is due within a couple of days. */
@@ -64,6 +64,12 @@ export type ShipmentLine = {
   image: string | null;
   /** auction, buy_it_now, giveaway… as Whatnot names it. */
   saleType: string | null;
+  /**
+   * The live show the order was placed in; null for one placed anywhere else
+   * (the marketplace). Missing on lines read before shows were kept, until
+   * the next refresh fills it in.
+   */
+  showId?: string | null;
 };
 
 export type ShipmentContents = {
@@ -142,6 +148,7 @@ async function readContents(
     return { order, items };
   }));
   const byItem = new Map(orders.flatMap(({ order, items }) => items.map(i => [i.id, { order, item: i }] as const)));
+  const showOf = new Map(orders.map(({ order }) => [order.id, order.show_id ?? null]));
 
   const lines: ShipmentLine[] = [];
   for (const p of parts) {
@@ -151,6 +158,7 @@ async function readContents(
       lines.push({
         orderId: p.order_id, orderItemId: p.order_item_id, orderUrl: null,
         title: 'Item details unavailable', quantity: 1, price: 0, image: null, saleType: null,
+        showId: p.order_id ? showOf.get(p.order_id) : undefined,
       });
       continue;
     }
@@ -164,6 +172,7 @@ async function readContents(
       price: money(item.unit_price),
       image: item.product_id ? await image(item.product_id) : null,
       saleType: order.transaction_type ?? null,
+      showId: order.show_id ?? null,
     });
   }
   return {
@@ -259,6 +268,7 @@ export function refreshQueue(opts: { force?: boolean } = {}): Promise<void> {
       if (rows.length) store.putShipments(rows);
       sync.refreshedAt = new Date().toISOString();
       await fillContents(rows);
+      await fillShows(rows);
     } catch (e) {
       sync.error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -267,6 +277,71 @@ export function refreshQueue(opts: { force?: boolean } = {}): Promise<void> {
     }
   })();
   return inflight;
+}
+
+// ─── Which show each parcel came from ──────────────────────────────────────
+//
+// An order says which show it was won in, and contents read from now on keep
+// that. Lines read before then are filled in from the orders already stored
+// (the Telegram poll keeps those), asking Whatnot only for ones it lacks. The
+// shows themselves — title and start time, for the picker — come from the
+// same store, read once more while a show is still live or upcoming.
+
+/** Orders looked up per refresh for older lines; the rest wait. */
+const ORDERS_PER_RUN = 300;
+/** A show not yet ended is read again at most this often. */
+const OPEN_SHOW_GAP_MS = 10 * 60_000;
+const showReadAt = new Map<string, number>();
+
+async function fillShows(shipments: WnShipment[]): Promise<void> {
+  const ids = new Set(shipments.map(s => s.id));
+  const all = getContents();
+  const stale = Object.values(all).filter(c => ids.has(c.shipmentId) && c.lines.some(l => l.orderId && l.showId === undefined));
+
+  if (stale.length) {
+    const showOf = new Map<string, string | null>();
+    for (const o of store.getOrders()) showOf.set(o.id, o.show_id ?? null);
+    const missing = Array.from(new Set(stale.flatMap(c => c.lines
+      .filter(l => l.orderId && l.showId === undefined && !showOf.has(l.orderId))
+      .map(l => l.orderId!)))).slice(0, ORDERS_PER_RUN);
+    const fetched: WnOrder[] = [];
+    await mapLimit(missing, 4, async id => {
+      try { fetched.push(await whatnot.getOrder(id)); } catch { /* next refresh */ }
+    });
+    if (fetched.length) store.putOrders(fetched);
+    for (const o of fetched) showOf.set(o.id, o.show_id ?? null);
+
+    const changed: ShipmentContents[] = [];
+    for (const c of stale) {
+      let touched = false;
+      const lines = c.lines.map(l => {
+        if (!l.orderId || l.showId !== undefined || !showOf.has(l.orderId)) return l;
+        touched = true;
+        return { ...l, showId: showOf.get(l.orderId) ?? null };
+      });
+      if (touched) changed.push({ ...c, lines });
+    }
+    putContents(changed);
+  }
+
+  // Titles and start times for every show these parcels came from.
+  const wanted = new Set<string>();
+  for (const c of Object.values(getContents())) {
+    if (!ids.has(c.shipmentId)) continue;
+    for (const l of c.lines) if (l.showId) wanted.add(l.showId);
+  }
+  const known = new Map(store.getShows().map(sh => [sh.id, sh]));
+  const now = Date.now();
+  const todo = Array.from(wanted).filter(id => {
+    const sh = known.get(id);
+    if (!sh) return true;
+    return sh.status !== 'ended' && now - (showReadAt.get(id) ?? 0) > OPEN_SHOW_GAP_MS;
+  }).slice(0, 30);
+  const shows: WnShow[] = [];
+  await mapLimit(todo, 4, async id => {
+    try { shows.push(await whatnot.getShow(id)); showReadAt.set(id, now); } catch { /* next refresh */ }
+  });
+  if (shows.length) store.putShows(shows);
 }
 
 // ─── Presenting a parcel ───────────────────────────────────────────────────
